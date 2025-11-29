@@ -1,0 +1,5 @@
+{
+  "name": "Sigma Vie",
+  "description": "Một nền tảng thương mại điện tử thanh lịch và hiện đại dành cho cửa hàng thời trang. Mỗi sản phẩm đều có một mã QR duy nhất cho phép khách hàng dễ dàng đặt hàng qua email, giúp quy trình mua sắm trở nên tinh gọn.",
+  "requestFramePermissions": []
+}
