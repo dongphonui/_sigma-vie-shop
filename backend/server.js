@@ -9,14 +9,27 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
-// Cấu hình kết nối PostgreSQL từ biến môi trường
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'sigmavie_data',
-  password: process.env.DB_PASSWORD || 'Pgadmin@654321!', // Mật khẩu mặc định nếu không có .env
-  port: process.env.DB_PORT || 5432,
-});
+// --- CẤU HÌNH KẾT NỐI DATABASE (Update cho Render) ---
+// Nếu có DATABASE_URL (Render cung cấp), ưu tiên dùng nó.
+// Nếu không, dùng các biến lẻ (DB_USER, DB_HOST...) cho localhost.
+const isProduction = !!process.env.DATABASE_URL;
+
+const poolConfig = isProduction
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // Bắt buộc cho kết nối SSL trên Cloud (Render/Neon/Heroku)
+      }
+    }
+  : {
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'sigmavie_data',
+      password: process.env.DB_PASSWORD || 'Pgadmin@654321!',
+      port: process.env.DB_PORT || 5432,
+    };
+
+const pool = new Pool(poolConfig);
 
 // --- KHỞI TẠO DATABASE & BẢNG ---
 const initDb = async () => {
