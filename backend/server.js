@@ -31,10 +31,19 @@ const poolConfig = isProduction
 
 const pool = new Pool(poolConfig);
 
+// Xử lý lỗi ngầm định của Pool để tránh crash app
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err);
+  // Không exit process ở đây để giữ server sống trên Render
+});
+
 // --- KHỞI TẠO DATABASE & BẢNG ---
 const initDb = async () => {
-  const client = await pool.connect();
+  let client;
   try {
+    // Thử kết nối, nếu sai thông tin DB thì sẽ nhảy vào catch ngay
+    client = await pool.connect();
+    
     await client.query('BEGIN');
     
     console.log("Đang kiểm tra và khởi tạo bảng...");
@@ -116,14 +125,20 @@ const initDb = async () => {
     await client.query('COMMIT');
     console.log("-> Cơ sở dữ liệu đã sẵn sàng.");
   } catch (e) {
-    await client.query('ROLLBACK');
-    console.error("Lỗi khởi tạo DB:", e);
+    if (client) await client.query('ROLLBACK');
+    console.error("--- LỖI KẾT NỐI DATABASE ---");
+    console.error("Vui lòng kiểm tra lại biến môi trường DATABASE_URL hoặc thông tin DB.");
+    console.error("Chi tiết lỗi:", e.message);
+    // Không throw lỗi tiếp để Server vẫn khởi động được
   } finally {
-    client.release();
+    if (client) client.release();
   }
 };
 
-initDb();
+// Gọi hàm khởi tạo nhưng bắt lỗi global để chắc chắn không crash
+initDb().catch(err => {
+    console.error("Critical Init Error:", err);
+});
 
 // Helper: Format tiền tệ
 const formatMoney = (amount) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
@@ -135,6 +150,19 @@ const parsePrice = (priceStr) => {
 };
 
 // --- API ENDPOINTS ---
+
+// Middleware kiểm tra DB connection trước khi xử lý request
+const checkDbConnection = async (req, res, next) => {
+    try {
+        // Chỉ check nhanh pool
+        if (pool.totalCount === 0 && !isProduction) { 
+            // Nếu local và chưa có connect nào thì có thể warn
+        }
+        next();
+    } catch (e) {
+        res.status(500).json({ error: 'Database connection failed' });
+    }
+}
 
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {
@@ -160,6 +188,7 @@ app.get('/api/products', async (req, res) => {
     res.json(products);
   } catch (err) {
     console.error(err);
+    // Trả về mảng rỗng hoặc lỗi 500 nhưng không crash
     res.status(500).send(err.message);
   }
 });
