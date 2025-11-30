@@ -5,7 +5,7 @@ import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
 import { addToCart } from '../utils/cartStorage';
-import { sendEmail } from '../utils/apiClient';
+// import { sendEmail } from '../utils/apiClient'; // Tạm tắt
 
 interface ProductModalProps {
   product: Product;
@@ -98,51 +98,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       const result = createOrder(customer, productForOrder, quantity);
 
       if (result.success && result.order) {
+          // --- EMAIL TẠM TẮT ---
+          /* 
           if (managerEmail) {
-             const totalPriceFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(result.order.totalPrice);
-             
-             // Send Real Email
-             const subject = `Đơn hàng mới: ${product.name} - KH: ${customer.fullName}`;
-             const html = `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #e0e0e0; padding: 20px;">
-                    <h2 style="color: #00695C; border-bottom: 2px solid #D4AF37; padding-bottom: 10px;">Đơn hàng Đặt nhanh</h2>
-                    
-                    <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                        <h3 style="margin-top: 0;">Thông tin khách hàng</h3>
-                        <p><strong>Họ tên:</strong> ${customer.fullName}</p>
-                        <p><strong>Liên hệ:</strong> ${customer.email || customer.phoneNumber}</p>
-                        <p><strong>Địa chỉ:</strong> ${customer.address || 'Chưa cập nhật'}</p>
-                        <p><strong>Mã KH:</strong> ${customer.id}</p>
-                    </div>
-
-                    <h3 style="color: #00695C;">Chi tiết sản phẩm</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px; font-weight: bold;">Sản phẩm:</td>
-                            <td style="padding: 10px;">${product.name} (SKU: ${product.sku})</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px; font-weight: bold;">Đơn giá:</td>
-                            <td style="padding: 10px;">${productForOrder.price} ${isFlashSaleActive ? '(Giá Flash Sale)' : ''}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px; font-weight: bold;">Số lượng:</td>
-                            <td style="padding: 10px;">${quantity}</td>
-                        </tr>
-                        <tr style="background-color: #00695C; color: white;">
-                            <td style="padding: 10px; font-weight: bold;">TỔNG TIỀN:</td>
-                            <td style="padding: 10px; font-weight: bold; font-size: 18px;">${totalPriceFormatted}</td>
-                        </tr>
-                    </table>
-                    
-                    <div style="text-align: center; margin-top: 30px;">
-                        <a href="https://sigmavie-shop.vercel.app" style="background-color: #D4AF37; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Truy cập Admin Panel</a>
-                    </div>
-                </div>
-             `;
-
+             // Logic gửi email cũ ở đây
              await sendEmail(managerEmail, subject, html);
           }
+          */
           setOrderStatus('SUCCESS');
       } else {
           setFeedbackMsg(result.message);
@@ -167,8 +129,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                 <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-green-700 mb-2">Đặt hàng thành công!</h3>
                 <p className="text-gray-600 mb-6">
-                    Đơn hàng của bạn đã được ghi nhận. <br/>
-                    Email thông báo đã được gửi đến quản trị viên.
+                    Đơn hàng của bạn đã được ghi nhận vào hệ thống.<br/>
+                    Chúng tôi sẽ sớm liên hệ để xác nhận.
                 </p>
                 <button 
                     onClick={onClose}

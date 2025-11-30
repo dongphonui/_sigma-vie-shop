@@ -3,8 +3,8 @@ import React, { useMemo, useState } from 'react';
 import type { CartItem, Customer } from '../types';
 import { updateCartQuantity, removeFromCart, clearCart } from '../utils/cartStorage';
 import { createOrder } from '../utils/orderStorage';
-import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
-import { sendEmail } from '../utils/apiClient';
+// import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
+// import { sendEmail } from '../utils/apiClient';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -41,10 +41,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       }
 
       setIsProcessing(true);
-      const adminEmail = getPrimaryAdminEmail();
+      // const adminEmail = getPrimaryAdminEmail();
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
-      const emailItems: {name: string, quantity: number, price: string, total: string}[] = [];
+      // const emailItems: {name: string, quantity: number, price: string, total: string}[] = [];
 
       // Process orders for each item
       items.forEach(item => {
@@ -52,72 +52,30 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
           const result = createOrder(currentUser, item, item.quantity);
           if (result.success && result.order) {
               successfulOrders.push(`${item.name} (x${item.quantity})`);
+              /*
               emailItems.push({
                   name: item.name,
                   quantity: item.quantity,
                   price: formatPrice(item.selectedPrice),
                   total: formatPrice(item.selectedPrice * item.quantity)
               });
+              */
           } else {
               failedItems.push(item.name);
           }
       });
 
       if (successfulOrders.length > 0) {
-          // Send Real Email via Backend
+          // --- EMAIL TẠM TẮT ---
+          /*
           const subject = `Đơn hàng mới từ ${currentUser.fullName} - ${successfulOrders.length} sản phẩm`;
-          
-          const itemsHtml = emailItems.map(item => `
-            <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.quantity}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.price}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.total}</td>
-            </tr>
-          `).join('');
-
-          const html = `
-            <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; color: #333;">
-                <h2 style="color: #00695C; border-bottom: 2px solid #D4AF37; padding-bottom: 10px;">Đơn hàng mới - Giỏ hàng</h2>
-                
-                <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                    <h3 style="margin-top: 0;">Thông tin khách hàng</h3>
-                    <p><strong>Họ tên:</strong> ${currentUser.fullName}</p>
-                    <p><strong>Liên hệ:</strong> ${currentUser.email || currentUser.phoneNumber}</p>
-                    <p><strong>Địa chỉ:</strong> ${currentUser.address || 'Chưa cập nhật'}</p>
-                </div>
-
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                    <thead>
-                        <tr style="background-color: #00695C; color: white;">
-                            <th style="padding: 10px; text-align: left;">Sản phẩm</th>
-                            <th style="padding: 10px; text-align: left;">SL</th>
-                            <th style="padding: 10px; text-align: left;">Đơn giá</th>
-                            <th style="padding: 10px; text-align: left;">Thành tiền</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itemsHtml}
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold;">TỔNG CỘNG:</td>
-                            <td style="padding: 15px; font-weight: bold; color: #D4AF37; font-size: 18px;">${formatPrice(totalPrice)}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-
-                ${failedItems.length > 0 ? `<p style="color: red;"><strong>Lưu ý:</strong> Một số sản phẩm hết hàng: ${failedItems.join(', ')}</p>` : ''}
-                
-                <p style="text-align: center; font-size: 12px; color: #888; margin-top: 30px;">Email tự động từ hệ thống Sigma Vie.</p>
-            </div>
-          `;
-
+          const html = `...`; // (Removed for brevity)
           await sendEmail(adminEmail, subject, html);
+          */
           
           clearCart(); 
           onClose();
-          alert('Đơn hàng đã được tạo thành công! Thông báo đã gửi đến Email quản trị.');
+          alert('Đơn hàng đã được tạo thành công! (Chức năng gửi email tạm tắt)');
       } else {
           alert('Không thể tạo đơn hàng. Vui lòng kiểm tra lại tồn kho.');
       }
@@ -208,7 +166,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                     disabled={isProcessing}
                     className="w-full bg-[#00695C] text-white py-3 rounded-full font-bold shadow-lg hover:bg-[#004d40] transition-transform transform hover:-translate-y-0.5 disabled:opacity-70"
                 >
-                    {isProcessing ? 'Đang gửi...' : 'Tiến hành Đặt hàng'}
+                    {isProcessing ? 'Đang xử lý...' : 'Tiến hành Đặt hàng'}
                 </button>
             </div>
         )}

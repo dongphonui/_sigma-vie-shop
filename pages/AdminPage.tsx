@@ -645,31 +645,12 @@ const AdminPage: React.FC = () => {
     window.location.hash = path;
   };
 
+  // --- EMAIL TEST DISABLED ---
+  /*
   const handleTestEmail = async () => {
-      const emails = getAdminEmails();
-      if (emails.length === 0) return;
-      
-      const targetEmail = emails[0];
-      setSettingsFeedback(`Đang gửi email test đến ${targetEmail}...`);
-      
-      try {
-          const result = await sendEmail(
-              targetEmail, 
-              'Kiểm tra cấu hình Email Sigma Vie', 
-              '<div style="padding: 20px; font-family: sans-serif;"><h2>Kiểm tra thành công!</h2><p>Hệ thống gửi email của bạn đang hoạt động tốt.</p></div>'
-          );
-          
-          if (result && result.success) {
-              setSettingsFeedback('Thành công: Cấu hình Email hoạt động tốt!');
-          } else {
-              setSettingsFeedback(`Lỗi: ${result?.message || 'Gửi thất bại'}`);
-          }
-      } catch (e) {
-          setSettingsFeedback('Lỗi kết nối hoặc cấu hình.');
-      }
-      
-      setTimeout(() => setSettingsFeedback(''), 5000);
+      // Disabled logic
   };
+  */
 
   const renderDashboard = () => {
     if (!dashboardData) return <div>Đang tải dữ liệu...</div>;
@@ -1961,6 +1942,15 @@ const AdminPage: React.FC = () => {
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
                   <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
                   
+                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                      <p className="text-sm text-yellow-700 font-bold">
+                          ⚠️ Hệ thống Email đang tạm tắt. 
+                      </p>
+                      <p className="text-xs text-yellow-600">
+                          Mã OTP sẽ hiển thị trực tiếp khi đăng nhập.
+                      </p>
+                  </div>
+
                   <ul className="mb-4 space-y-2">
                       {adminEmails.map((email, idx) => (
                           <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
@@ -1982,16 +1972,7 @@ const AdminPage: React.FC = () => {
                       <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
                   
-                  <div className="mt-6 border-t pt-4">
-                      <button 
-                        onClick={handleTestEmail}
-                        className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                      >
-                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                         Gửi Email kiểm tra
-                      </button>
-                      <p className="text-xs text-gray-500 mt-2 text-center">Gửi mail test đến {adminEmails[0]} để xác nhận cấu hình Server.</p>
-                  </div>
+                  {/* Test Email Button Removed */}
               </div>
 
               {/* Social Media Links */}
