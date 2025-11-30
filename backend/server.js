@@ -216,8 +216,11 @@ app.post('/api/send-email', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Email configuration missing on server.' });
   }
 
+  // Lấy tên người gửi từ biến môi trường hoặc dùng mặc định
+  const senderName = process.env.EMAIL_FROM_NAME || "Sigma Vie Store";
+
   const mailOptions = {
-    from: `"Sigma Vie Store" <${process.env.EMAIL_USER}>`,
+    from: `"${senderName}" <${process.env.EMAIL_USER}>`,
     to: to,
     subject: subject,
     html: html
