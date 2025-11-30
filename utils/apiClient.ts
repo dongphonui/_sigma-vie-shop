@@ -71,6 +71,33 @@ export const syncCategoryToDB = (category: any) => syncData('categories', catego
 export const fetchCustomersFromDB = () => fetchData('customers');
 export const syncCustomerToDB = (customer: any) => syncData('customers', customer);
 
+export const updateCustomerInDB = async (customer: any) => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/customers/${customer.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(customer)
+        });
+        return await res.json();
+    } catch (error) {
+        console.warn('Không thể cập nhật khách hàng trên Server.');
+        return null;
+    }
+};
+
+export const deleteCustomerFromDB = async (id: string) => {
+    try {
+        const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
+            method: 'DELETE'
+        });
+        return await res.json();
+    } catch (error) {
+        console.warn('Không thể xóa khách hàng trên Server.');
+        return null;
+    }
+};
+
+
 // Orders
 export const fetchOrdersFromDB = () => fetchData('orders');
 export const syncOrderToDB = (order: any) => syncData('orders', order);

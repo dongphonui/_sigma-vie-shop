@@ -366,6 +366,34 @@ app.post('/api/customers/sync', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false }); }
 });
 
+// API Update Customer
+app.put('/api/customers/:id', async (req, res) => {
+    const id = req.params.id;
+    const { fullName, email, phoneNumber, address } = req.body;
+    try {
+        await pool.query(
+            `UPDATE customers SET full_name = $1, email = $2, phone_number = $3, address = $4 WHERE id = $5`,
+            [fullName, email, phoneNumber, address, id]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// API Delete Customer
+app.delete('/api/customers/:id', async (req, res) => {
+    const id = req.params.id;
+    try {
+        await pool.query('DELETE FROM customers WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // 4. ORDERS
 app.get('/api/orders', async (req, res) => {
   try {

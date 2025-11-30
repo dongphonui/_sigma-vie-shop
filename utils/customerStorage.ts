@@ -1,6 +1,6 @@
 
 import type { Customer } from '../types';
-import { fetchCustomersFromDB, syncCustomerToDB } from './apiClient';
+import { fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, deleteCustomerFromDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_customers';
 const SESSION_KEY = 'sigma_vie_current_customer';
@@ -76,6 +76,29 @@ export const registerCustomer = (data: {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(newCustomer));
   
   return { success: true, message: 'Đăng ký thành công!', customer: newCustomer };
+};
+
+export const updateCustomer = (updatedCustomer: Customer): void => {
+    const customers = getCustomers();
+    const index = customers.findIndex(c => c.id === updatedCustomer.id);
+    if (index !== -1) {
+        customers[index] = updatedCustomer;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+        updateCustomerInDB(updatedCustomer);
+        
+        // If updating current logged in user, update session as well
+        const currentUser = getCurrentCustomer();
+        if (currentUser && currentUser.id === updatedCustomer.id) {
+             sessionStorage.setItem(SESSION_KEY, JSON.stringify(updatedCustomer));
+        }
+    }
+};
+
+export const deleteCustomer = (id: string): void => {
+    const customers = getCustomers();
+    const updatedCustomers = customers.filter(c => c.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
+    deleteCustomerFromDB(id);
 };
 
 export const loginCustomer = (identifier: string, password: string): { success: boolean; message: string; customer?: Customer } => {

@@ -16,7 +16,7 @@ import { getDashboardMetrics, type DashboardData } from '../utils/analytics';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../utils/categoryStorage';
 import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
-import { getCustomers } from '../utils/customerStorage';
+import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { sendEmail } from '../utils/apiClient';
 
 
@@ -149,6 +149,14 @@ const AdminPage: React.FC = () => {
   // Customer State
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [editCustName, setEditCustName] = useState('');
+  const [editCustEmail, setEditCustEmail] = useState('');
+  const [editCustPhone, setEditCustPhone] = useState('');
+  const [editCustAddress, setEditCustAddress] = useState('');
+  const [customerFeedback, setCustomerFeedback] = useState('');
+
 
   // About Page State
   const [aboutContent, setAboutContent] = useState<AboutPageContent | null>(null);
@@ -433,6 +441,43 @@ const AdminPage: React.FC = () => {
       updateOrderStatus(orderId, newStatus);
       refreshOrders();
   };
+
+  // Customer Handlers
+  const handleEditCustomer = (customer: Customer) => {
+      setEditingCustomer(customer);
+      setEditCustName(customer.fullName);
+      setEditCustEmail(customer.email || '');
+      setEditCustPhone(customer.phoneNumber || '');
+      setEditCustAddress(customer.address || '');
+      setIsEditingCustomer(true);
+  };
+
+  const handleDeleteCustomer = (id: string, name: string) => {
+      if(window.confirm(`Bạn có chắc muốn xóa khách hàng "${name}"? Hành động này không thể hoàn tác.`)) {
+          deleteCustomer(id);
+          refreshCustomers();
+          setCustomerFeedback(`Đã xóa khách hàng ${name}.`);
+          setTimeout(() => setCustomerFeedback(''), 3000);
+      }
+  };
+
+  const handleSaveCustomer = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(editingCustomer) {
+          updateCustomer({
+              ...editingCustomer,
+              fullName: editCustName,
+              email: editCustEmail || undefined,
+              phoneNumber: editCustPhone || undefined,
+              address: editCustAddress
+          });
+          setCustomerFeedback('Cập nhật thông tin khách hàng thành công.');
+          setIsEditingCustomer(false);
+          setEditingCustomer(null);
+          refreshCustomers();
+          setTimeout(() => setCustomerFeedback(''), 3000);
+      }
+  }
 
   const handleInventorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -731,59 +776,139 @@ const AdminPage: React.FC = () => {
     );
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
-                <UsersIcon className="w-6 h-6"/> Quản lý Khách hàng
-            </h3>
+        <>
+            {/* Customer Edit Modal */}
+            {isEditingCustomer && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-fade-in-up">
+                        <h3 className="text-xl font-bold mb-4 text-gray-800">Chỉnh sửa Khách hàng</h3>
+                        <form onSubmit={handleSaveCustomer} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
+                                <input 
+                                    type="text" 
+                                    value={editCustName} 
+                                    onChange={(e) => setEditCustName(e.target.value)}
+                                    className="mt-1 block w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <input 
+                                    type="email" 
+                                    value={editCustEmail} 
+                                    onChange={(e) => setEditCustEmail(e.target.value)}
+                                    className="mt-1 block w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                                <input 
+                                    type="text" 
+                                    value={editCustPhone} 
+                                    onChange={(e) => setEditCustPhone(e.target.value)}
+                                    className="mt-1 block w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                                <textarea 
+                                    value={editCustAddress} 
+                                    onChange={(e) => setEditCustAddress(e.target.value)}
+                                    className="mt-1 block w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsEditingCustomer(false)}
+                                    className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
+                                >
+                                    Hủy
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="px-4 py-2 bg-[#00695C] text-white rounded hover:bg-[#004d40]"
+                                >
+                                    Lưu thay đổi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-            <div className="mb-6 relative max-w-md">
-                <input 
-                    type="text" 
-                    placeholder="Tìm kiếm khách hàng (Tên, Email, SĐT)..." 
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-                />
-                <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
-            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                    <UsersIcon className="w-6 h-6"/> Quản lý Khách hàng
+                </h3>
 
-            <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                    <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
-                        <tr>
-                            <th className="px-4 py-3">ID</th>
-                            <th className="px-4 py-3">Họ và tên</th>
-                            <th className="px-4 py-3">Liên hệ</th>
-                            <th className="px-4 py-3">Địa chỉ</th>
-                            <th className="px-4 py-3">Ngày đăng ký</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {filteredCustomers.map(customer => (
-                            <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-3 font-medium text-gray-900">{customer.id.split('-')[1] || customer.id}</td>
-                                <td className="px-4 py-3 font-semibold">{customer.fullName}</td>
-                                <td className="px-4 py-3">
-                                    <p>{customer.email || '---'}</p>
-                                    <p className="text-xs text-gray-500">{customer.phoneNumber || '---'}</p>
-                                </td>
-                                <td className="px-4 py-3 text-gray-600 truncate max-w-xs">{customer.address || 'Chưa cập nhật'}</td>
-                                <td className="px-4 py-3 text-gray-500">
-                                    {new Date(customer.createdAt).toLocaleDateString('vi-VN')}
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredCustomers.length === 0 && (
+                {customerFeedback && (
+                    <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-center">
+                        {customerFeedback}
+                    </div>
+                )}
+
+                <div className="mb-6 relative max-w-md">
+                    <input 
+                        type="text" 
+                        placeholder="Tìm kiếm khách hàng (Tên, Email, SĐT)..." 
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                    />
+                    <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                        <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
                             <tr>
-                                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                                    Không tìm thấy khách hàng nào.
-                                </td>
+                                <th className="px-4 py-3">ID</th>
+                                <th className="px-4 py-3">Họ và tên</th>
+                                <th className="px-4 py-3">Liên hệ</th>
+                                <th className="px-4 py-3">Địa chỉ</th>
+                                <th className="px-4 py-3">Ngày đăng ký</th>
+                                <th className="px-4 py-3 text-right">Hành động</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {filteredCustomers.map(customer => (
+                                <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-4 py-3 font-medium text-gray-900">{customer.id.split('-')[1] || customer.id}</td>
+                                    <td className="px-4 py-3 font-semibold">{customer.fullName}</td>
+                                    <td className="px-4 py-3">
+                                        <p>{customer.email || '---'}</p>
+                                        <p className="text-xs text-gray-500">{customer.phoneNumber || '---'}</p>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 truncate max-w-xs">{customer.address || 'Chưa cập nhật'}</td>
+                                    <td className="px-4 py-3 text-gray-500">
+                                        {new Date(customer.createdAt).toLocaleDateString('vi-VN')}
+                                    </td>
+                                    <td className="px-4 py-3 text-right">
+                                        <button onClick={() => handleEditCustomer(customer)} className="text-blue-600 hover:text-blue-800 mr-3 transition-colors" title="Sửa">
+                                            <EditIcon className="w-4 h-4 inline" />
+                                        </button>
+                                        <button onClick={() => handleDeleteCustomer(customer.id, customer.fullName)} className="text-red-600 hover:text-red-800 transition-colors" title="Xóa">
+                                            <Trash2Icon className="w-4 h-4 inline" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {filteredCustomers.length === 0 && (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                                        Không tìm thấy khách hàng nào.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </>
     );
   };
 
