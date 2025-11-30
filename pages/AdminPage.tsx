@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   LineChart, Line, AreaChart, Area
 } from 'recharts';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings } from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { getAdminEmails, addAdminEmail, removeAdminEmail } from '../utils/adminSettingsStorage';
@@ -16,6 +16,7 @@ import { getDashboardMetrics, type DashboardData } from '../utils/analytics';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../utils/categoryStorage';
 import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
+import { getCustomers } from '../utils/customerStorage';
 import { sendEmail } from '../utils/apiClient';
 
 
@@ -65,6 +66,10 @@ const UserIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 );
 
+const UsersIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+);
+
 const UserPlusIcon: React.FC<{className?: string, style?: React.CSSProperties}> = ({className, style}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
 );
@@ -84,7 +89,7 @@ const ChevronRightIcon: React.FC<{className?: string}> = ({className}) => (
 
 const AdminPage: React.FC = () => {
   // General State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -128,6 +133,10 @@ const AdminPage: React.FC = () => {
   const [orderSearch, setOrderSearch] = useState('');
   const [orderCurrentPage, setOrderCurrentPage] = useState(1);
   const ordersPerPage = 10;
+
+  // Customer State
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   // About Page State
   const [aboutContent, setAboutContent] = useState<AboutPageContent | null>(null);
@@ -173,6 +182,10 @@ const AdminPage: React.FC = () => {
   const refreshOrders = useCallback(() => {
       setOrders(getOrders());
   }, []);
+
+  const refreshCustomers = useCallback(() => {
+      setCustomers(getCustomers());
+  }, []);
   
   const refreshAboutPage = useCallback(() => {
     setAboutContent(getAboutPageContent());
@@ -204,13 +217,14 @@ const AdminPage: React.FC = () => {
     refreshProducts();
     refreshCategories();
     refreshOrders();
+    refreshCustomers();
     refreshAboutPage();
     refreshSettings();
     refreshHomeSettings();
     refreshHeaderSettings();
     refreshInventory();
     refreshDashboard();
-  }, [refreshProducts, refreshCategories, refreshOrders, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard]);
+  }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard]);
 
   // Re-calculate dashboard when transactions or products change
   useEffect(() => {
@@ -1104,6 +1118,75 @@ const AdminPage: React.FC = () => {
     );
   };
 
+  const renderCustomerManager = () => {
+      const filteredCustomers = customers.filter(c => 
+          c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
+          (c.email && c.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
+          (c.phoneNumber && c.phoneNumber.includes(customerSearch))
+      );
+
+      return (
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden animate-fade-in-up flex flex-col h-full">
+            <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between gap-4 bg-gray-50">
+                <div className="flex items-center gap-4">
+                    <h2 className="text-xl font-bold font-serif text-gray-800">Quản lý Khách hàng</h2>
+                    <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full">{filteredCustomers.length} người dùng</span>
+                </div>
+                <div className="flex flex-col md:flex-row gap-3">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Tìm tên, email, sđt..."
+                            value={customerSearch}
+                            onChange={(e) => setCustomerSearch(e.target.value)}
+                            className="pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-[#D4AF37] focus:border-[#D4AF37] w-full md:w-64"
+                        />
+                        <SearchIcon className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+                    </div>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-100">
+                        <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Họ và Tên</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Liên hệ</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Địa chỉ</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày đăng ký</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredCustomers.map(customer => (
+                            <tr key={customer.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-gray-200 rounded-full p-1"><UserIcon className="w-4 h-4 text-gray-600"/></div>
+                                        {customer.fullName}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600">
+                                    {customer.email && <div>Email: {customer.email}</div>}
+                                    {customer.phoneNumber && <div>SĐT: {customer.phoneNumber}</div>}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-500">
+                                    {customer.address || '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {new Date(customer.createdAt).toLocaleDateString('vi-VN')}
+                                </td>
+                            </tr>
+                        ))}
+                        {filteredCustomers.length === 0 && (
+                            <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">Không tìm thấy khách hàng nào.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      );
+  };
+
   const renderInventoryManager = () => {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in-up">
@@ -1950,6 +2033,12 @@ const AdminPage: React.FC = () => {
                 >
                     <PackageIcon className="w-5 h-5"/> Kho hàng
                 </button>
+                <button 
+                    onClick={() => setActiveTab('customers')}
+                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'customers' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                    <UsersIcon className="w-5 h-5"/> Khách hàng
+                </button>
                 
                 <div className="pt-4 pb-2">
                     <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Cấu hình Web</p>
@@ -1997,6 +2086,7 @@ const AdminPage: React.FC = () => {
                 {activeTab === 'products' && renderProductManager()}
                 {activeTab === 'orders' && renderOrderManager()}
                 {activeTab === 'inventory' && renderInventoryManager()}
+                {activeTab === 'customers' && renderCustomerManager()}
                 {activeTab === 'home' && renderHomePageManager()}
                 {activeTab === 'about' && renderAboutPageEditor()}
                 {activeTab === 'header' && renderHeaderManager()}
