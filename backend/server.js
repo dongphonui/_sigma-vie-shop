@@ -162,6 +162,7 @@ const parsePrice = (priceStr) => {
 
 // --- NODEMAILER CONFIGURATION ---
 // Sử dụng cấu hình SMTP chi tiết (Port 587 STARTTLS) để tránh timeout trên Render
+// Tăng timeout lên 60s để đảm bảo kết nối ổn định
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
@@ -173,9 +174,11 @@ const transporter = nodemailer.createTransport({
   tls: {
       rejectUnauthorized: false // Giúp tránh lỗi chứng chỉ trên một số môi trường proxy
   },
-  connectionTimeout: 10000, // 10 giây
-  greetingTimeout: 5000,
-  socketTimeout: 10000
+  connectionTimeout: 60000, // 60 giây (Tăng lên để fix ETIMEDOUT)
+  greetingTimeout: 30000,
+  socketTimeout: 60000,
+  logger: true, // Log chi tiết hoạt động SMTP
+  debug: true   // Bật chế độ debug
 });
 
 // --- VERIFY EMAIL CONNECTION ON STARTUP ---
