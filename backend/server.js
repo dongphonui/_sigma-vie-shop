@@ -31,6 +31,16 @@ const poolConfig = isProduction
 
 const pool = new Pool(poolConfig);
 
+// Log debug để kiểm tra kết nối
+if (isProduction) {
+    console.log("--- DEBUG CONNECTION ---");
+    // Che giấu mật khẩu trong log
+    const maskedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
+    console.log("Using DATABASE_URL:", maskedUrl);
+} else {
+    console.log("Using Local Config:", poolConfig.host);
+}
+
 // Xử lý lỗi ngầm định của Pool để tránh crash app
 pool.on('error', (err, client) => {
   console.error('Unexpected error on idle client', err);
@@ -218,6 +228,31 @@ app.post('/api/products/sync', async (req, res) => {
     const values = [p.sku, p.name, price, salePrice, importPrice, p.description, p.imageUrl, p.stock, p.category, p.brand, p.status, p.isFlashSale, fsStart, fsEnd];
     await pool.query(query, values);
     res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// NEW API: ATOMIC STOCK UPDATE (Quan trọng cho vấn đề Race Condition)
+app.post('/api/products/stock', async (req, res) => {
+  const { id, quantityChange } = req.body;
+  try {
+    // Sử dụng logic cộng dồn trực tiếp trên DB: stock = stock + $1
+    // Điều này đảm bảo tính toàn vẹn dữ liệu ngay cả khi có nhiều request cùng lúc
+    const query = `
+      UPDATE products
+      SET stock = stock + $1
+      WHERE id = $2
+      RETURNING stock;
+    `;
+    const result = await pool.query(query, [quantityChange, id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    res.json({ success: true, newStock: result.rows[0].stock });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: err.message });

@@ -1,7 +1,7 @@
 
 import { PRODUCTS } from '../constants';
 import type { Product } from '../types';
-import { fetchProductsFromDB, syncProductToDB } from './apiClient';
+import { fetchProductsFromDB, syncProductToDB, updateProductStockInDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_products';
 
@@ -22,17 +22,18 @@ export const getProducts = (): Product[] => {
     }
 
     // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API ngầm
+    // Cải tiến: Thêm timeout nhỏ để tránh conflict nếu vừa load trang
     if (!hasLoadedFromDB) {
-      fetchProductsFromDB().then(dbProducts => {
-        if (dbProducts && dbProducts.length > 0) {
-          console.log('Đã tải dữ liệu từ Postgres thành công!');
-          // Ghi đè LocalStorage bằng dữ liệu thật từ DB
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
-          hasLoadedFromDB = true;
-          // Dispatch event để báo hiệu cho các component cập nhật (nếu cần thiết)
-          // window.dispatchEvent(new Event('storage'));
-        }
-      });
+      setTimeout(() => {
+        fetchProductsFromDB().then(dbProducts => {
+          if (dbProducts && dbProducts.length > 0) {
+            console.log('Đã tải dữ liệu từ Postgres thành công!');
+            // Ghi đè LocalStorage bằng dữ liệu thật từ DB
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
+            hasLoadedFromDB = true;
+          }
+        });
+      }, 500);
       hasLoadedFromDB = true; 
     }
 
@@ -111,11 +112,17 @@ export const updateProductStock = (id: number, quantityChange: number): boolean 
 
     if (newStock < 0) return false;
 
+    // 1. Cập nhật Optimistic cho UI (Local Storage) để người dùng thấy ngay
     products[productIndex].stock = newStock;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
-    // Đồng bộ tồn kho lên DB
-    syncProductToDB(products[productIndex]);
+    // 2. Cập nhật Atomic lên Server (Quan trọng: Gửi +10, -5 chứ không gửi số tổng)
+    // Điều này giúp tránh việc ghi đè sai dữ liệu khi thao tác nhanh
+    updateProductStockInDB(id, quantityChange).then(response => {
+        if (response && response.success) {
+            console.log(`Đã cập nhật kho an toàn trên server. Tồn kho mới: ${response.newStock}`);
+        }
+    });
 
     return true;
 };

@@ -29,6 +29,21 @@ const syncData = async (endpoint: string, data: any) => {
   }
 };
 
+// Hàm cập nhật kho Atomic (Cộng dồn trực tiếp trên DB)
+export const updateProductStockInDB = async (id: number, quantityChange: number) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/products/stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, quantityChange })
+    });
+    return await res.json();
+  } catch (error) {
+    console.warn('Không thể cập nhật tồn kho trên Server.');
+    return null;
+  }
+};
+
 // Products
 export const fetchProductsFromDB = () => fetchData('products');
 export const syncProductToDB = (product: any) => syncData('products', product);
