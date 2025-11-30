@@ -4,6 +4,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors());
@@ -159,6 +160,15 @@ const parsePrice = (priceStr) => {
   return parseInt(numberStr, 10) || 0;
 };
 
+// --- NODEMAILER CONFIGURATION ---
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER, // e.g. dongphonui1975@gmail.com
+    pass: process.env.EMAIL_PASS  // App Password 16 ký tự
+  }
+});
+
 // --- API ENDPOINTS ---
 
 // Middleware kiểm tra DB connection trước khi xử lý request
@@ -173,6 +183,31 @@ const checkDbConnection = async (req, res, next) => {
         res.status(500).json({ error: 'Database connection failed' });
     }
 }
+
+// 0. SEND EMAIL API
+app.post('/api/send-email', async (req, res) => {
+  const { to, subject, html } = req.body;
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res.status(500).json({ success: false, message: 'Email configuration missing on server.' });
+  }
+
+  const mailOptions = {
+    from: `"Sigma Vie Store" <${process.env.EMAIL_USER}>`,
+    to: to,
+    subject: subject,
+    html: html
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Email sent successfully to ${to}`);
+    res.json({ success: true, message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ success: false, message: 'Failed to send email', error: error.message });
+  }
+});
 
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {

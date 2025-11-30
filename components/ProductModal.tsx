@@ -5,6 +5,7 @@ import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
 import { addToCart } from '../utils/cartStorage';
+import { sendEmail } from '../utils/apiClient';
 
 interface ProductModalProps {
   product: Product;
@@ -46,7 +47,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   
   // Order Logic State
   const [quantity, setQuantity] = useState(1);
-  const [orderStatus, setOrderStatus] = useState<'IDLE' | 'SUCCESS'>('IDLE');
+  const [orderStatus, setOrderStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS'>('IDLE');
   const [feedbackMsg, setFeedbackMsg] = useState('');
 
   useEffect(() => {
@@ -79,12 +80,14 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       setTimeout(() => setFeedbackMsg(''), 2000);
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
       const customer = getCurrentCustomer();
       if (!customer) {
           onOpenAuth();
           return;
       }
+
+      setOrderStatus('PROCESSING');
 
       // Use the sale price if available and active
       const productForOrder = { ...product };
@@ -95,33 +98,55 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       const result = createOrder(customer, productForOrder, quantity);
 
       if (result.success && result.order) {
-          setOrderStatus('SUCCESS');
-          
           if (managerEmail) {
              const totalPriceFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(result.order.totalPrice);
-             const subject = encodeURIComponent(`Đơn hàng mới: ${product.name} - KH: ${customer.fullName}`);
-             const body = encodeURIComponent(
-`THÔNG TIN ĐƠN HÀNG MỚI (Đặt nhanh)
-----------------------
-Sản phẩm: ${product.name} (SKU: ${product.sku})
-Đơn giá: ${productForOrder.price} ${isFlashSaleActive ? '(Giá Flash Sale)' : ''}
-Số lượng: ${quantity}
-Tổng tiền: ${totalPriceFormatted}
-
-THÔNG TIN KHÁCH HÀNG
---------------------
-Họ tên: ${customer.fullName}
-Liên hệ: ${customer.email || customer.phoneNumber}
-Địa chỉ: ${customer.address || 'Chưa cập nhật'}
-Mã KH: ${customer.id}
-
-Vui lòng xác nhận và giao hàng.`
-             );
              
-             window.location.href = `mailto:${managerEmail}?subject=${subject}&body=${body}`;
+             // Send Real Email
+             const subject = `Đơn hàng mới: ${product.name} - KH: ${customer.fullName}`;
+             const html = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #e0e0e0; padding: 20px;">
+                    <h2 style="color: #00695C; border-bottom: 2px solid #D4AF37; padding-bottom: 10px;">Đơn hàng Đặt nhanh</h2>
+                    
+                    <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                        <h3 style="margin-top: 0;">Thông tin khách hàng</h3>
+                        <p><strong>Họ tên:</strong> ${customer.fullName}</p>
+                        <p><strong>Liên hệ:</strong> ${customer.email || customer.phoneNumber}</p>
+                        <p><strong>Địa chỉ:</strong> ${customer.address || 'Chưa cập nhật'}</p>
+                        <p><strong>Mã KH:</strong> ${customer.id}</p>
+                    </div>
+
+                    <h3 style="color: #00695C;">Chi tiết sản phẩm</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px; font-weight: bold;">Sản phẩm:</td>
+                            <td style="padding: 10px;">${product.name} (SKU: ${product.sku})</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px; font-weight: bold;">Đơn giá:</td>
+                            <td style="padding: 10px;">${productForOrder.price} ${isFlashSaleActive ? '(Giá Flash Sale)' : ''}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 10px; font-weight: bold;">Số lượng:</td>
+                            <td style="padding: 10px;">${quantity}</td>
+                        </tr>
+                        <tr style="background-color: #00695C; color: white;">
+                            <td style="padding: 10px; font-weight: bold;">TỔNG TIỀN:</td>
+                            <td style="padding: 10px; font-weight: bold; font-size: 18px;">${totalPriceFormatted}</td>
+                        </tr>
+                    </table>
+                    
+                    <div style="text-align: center; margin-top: 30px;">
+                        <a href="https://sigmavie-shop.vercel.app" style="background-color: #D4AF37; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Truy cập Admin Panel</a>
+                    </div>
+                </div>
+             `;
+
+             await sendEmail(managerEmail, subject, html);
           }
+          setOrderStatus('SUCCESS');
       } else {
           setFeedbackMsg(result.message);
+          setOrderStatus('IDLE');
       }
   };
 
@@ -143,7 +168,7 @@ Vui lòng xác nhận và giao hàng.`
                 <h3 className="text-2xl font-bold text-green-700 mb-2">Đặt hàng thành công!</h3>
                 <p className="text-gray-600 mb-6">
                     Đơn hàng của bạn đã được ghi nhận. <br/>
-                    Ứng dụng email của bạn đã được mở để gửi chi tiết đến quản trị viên.
+                    Email thông báo đã được gửi đến quản trị viên.
                 </p>
                 <button 
                     onClick={onClose}
@@ -163,7 +188,7 @@ Vui lòng xác nhận và giao hàng.`
             <div className="flex items-center justify-center gap-4 mb-6">
                 <button 
                     onClick={() => handleQuantityChange(-1)}
-                    disabled={quantity <= 1}
+                    disabled={quantity <= 1 || orderStatus === 'PROCESSING'}
                     className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     -
@@ -173,7 +198,7 @@ Vui lòng xác nhận và giao hàng.`
                 </div>
                 <button 
                     onClick={() => handleQuantityChange(1)}
-                    disabled={quantity >= product.stock}
+                    disabled={quantity >= product.stock || orderStatus === 'PROCESSING'}
                     className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     +
@@ -184,7 +209,8 @@ Vui lòng xác nhận và giao hàng.`
             <div className="flex flex-col gap-3">
                  <button 
                     onClick={handleAddToCart}
-                    className="w-full text-[#00695C] border-2 border-[#00695C] font-bold py-3 px-8 rounded-full transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 hover:bg-teal-50"
+                    disabled={orderStatus === 'PROCESSING'}
+                    className="w-full text-[#00695C] border-2 border-[#00695C] font-bold py-3 px-8 rounded-full transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 hover:bg-teal-50 disabled:opacity-50"
                 >
                     <ShoppingCartIcon className="w-5 h-5" />
                     <span>Thêm vào Giỏ Hàng</span>
@@ -200,10 +226,11 @@ Vui lòng xác nhận và giao hàng.`
                 ) : (
                     <button 
                         onClick={handlePlaceOrder}
-                        className={`w-full text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 ${isFlashSaleActive ? 'bg-red-600 hover:bg-red-700' : 'bg-[#00695C] hover:bg-[#004d40]'}`}
+                        disabled={orderStatus === 'PROCESSING'}
+                        className={`w-full text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 ${isFlashSaleActive ? 'bg-red-600 hover:bg-red-700' : 'bg-[#00695C] hover:bg-[#004d40]'} disabled:opacity-70`}
                     >
                         {isFlashSaleActive && <LightningIcon className="w-5 h-5" />}
-                        <span>Mua ngay (Đặt nhanh)</span>
+                        <span>{orderStatus === 'PROCESSING' ? 'Đang xử lý...' : 'Mua ngay (Đặt nhanh)'}</span>
                     </button>
                 )}
             </div>

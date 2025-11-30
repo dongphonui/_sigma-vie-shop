@@ -44,6 +44,21 @@ export const updateProductStockInDB = async (id: number, quantityChange: number)
   }
 };
 
+// Hàm gửi email thật qua Backend
+export const sendEmail = async (to: string, subject: string, html: string) => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, html })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('Không thể gửi email:', error);
+    return { success: false, message: 'Lỗi kết nối khi gửi email.' };
+  }
+};
+
 // Products
 export const fetchProductsFromDB = () => fetchData('products');
 export const syncProductToDB = (product: any) => syncData('products', product);
