@@ -86,6 +86,18 @@ const ChevronRightIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 18l6-6-6-6"/></svg>
 );
 
+const CheckIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
+);
+
+const TruckIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+);
+
+const XCircleIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
@@ -614,7 +626,6 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
-  // ... (renderDashboard, renderCategoryManager, renderProductManager, renderOrderManager, renderInventoryManager, renderAboutPageEditor kept same) ...
   const renderDashboard = () => {
     if (!dashboardData) return <div>Đang tải dữ liệu...</div>;
 
@@ -689,16 +700,16 @@ const AdminPage: React.FC = () => {
                                 <tr key={p.id} className="bg-white border-b hover:bg-red-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">{p.name}</td>
                                     <td className="px-4 py-2">{p.sku}</td>
-                                    <td className="px-4 py-2 font-bold text-red-600">{p.stock}</td>
+                                    <td className="px-4 py-2 text-red-600 font-bold">{p.stock}</td>
                                     <td className="px-4 py-2">
                                         <button 
                                             onClick={() => {
-                                                setSelectedProductForInventory(p.id.toString());
                                                 setActiveTab('inventory');
+                                                setSelectedProductForInventory(p.id.toString());
                                             }}
                                             className="text-blue-600 hover:underline"
                                         >
-                                            Nhập hàng
+                                            Nhập kho
                                         </button>
                                     </td>
                                 </tr>
@@ -711,1409 +722,1319 @@ const AdminPage: React.FC = () => {
       </div>
     );
   };
+  
+  const renderCustomerManager = () => {
+    const filteredCustomers = customers.filter(c => 
+        c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
+        (c.email && c.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
+        (c.phoneNumber && c.phoneNumber.includes(customerSearch))
+    );
 
-  const renderCategoryManager = () => (
-    <div className="bg-white p-6 rounded-lg shadow-lg animate-fade-in-up">
-         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800">Quản lý Danh mục</h2>
-            <button onClick={() => { setIsManagingCategories(false); handleCancelEdit(); }} className="text-gray-500 hover:text-gray-700">
-                Quay lại Sản phẩm
-            </button>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-             {/* Form */}
-             <div className="lg:col-span-1 bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-bold mb-4">{editingCategory ? 'Cập nhật Danh mục' : 'Thêm Danh mục Mới'}</h3>
-                <form onSubmit={handleSaveCategory}>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tên Danh mục</label>
-                        <input 
-                            type="text" 
-                            value={newCategoryName}
-                            onChange={e => setNewCategoryName(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2"
-                            required
-                        />
-                    </div>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
-                        <textarea 
-                            value={newCategoryDesc}
-                            onChange={e => setNewCategoryDesc(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2"
-                            rows={3}
-                        />
-                    </div>
-                    <div className="flex gap-2">
-                         <button type="submit" className="flex-1 bg-[#00695C] text-white py-2 rounded-md hover:bg-[#004d40]">
-                            {editingCategory ? 'Lưu Cập nhật' : 'Thêm Mới'}
-                         </button>
-                         {editingCategory && (
-                             <button type="button" onClick={handleCancelEdit} className="px-4 border border-gray-300 rounded-md hover:bg-gray-100">Hủy</button>
-                         )}
-                    </div>
-                </form>
-             </div>
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                <UsersIcon className="w-6 h-6"/> Quản lý Khách hàng
+            </h3>
 
-             {/* List */}
-             <div className="lg:col-span-2 overflow-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
+            <div className="mb-6 relative max-w-md">
+                <input 
+                    type="text" 
+                    placeholder="Tìm kiếm khách hàng (Tên, Email, SĐT)..." 
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                />
+                <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+            </div>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                    <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mô tả</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hành động</th>
+                            <th className="px-4 py-3">ID</th>
+                            <th className="px-4 py-3">Họ và tên</th>
+                            <th className="px-4 py-3">Liên hệ</th>
+                            <th className="px-4 py-3">Địa chỉ</th>
+                            <th className="px-4 py-3">Ngày đăng ký</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                        {categories.map(cat => (
-                            <tr key={cat.id}>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{cat.name}</td>
-                                <td className="px-6 py-4 text-sm text-gray-500">{cat.description}</td>
-                                <td className="px-6 py-4 text-right text-sm font-medium">
-                                    <button onClick={() => handleEditCategory(cat)} className="text-blue-600 hover:text-blue-900 mr-4">Sửa</button>
-                                    <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="text-red-600 hover:text-red-900">Xóa</button>
+                        {filteredCustomers.map(customer => (
+                            <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-3 font-medium text-gray-900">{customer.id.split('-')[1] || customer.id}</td>
+                                <td className="px-4 py-3 font-semibold">{customer.fullName}</td>
+                                <td className="px-4 py-3">
+                                    <p>{customer.email || '---'}</p>
+                                    <p className="text-xs text-gray-500">{customer.phoneNumber || '---'}</p>
+                                </td>
+                                <td className="px-4 py-3 text-gray-600 truncate max-w-xs">{customer.address || 'Chưa cập nhật'}</td>
+                                <td className="px-4 py-3 text-gray-500">
+                                    {new Date(customer.createdAt).toLocaleDateString('vi-VN')}
                                 </td>
                             </tr>
                         ))}
-                    </tbody>
-                </table>
-             </div>
-        </div>
-    </div>
-  );
-
-  const renderProductManager = () => {
-    if (isManagingCategories) {
-        return renderCategoryManager();
-    }
-
-    const filteredProducts = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
-                              p.sku.toLowerCase().includes(productSearch.toLowerCase());
-        const matchesStatus = filterStatus === 'all' || p.status === filterStatus;
-        return matchesSearch && matchesStatus;
-    });
-
-    if (isAddingProduct) {
-        return (
-            <div className="bg-white p-8 rounded-lg shadow-lg animate-fade-in-up">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold font-serif text-gray-800">
-                        {editingProduct ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm Mới'}
-                    </h2>
-                    <button onClick={handleCancelProductEdit} className="text-gray-500 hover:text-gray-700">
-                        Hủy bỏ
-                    </button>
-                </div>
-                <form onSubmit={handleProductSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Sản phẩm</label>
-                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors">
-                            <div className="space-y-1 text-center">
-                                {newProductImage ? (
-                                    <div className="relative">
-                                        <img src={newProductImage} alt="Preview" className="mx-auto h-64 w-auto object-contain rounded-md shadow-sm" />
-                                        <button type="button" onClick={() => setNewProductImage(null)} className="absolute top-0 right-0 -mt-2 -mr-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"><Trash2Icon className="w-4 h-4" /></button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <ImagePlus className="mx-auto h-12 w-12 text-gray-400"/>
-                                        <div className="flex text-sm text-gray-600 justify-center">
-                                            <label htmlFor="image-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-[#D4AF37] hover:text-[#b89b31] focus-within:outline-none">
-                                                <span>Tải lên một tệp</span>
-                                                <input id="image-upload" name="image-upload" type="file" className="sr-only" onChange={handleProductImageUpload} onClick={(e) => (e.currentTarget.value = '')} accept="image/*" />
-                                            </label>
-                                        </div>
-                                        <p className="text-xs text-gray-500">PNG, JPG, GIF tối đa 10MB</p>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label htmlFor="name" className="block text-sm font-medium text-gray-700">Tên Sản phẩm <span className="text-red-500">*</span></label><input type="text" id="name" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="mt-1 block w-full input-style" required placeholder="VD: Áo Thun Premium" /></div>
-                            <div><label htmlFor="sku" className="block text-sm font-medium text-gray-700">Mã SKU</label><input type="text" id="sku" value={newProductSku} onChange={(e) => setNewProductSku(e.target.value)} className="mt-1 block w-full input-style" placeholder="VD: AT-001-BL" /></div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div><label htmlFor="price" className="block text-sm font-medium text-gray-700">Giá bán <span className="text-red-500">*</span></label><input type="text" id="price" value={newProductPrice} onChange={(e) => setNewProductPrice(e.target.value)} className="mt-1 block w-full input-style" required placeholder="VD: 500,000₫" /></div>
-                            <div><label htmlFor="importPrice" className="block text-sm font-medium text-gray-700">Giá nhập</label><input type="text" id="importPrice" value={newProductImportPrice} onChange={(e) => setNewProductImportPrice(e.target.value)} className="mt-1 block w-full input-style" placeholder="VD: 300,000₫" /></div>
-                            <div><label htmlFor="category" className="block text-sm font-medium text-gray-700">Danh mục</label><select id="category" value={newProductCategory} onChange={(e) => setNewProductCategory(e.target.value)} className="mt-1 block w-full input-style h-11"><option value="">-- Chọn danh mục --</option>{categories.map(cat => (<option key={cat.id} value={cat.name}>{cat.name}</option>))}</select></div>
-                        </div>
-                        <div className="bg-red-50 p-4 rounded-md border border-red-100">
-                            <div className="flex items-start gap-3 mb-3">
-                                <div className="flex items-center h-5"><input id="isFlashSale" type="checkbox" checked={newProductIsFlashSale} onChange={(e) => setNewProductIsFlashSale(e.target.checked)} className="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded" /></div>
-                                <div className="flex-1"><label htmlFor="isFlashSale" className="font-medium text-gray-700 flex items-center gap-2"><LightningIcon className="w-4 h-4 text-red-600" /> Bật Flash Sale</label></div>
-                            </div>
-                            {newProductIsFlashSale && (
-                                <div className="ml-7 space-y-3">
-                                    <div><label htmlFor="salePrice" className="block text-sm font-medium text-gray-700">Giá khuyến mãi</label><input type="text" id="salePrice" value={newProductSalePrice} onChange={(e) => setNewProductSalePrice(e.target.value)} className="mt-1 block w-full input-style border-red-300 focus:border-red-500 focus:ring-red-500" placeholder="VD: 350,000₫" /></div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div><label htmlFor="startTime" className="block text-sm font-medium text-gray-700">Bắt đầu</label><input type="datetime-local" id="startTime" value={newProductFlashSaleStartTime} onChange={(e) => setNewProductFlashSaleStartTime(e.target.value)} className="mt-1 block w-full input-style" /></div>
-                                        <div><label htmlFor="endTime" className="block text-sm font-medium text-gray-700">Kết thúc</label><input type="datetime-local" id="endTime" value={newProductFlashSaleEndTime} onChange={(e) => setNewProductFlashSaleEndTime(e.target.value)} className="mt-1 block w-full input-style" /></div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div><label htmlFor="brand" className="block text-sm font-medium text-gray-700">Thương hiệu</label><input type="text" id="brand" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} className="mt-1 block w-full input-style" placeholder="VD: Sigma Vie" /></div>
-                             <div><label htmlFor="status" className="block text-sm font-medium text-gray-700">Trạng thái</label><select id="status" value={newProductStatus} onChange={(e) => setNewProductStatus(e.target.value as any)} className="mt-1 block w-full input-style h-10"><option value="active">Đang kinh doanh</option><option value="draft">Nháp</option><option value="archived">Ngừng kinh doanh</option></select></div>
-                        </div>
-                        <div><label htmlFor="description" className="block text-sm font-medium text-gray-700">Mô tả chi tiết <span className="text-red-500">*</span></label><textarea id="description" value={newProductDescription} onChange={(e) => setNewProductDescription(e.target.value)} rows={4} className="mt-1 block w-full input-style" required placeholder="Mô tả chất liệu, kiểu dáng..." /></div>
-                        <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
-                            <button type="button" onClick={handleCancelProductEdit} className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Hủy</button>
-                            <button type="submit" className="py-2 px-6 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#00695C] hover:bg-[#004d40] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00695C]">{editingProduct ? 'Lưu Cập nhật' : 'Lưu Sản phẩm'}</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col h-[800px]">
-            <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50">
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <h2 className="text-xl font-bold font-serif text-gray-800">Quản lý Kho hàng & Sản phẩm</h2>
-                    <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full">{filteredProducts.length} sản phẩm</span>
-                </div>
-                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                    <div className="relative">
-                        <input type="text" placeholder="Tìm kiếm..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} className="pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-[#D4AF37] focus:border-[#D4AF37] w-full md:w-64" />
-                        <SearchIcon className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <FilterIcon className="w-4 h-4 text-gray-500"/>
-                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border border-gray-300 rounded-md text-sm py-2 pl-2 pr-8 focus:ring-[#D4AF37] focus:border-[#D4AF37]"><option value="all">Tất cả trạng thái</option><option value="active">Đang bán</option><option value="draft">Nháp</option><option value="archived">Ngừng bán</option></select>
-                    </div>
-                    <button onClick={() => setIsManagingCategories(true)} className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-all"><LayersIcon className="w-4 h-4"/> Quản lý Danh mục</button>
-                    <button onClick={() => setIsAddingProduct(true)} className="bg-[#D4AF37] hover:bg-[#b89b31] text-white py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-all"><span className="text-lg leading-none">+</span> Thêm mới</button>
-                </div>
-            </div>
-            {productFeedback && <div className={`p-3 text-sm text-center font-medium ${productFeedback.includes('xóa') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{productFeedback}</div>}
-            <div className="flex-1 overflow-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100 sticky top-0 z-10">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Ảnh</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Thông tin sản phẩm</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Danh mục</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tồn kho</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Giá bán</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Hành động</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredProducts.length > 0 ? filteredProducts.map((product) => (
-                            <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="h-12 w-12 rounded-md overflow-hidden border border-gray-200"><img className="h-full w-full object-cover" src={product.imageUrl} alt="" /></div>
-                                </td>
-                                <td className="px-6 py-4"><div className="flex flex-col"><span className="text-sm font-medium text-gray-900 line-clamp-1" title={product.name}>{product.name}</span><span className="text-xs text-gray-500">SKU: {product.sku}</span><span className="text-xs text-gray-400">{product.brand}</span>{product.isFlashSale && <span className="text-xs text-red-600 font-bold flex items-center mt-1"><LightningIcon className="w-3 h-3 mr-1"/> Flash Sale: {product.salePrice}</span>}</div></td>
-                                <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-50 text-blue-800">{product.category}</span></td>
-                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.status === 'active' ? 'bg-green-100 text-green-800' : product.status === 'draft' ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'}`}>{product.status === 'active' ? 'Đang bán' : product.status === 'draft' ? 'Nháp' : 'Ngừng bán'}</span></td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span className={product.stock < 5 ? 'text-red-600 font-bold' : ''}>{product.stock}</span></td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium"><div className="flex flex-col items-end"><span className={product.isFlashSale ? 'line-through text-gray-400 text-xs' : ''}>{product.price}</span>{product.isFlashSale && <span className="text-red-600 font-bold">{product.salePrice}</span>}</div></td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div className="flex justify-end gap-2">
-                                        <button onClick={() => handleEditProduct(product)} className="text-gray-400 hover:text-blue-600 transition-colors p-2 rounded-full hover:bg-blue-50" title="Sửa sản phẩm"><EditIcon className="w-5 h-5" /></button>
-                                        <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-gray-400 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50" title="Xóa sản phẩm"><Trash2Icon className="w-5 h-5" /></button>
-                                    </div>
+                        {filteredCustomers.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                                    Không tìm thấy khách hàng nào.
                                 </td>
                             </tr>
-                        )) : (<tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Không tìm thấy sản phẩm nào phù hợp.</td></tr>)}
+                        )}
                     </tbody>
                 </table>
             </div>
-            <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between"><span>Hiển thị {filteredProducts.length} kết quả</span><span>Dữ liệu được cập nhật theo thời gian thực</span></div>
         </div>
     );
   };
 
   const renderOrderManager = () => {
     const filteredOrders = orders.filter(order => {
-        const matchesSearch = order.id.toLowerCase().includes(orderSearch.toLowerCase()) || 
-                              order.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
-                              order.customerContact.toLowerCase().includes(orderSearch.toLowerCase());
-        const matchesStatus = orderFilterStatus === 'all' || order.status === orderFilterStatus;
-        return matchesSearch && matchesStatus;
+        const matchesSearch = order.id.toLowerCase().includes(orderSearch.toLowerCase()) ||
+                              order.customerName.toLowerCase().includes(orderSearch.toLowerCase());
+        const matchesFilter = orderFilterStatus === 'all' || order.status === orderFilterStatus;
+        return matchesSearch && matchesFilter;
     });
 
-    // Pagination Logic
     const indexOfLastOrder = orderCurrentPage * ordersPerPage;
     const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
     const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
     const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
 
-    const handleNextPage = () => {
-        if (orderCurrentPage < totalPages) {
-            setOrderCurrentPage(prev => prev + 1);
-        }
-    };
-
-    const handlePrevPage = () => {
-        if (orderCurrentPage > 1) {
-            setOrderCurrentPage(prev => prev - 1);
-        }
-    };
-
     return (
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden animate-fade-in-up flex flex-col h-full">
-         <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between gap-4 bg-gray-50">
-            <h2 className="text-xl font-bold font-serif text-gray-800">Quản lý Đơn hàng</h2>
-            <div className="flex flex-col md:flex-row gap-3">
-                 <input 
-                    type="text" 
-                    placeholder="Tìm đơn hàng, khách hàng..." 
-                    value={orderSearch}
-                    onChange={(e) => setOrderSearch(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-                 />
-                 <select 
-                    value={orderFilterStatus} 
+        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                <ClipboardListIcon className="w-6 h-6"/> Quản lý Đơn hàng
+            </h3>
+            
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <div className="relative flex-1">
+                     <input 
+                        type="text" 
+                        placeholder="Tìm kiếm đơn hàng..." 
+                        value={orderSearch}
+                        onChange={(e) => setOrderSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                     />
+                     <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+                </div>
+                <select 
+                    value={orderFilterStatus}
                     onChange={(e) => setOrderFilterStatus(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-                 >
+                    className="border rounded-lg px-4 py-2 focus:ring-[#D4AF37]"
+                >
                     <option value="all">Tất cả trạng thái</option>
                     <option value="PENDING">Chờ xử lý</option>
                     <option value="CONFIRMED">Đã xác nhận</option>
                     <option value="SHIPPED">Đã giao</option>
                     <option value="CANCELLED">Đã hủy</option>
-                 </select>
-            </div>
-         </div>
-         
-         <div className="overflow-x-auto">
-             <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-100">
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã ĐH</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày đặt</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                    {currentOrders.map(order => (
-                        <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{order.id}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                                <div className="font-medium">{order.customerName}</div>
-                                <div className="text-gray-500 text-xs">{order.customerContact}</div>
-                                <div className="text-gray-500 text-xs truncate max-w-xs" title={order.customerAddress}>{order.customerAddress}</div>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                                <div>{order.productName}</div>
-                                <div className="text-gray-500 text-xs">SL: {order.quantity}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(order.timestamp).toLocaleDateString('vi-VN')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                    ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
-                                      order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                                      order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' : 
-                                      'bg-gray-100 text-gray-800'}`}>
-                                    {order.status === 'PENDING' ? 'Chờ xử lý' : 
-                                     order.status === 'CONFIRMED' ? 'Đã xác nhận' :
-                                     order.status === 'SHIPPED' ? 'Đã giao' : 'Đã hủy'}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <select 
-                                    value={order.status}
-                                    onChange={(e) => handleOrderStatusChange(order.id, e.target.value as any)}
-                                    className="border border-gray-300 rounded text-xs py-1 px-2"
-                                >
-                                    <option value="PENDING">Chờ xử lý</option>
-                                    <option value="CONFIRMED">Xác nhận</option>
-                                    <option value="SHIPPED">Đã giao</option>
-                                    <option value="CANCELLED">Hủy</option>
-                                </select>
-                            </td>
-                        </tr>
-                    ))}
-                    {filteredOrders.length === 0 && (
-                        <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Không có đơn hàng nào.</td></tr>
-                    )}
-                </tbody>
-             </table>
-         </div>
-         
-         {/* Pagination Controls */}
-         {filteredOrders.length > ordersPerPage && (
-             <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                     <div>
-                         <p className="text-sm text-gray-700">
-                             Hiển thị <span className="font-medium">{indexOfFirstOrder + 1}</span> đến <span className="font-medium">{Math.min(indexOfLastOrder, filteredOrders.length)}</span> trong số <span className="font-medium">{filteredOrders.length}</span> đơn hàng
-                         </p>
-                     </div>
-                     <div>
-                         <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                             <button
-                                 onClick={handlePrevPage}
-                                 disabled={orderCurrentPage === 1}
-                                 className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                             >
-                                 <span className="sr-only">Previous</span>
-                                 <ChevronLeftIcon className="h-5 w-5" />
-                             </button>
-                             {/* Page Numbers */}
-                             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                <button
-                                    key={page}
-                                    onClick={() => setOrderCurrentPage(page)}
-                                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                                        orderCurrentPage === page
-                                            ? 'z-10 bg-[#00695C] border-[#00695C] text-white'
-                                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {page}
-                                </button>
-                             ))}
-                             <button
-                                 onClick={handleNextPage}
-                                 disabled={orderCurrentPage === totalPages}
-                                 className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                             >
-                                 <span className="sr-only">Next</span>
-                                 <ChevronRightIcon className="h-5 w-5" />
-                             </button>
-                         </nav>
-                     </div>
-                 </div>
-                 {/* Mobile Pagination View */}
-                 <div className="flex items-center justify-between sm:hidden w-full">
-                    <button
-                        onClick={handlePrevPage}
-                        disabled={orderCurrentPage === 1}
-                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                        Trước
-                    </button>
-                    <span className="text-sm text-gray-700">Trang {orderCurrentPage} / {totalPages}</span>
-                    <button
-                        onClick={handleNextPage}
-                        disabled={orderCurrentPage === totalPages}
-                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                        Sau
-                    </button>
-                 </div>
-             </div>
-         )}
-      </div>
-    );
-  };
-
-  const renderCustomerManager = () => {
-      const filteredCustomers = customers.filter(c => 
-          c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
-          (c.email && c.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
-          (c.phoneNumber && c.phoneNumber.includes(customerSearch))
-      );
-
-      return (
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden animate-fade-in-up flex flex-col h-full">
-            <div className="p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between gap-4 bg-gray-50">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-xl font-bold font-serif text-gray-800">Quản lý Khách hàng</h2>
-                    <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full">{filteredCustomers.length} người dùng</span>
-                </div>
-                <div className="flex flex-col md:flex-row gap-3">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Tìm tên, email, sđt..."
-                            value={customerSearch}
-                            onChange={(e) => setCustomerSearch(e.target.value)}
-                            className="pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-[#D4AF37] focus:border-[#D4AF37] w-full md:w-64"
-                        />
-                        <SearchIcon className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-                    </div>
-                </div>
+                </select>
             </div>
 
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
+                <table className="min-w-full text-left text-sm">
+                    <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Họ và Tên</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Liên hệ</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Địa chỉ</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày đăng ký</th>
+                            <th className="px-4 py-3">Mã Đơn</th>
+                            <th className="px-4 py-3">Khách hàng</th>
+                            <th className="px-4 py-3">Sản phẩm</th>
+                            <th className="px-4 py-3">Tổng tiền</th>
+                            <th className="px-4 py-3">Thời gian</th>
+                            <th className="px-4 py-3">Trạng thái</th>
+                            <th className="px-4 py-3 text-center">Thao tác</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredCustomers.map(customer => (
-                            <tr key={customer.id} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    <div className="flex items-center gap-2">
-                                        <div className="bg-gray-200 rounded-full p-1"><UserIcon className="w-4 h-4 text-gray-600"/></div>
-                                        {customer.fullName}
-                                    </div>
+                    <tbody className="divide-y divide-gray-200">
+                        {currentOrders.map(order => (
+                            <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-3 font-medium text-gray-900">{order.id}</td>
+                                <td className="px-4 py-3">
+                                    <p className="font-medium">{order.customerName}</p>
+                                    <p className="text-xs text-gray-500">{order.customerContact}</p>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-600">
-                                    {customer.email && <div>Email: {customer.email}</div>}
-                                    {customer.phoneNumber && <div>SĐT: {customer.phoneNumber}</div>}
+                                <td className="px-4 py-3">
+                                    <p>{order.productName}</p>
+                                    <p className="text-xs text-gray-500">SL: {order.quantity}</p>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-500">
-                                    {customer.address || '-'}
+                                <td className="px-4 py-3 font-medium text-[#00695C]">
+                                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice)}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {new Date(customer.createdAt).toLocaleDateString('vi-VN')}
+                                <td className="px-4 py-3 text-gray-500">
+                                    {new Date(order.timestamp).toLocaleDateString('vi-VN')}
+                                </td>
+                                <td className="px-4 py-3">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                        order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                        order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
+                                        order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' :
+                                        'bg-red-100 text-red-800'
+                                    }`}>
+                                        {order.status === 'PENDING' ? 'Chờ xử lý' :
+                                         order.status === 'CONFIRMED' ? 'Đã xác nhận' :
+                                         order.status === 'SHIPPED' ? 'Đã giao' : 'Đã hủy'}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                     <div className="flex items-center justify-center gap-2">
+                                        {order.status === 'PENDING' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'CONFIRMED')}
+                                                title="Xác nhận đơn hàng"
+                                                className="p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                                            >
+                                                <CheckIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {order.status === 'CONFIRMED' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'SHIPPED')}
+                                                title="Giao hàng"
+                                                className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                                            >
+                                                <TruckIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {order.status !== 'CANCELLED' && order.status !== 'SHIPPED' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'CANCELLED')}
+                                                title="Hủy đơn hàng"
+                                                className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                                            >
+                                                <XCircleIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                     </div>
                                 </td>
                             </tr>
                         ))}
-                        {filteredCustomers.length === 0 && (
-                            <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">Không tìm thấy khách hàng nào.</td></tr>
+                        {currentOrders.length === 0 && (
+                            <tr>
+                                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                                    Không tìm thấy đơn hàng nào.
+                                </td>
+                            </tr>
                         )}
                     </tbody>
                 </table>
             </div>
-        </div>
-      );
-  };
 
-  const renderInventoryManager = () => {
-    return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in-up">
-            <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg h-fit">
-                <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <PackageIcon className="w-5 h-5"/> Nhập/Xuất Kho
-                </h2>
-                
-                {inventoryFeedback && (
-                    <div className={`p-3 mb-4 text-sm rounded ${inventoryFeedback.includes('Lỗi') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                        {inventoryFeedback}
-                    </div>
-                )}
-
-                <form onSubmit={handleInventorySubmit}>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Loại giao dịch</label>
-                        <div className="flex rounded-md shadow-sm">
-                            <button
-                                type="button"
-                                onClick={() => setInventoryType('IMPORT')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-l-md border ${inventoryType === 'IMPORT' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                            >
-                                Nhập kho
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setInventoryType('EXPORT')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-r-md border ${inventoryType === 'EXPORT' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                            >
-                                Xuất kho
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm</label>
-                        <select 
-                            value={selectedProductForInventory} 
-                            onChange={(e) => setSelectedProductForInventory(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-                            required
-                        >
-                            <option value="">-- Chọn sản phẩm --</option>
-                            {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} (Hiện có: {p.stock})</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
-                        <input 
-                            type="number" 
-                            min="1"
-                            value={inventoryQuantity}
-                            onChange={(e) => setInventoryQuantity(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-                            required
-                        />
-                    </div>
-
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                        <textarea 
-                            value={inventoryNote}
-                            onChange={(e) => setInventoryNote(e.target.value)}
-                            className="w-full border border-gray-300 rounded-md p-2 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-                            rows={3}
-                            placeholder="VD: Nhập hàng mới, Xuất cho đơn hàng #123..."
-                        />
-                    </div>
-
-                    <button 
-                        type="submit" 
-                        className={`w-full py-2 px-4 rounded-md text-white font-medium shadow-sm ${inventoryType === 'IMPORT' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+             {totalPages > 1 && (
+                <div className="flex justify-center mt-6 gap-2">
+                    <button
+                        onClick={() => setOrderCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={orderCurrentPage === 1}
+                        className="p-2 border rounded hover:bg-gray-100 disabled:opacity-50"
                     >
-                        Xác nhận {inventoryType === 'IMPORT' ? 'Nhập' : 'Xuất'}
+                        <ChevronLeftIcon className="w-5 h-5" />
                     </button>
-                </form>
-            </div>
-
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-800">Lịch sử Giao dịch</h3>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Tìm kiếm..."
-                            value={inventorySearch}
-                            onChange={(e) => setInventorySearch(e.target.value)}
-                            className="border border-gray-300 rounded-md pl-8 pr-3 py-1 text-sm"
-                        />
-                        <SearchIcon className="w-4 h-4 text-gray-400 absolute left-2 top-1.5" />
-                    </div>
+                    <span className="px-4 py-2">Trang {orderCurrentPage} / {totalPages}</span>
+                    <button
+                        onClick={() => setOrderCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={orderCurrentPage === totalPages}
+                        className="p-2 border rounded hover:bg-gray-100 disabled:opacity-50"
+                    >
+                        <ChevronRightIcon className="w-5 h-5" />
+                    </button>
                 </div>
-                <div className="overflow-auto flex-1 max-h-[600px]">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-100 sticky top-0">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thời gian</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {transactions
-                                .filter(t => t.productName.toLowerCase().includes(inventorySearch.toLowerCase()) || (t.note && t.note.toLowerCase().includes(inventorySearch.toLowerCase())))
-                                .map(t => (
-                                <tr key={t.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {new Date(t.timestamp).toLocaleString('vi-VN')}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{t.productName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${t.type === 'IMPORT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                            {t.type === 'IMPORT' ? 'Nhập' : 'Xuất'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-700">
-                                        {t.quantity}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500 italic truncate max-w-xs" title={t.note}>
-                                        {t.note || '-'}
-                                    </td>
-                                </tr>
-                            ))}
-                            {transactions.length === 0 && (
-                                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Chưa có giao dịch nào.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            )}
         </div>
     );
   };
 
+  const renderCategoryManager = () => (
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up mb-8">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                <LayersIcon className="w-6 h-6"/> Quản lý Danh mục
+            </h3>
+
+             <form onSubmit={handleSaveCategory} className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Tên danh mục</label>
+                        <input
+                            type="text"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                            required
+                        />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700">Mô tả</label>
+                         <input
+                            type="text"
+                            value={newCategoryDesc}
+                            onChange={(e) => setNewCategoryDesc(e.target.value)}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                        />
+                    </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                    <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">
+                        {editingCategory ? 'Cập nhật Danh mục' : 'Thêm Danh mục'}
+                    </button>
+                    {editingCategory && (
+                        <button type="button" onClick={handleCancelEdit} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">
+                            Hủy bỏ
+                        </button>
+                    )}
+                </div>
+            </form>
+
+            <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                     <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                        <tr>
+                            <th className="px-4 py-3">Tên Danh mục</th>
+                            <th className="px-4 py-3">Mô tả</th>
+                             <th className="px-4 py-3 text-right">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                         {categories.map(cat => (
+                             <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
+                                 <td className="px-4 py-3 font-medium">{cat.name}</td>
+                                 <td className="px-4 py-3 text-gray-600">{cat.description}</td>
+                                 <td className="px-4 py-3 text-right">
+                                     <button onClick={() => handleEditCategory(cat)} className="text-blue-600 hover:text-blue-800 mr-3">
+                                         <EditIcon className="w-4 h-4 inline" />
+                                     </button>
+                                     <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="text-red-600 hover:text-red-800">
+                                          <Trash2Icon className="w-4 h-4 inline" />
+                                     </button>
+                                 </td>
+                             </tr>
+                         ))}
+                    </tbody>
+                </table>
+            </div>
+      </div>
+  );
+
+  const renderProductManager = () => (
+      <>
+        {productFeedback && (
+          <div className="mb-4 p-4 bg-blue-100 text-blue-700 rounded-lg animate-pulse text-center font-medium">
+            {productFeedback}
+          </div>
+        )}
+        
+        {/* Toggle between Product List and Add/Edit Form */}
+        {!isAddingProduct && !isManagingCategories ? (
+          <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+               <h3 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+                  <PackageIcon className="w-6 h-6"/> Danh sách Sản phẩm
+               </h3>
+               <div className="flex gap-2">
+                    <button 
+                        onClick={() => setIsManagingCategories(true)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-colors flex items-center gap-2"
+                    >
+                        <LayersIcon className="w-4 h-4" /> Quản lý Danh mục
+                    </button>
+                   <button 
+                        onClick={() => setIsAddingProduct(true)}
+                        className="bg-[#D4AF37] hover:bg-[#b89b31] text-white font-bold py-2 px-4 rounded transition-colors flex items-center gap-2"
+                   >
+                        <ImagePlus className="w-4 h-4"/> Thêm Sản phẩm
+                   </button>
+               </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <div className="relative flex-1">
+                     <input 
+                        type="text" 
+                        placeholder="Tìm kiếm sản phẩm..." 
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                     />
+                     <SearchIcon className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <FilterIcon className="w-5 h-5 text-gray-500" />
+                    <select 
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="border rounded-lg px-4 py-2 focus:ring-[#D4AF37]"
+                    >
+                        <option value="all">Tất cả trạng thái</option>
+                        <option value="active">Đang bán</option>
+                        <option value="draft">Nháp</option>
+                        <option value="archived">Lưu trữ</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                  <tr>
+                    <th className="px-4 py-3">Hình ảnh</th>
+                    <th className="px-4 py-3">Tên sản phẩm</th>
+                    <th className="px-4 py-3">SKU</th>
+                    <th className="px-4 py-3">Giá bán</th>
+                    <th className="px-4 py-3">Tồn kho</th>
+                    <th className="px-4 py-3">Trạng thái</th>
+                    <th className="px-4 py-3 text-right">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {products
+                    .filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) && (filterStatus === 'all' || p.status === filterStatus))
+                    .map(product => (
+                    <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <img src={product.imageUrl} alt={product.name} className="w-12 h-12 object-cover rounded shadow-sm" />
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                          {product.name}
+                          {product.isFlashSale && <span className="ml-2 text-xs bg-red-100 text-red-600 px-1 rounded font-bold">SALE</span>}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">{product.sku}</td>
+                      <td className="px-4 py-3 font-medium text-[#00695C]">{product.price}</td>
+                      <td className={`px-4 py-3 font-bold ${product.stock < 5 ? 'text-red-500' : 'text-gray-700'}`}>
+                          {product.stock}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            product.status === 'active' ? 'bg-green-100 text-green-800' : 
+                            product.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                            {product.status === 'active' ? 'Đang bán' : product.status === 'draft' ? 'Nháp' : 'Lưu trữ'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                         <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-3 transition-colors" title="Sửa">
+                           <EditIcon className="w-5 h-5 inline"/>
+                         </button>
+                        <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800 transition-colors" title="Xóa">
+                           <Trash2Icon className="w-5 h-5 inline"/>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {products.length === 0 && (
+                      <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                              Chưa có sản phẩm nào. Hãy thêm sản phẩm mới.
+                          </td>
+                      </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : isManagingCategories ? (
+            <div>
+                 <button 
+                    onClick={() => setIsManagingCategories(false)}
+                    className="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                >
+                    <ChevronLeftIcon className="w-4 h-4" /> Quay lại danh sách
+                </button>
+                {renderCategoryManager()}
+            </div>
+        ) : (
+          <div className="bg-white p-8 rounded-lg shadow-md animate-fade-in-up">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">
+                    {editingProduct ? 'Chỉnh sửa Sản phẩm' : 'Thêm Sản phẩm Mới'}
+                </h3>
+                <button onClick={handleCancelProductEdit} className="text-gray-500 hover:text-gray-700">
+                    <XCircleIcon className="w-6 h-6"/>
+                </button>
+             </div>
+             
+            <form onSubmit={handleProductSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tên sản phẩm *</label>
+                      <input
+                        type="text"
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                        placeholder="VD: Áo Thun Premium"
+                        required
+                      />
+                  </div>
+                   <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Mã kho) *</label>
+                      <input
+                        type="text"
+                        value={newProductSku}
+                        onChange={(e) => setNewProductSku(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                        placeholder="VD: AT-001-WHT"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Giá bán *</label>
+                      <input
+                        type="text"
+                        value={newProductPrice}
+                        onChange={(e) => setNewProductPrice(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                        placeholder="VD: 500,000₫"
+                        required
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Giá nhập (Chỉ Admin thấy)</label>
+                      <input
+                        type="text"
+                        value={newProductImportPrice}
+                        onChange={(e) => setNewProductImportPrice(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                        placeholder="VD: 200,000₫"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
+                      <select
+                          value={newProductCategory}
+                          onChange={(e) => setNewProductCategory(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                      >
+                          <option value="">Chọn danh mục</option>
+                          {categories.map(cat => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                      <select
+                          value={newProductStatus}
+                          onChange={(e) => setNewProductStatus(e.target.value as any)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                      >
+                          <option value="active">Đang bán</option>
+                          <option value="draft">Nháp</option>
+                          <option value="archived">Lưu trữ (Ẩn)</option>
+                      </select>
+                  </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả sản phẩm *</label>
+                <textarea
+                  value={newProductDescription}
+                  onChange={(e) => setNewProductDescription(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                  rows={4}
+                  placeholder="Mô tả chi tiết về chất liệu, kiểu dáng..."
+                  required
+                />
+              </div>
+
+              {/* Flash Sale Section */}
+              <div className="bg-red-50 p-6 rounded-lg border border-red-100">
+                  <div className="flex items-center gap-2 mb-4">
+                      <input 
+                        type="checkbox" 
+                        id="flashSale" 
+                        checked={newProductIsFlashSale}
+                        onChange={(e) => setNewProductIsFlashSale(e.target.checked)}
+                        className="w-4 h-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="flashSale" className="font-bold text-red-800 flex items-center gap-1">
+                          <LightningIcon className="w-4 h-4"/> Bật Flash Sale cho sản phẩm này
+                      </label>
+                  </div>
+                  
+                  {newProductIsFlashSale && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up">
+                           <div>
+                                <label className="block text-xs font-bold text-red-700 uppercase mb-1">Giá khuyến mãi</label>
+                                <input
+                                    type="text"
+                                    value={newProductSalePrice}
+                                    onChange={(e) => setNewProductSalePrice(e.target.value)}
+                                    className="w-full px-3 py-2 border border-red-200 rounded focus:ring-red-500 focus:border-red-500"
+                                    placeholder="VD: 300,000₫"
+                                />
+                           </div>
+                           <div>
+                                <label className="block text-xs font-bold text-red-700 uppercase mb-1">Bắt đầu</label>
+                                <input
+                                    type="datetime-local"
+                                    value={newProductFlashSaleStartTime}
+                                    onChange={(e) => setNewProductFlashSaleStartTime(e.target.value)}
+                                    className="w-full px-3 py-2 border border-red-200 rounded focus:ring-red-500 focus:border-red-500"
+                                />
+                           </div>
+                           <div>
+                                <label className="block text-xs font-bold text-red-700 uppercase mb-1">Kết thúc</label>
+                                <input
+                                    type="datetime-local"
+                                    value={newProductFlashSaleEndTime}
+                                    onChange={(e) => setNewProductFlashSaleEndTime(e.target.value)}
+                                    className="w-full px-3 py-2 border border-red-200 rounded focus:ring-red-500 focus:border-red-500"
+                                />
+                           </div>
+                      </div>
+                  )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hình ảnh sản phẩm *</label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-[#D4AF37] transition-colors">
+                  <div className="space-y-1 text-center">
+                    {newProductImage ? (
+                        <div className="relative inline-block">
+                             <img src={newProductImage} alt="Preview" className="h-48 object-contain rounded-md" />
+                             <button 
+                                type="button"
+                                onClick={() => setNewProductImage(null)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                             >
+                                 <XCircleIcon className="w-4 h-4"/>
+                             </button>
+                        </div>
+                    ) : (
+                        <>
+                            <ImagePlus className="mx-auto h-12 w-12 text-gray-400" />
+                            <div className="flex text-sm text-gray-600 justify-center">
+                            <label htmlFor="image-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-[#D4AF37] hover:text-[#b89b31] focus-within:outline-none">
+                                <span>Tải ảnh lên</span>
+                                <input id="image-upload" name="image-upload" type="file" className="sr-only" accept="image/*" onChange={handleProductImageUpload} />
+                            </label>
+                            <p className="pl-1">hoặc kéo thả vào đây</p>
+                            </div>
+                            <p className="text-xs text-gray-500">PNG, JPG, GIF lên đến 10MB</p>
+                        </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                 <button
+                  type="button"
+                  onClick={handleCancelProductEdit}
+                  className="px-6 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors"
+                >
+                  {editingProduct ? 'Lưu thay đổi' : 'Thêm sản phẩm'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </>
+  );
+  
+  const renderInventoryManager = () => (
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
+                <BarChart2 className="w-6 h-6"/> Quản lý Kho hàng
+            </h3>
+
+            {inventoryFeedback && (
+                 <div className={`mb-4 p-3 rounded text-center font-medium ${inventoryFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                     {inventoryFeedback}
+                 </div>
+            )}
+
+            <div className="flex border-b mb-6">
+                <button 
+                    onClick={() => setInventoryView('stock')}
+                    className={`px-4 py-2 font-medium ${inventoryView === 'stock' ? 'text-[#00695C] border-b-2 border-[#00695C]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    Nhập/Xuất Kho
+                </button>
+                <button 
+                    onClick={() => setInventoryView('history')}
+                    className={`px-4 py-2 font-medium ${inventoryView === 'history' ? 'text-[#00695C] border-b-2 border-[#00695C]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                    Lịch sử Giao dịch
+                </button>
+            </div>
+
+            {inventoryView === 'stock' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                         <h4 className="font-bold text-gray-700 mb-3">Thao tác kho</h4>
+                         <form onSubmit={handleInventorySubmit} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Loại giao dịch</label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="invType" 
+                                            value="IMPORT" 
+                                            checked={inventoryType === 'IMPORT'} 
+                                            onChange={() => setInventoryType('IMPORT')}
+                                            className="text-[#00695C] focus:ring-[#00695C]"
+                                        />
+                                        <span className="font-medium text-green-700">Nhập kho (+)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="invType" 
+                                            value="EXPORT" 
+                                            checked={inventoryType === 'EXPORT'} 
+                                            onChange={() => setInventoryType('EXPORT')}
+                                            className="text-red-600 focus:ring-red-600"
+                                        />
+                                        <span className="font-medium text-red-700">Xuất kho (-)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Chọn sản phẩm</label>
+                                <select 
+                                    value={selectedProductForInventory}
+                                    onChange={(e) => setSelectedProductForInventory(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                    required
+                                >
+                                    <option value="">-- Chọn sản phẩm --</option>
+                                    {products.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name} (Tồn: {p.stock})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    value={inventoryQuantity}
+                                    onChange={(e) => setInventoryQuantity(e.target.value)}
+                                    className="w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                    required
+                                />
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                                <input 
+                                    type="text"
+                                    value={inventoryNote}
+                                    onChange={(e) => setInventoryNote(e.target.value)}
+                                    placeholder="Lý do nhập/xuất..."
+                                    className="w-full px-3 py-2 border rounded focus:ring-[#D4AF37]"
+                                />
+                            </div>
+
+                            <button type="submit" className="w-full bg-[#00695C] text-white font-bold py-2 rounded hover:bg-[#004d40] transition-colors">
+                                Xác nhận
+                            </button>
+                         </form>
+                    </div>
+
+                    <div>
+                        <h4 className="font-bold text-gray-700 mb-3">Tồn kho hiện tại</h4>
+                        <div className="relative mb-3">
+                             <input 
+                                type="text" 
+                                placeholder="Tìm kiếm..." 
+                                value={inventorySearch}
+                                onChange={(e) => setInventorySearch(e.target.value)}
+                                className="w-full pl-8 pr-4 py-2 text-sm border rounded focus:ring-[#D4AF37]"
+                             />
+                             <SearchIcon className="w-4 h-4 text-gray-400 absolute left-2.5 top-2.5" />
+                        </div>
+                        <div className="bg-white border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+                            <table className="min-w-full text-sm text-left">
+                                <thead className="bg-gray-100 text-gray-700 sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-2">Sản phẩm</th>
+                                        <th className="px-4 py-2 text-right">Tồn kho</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {products
+                                        .filter(p => p.name.toLowerCase().includes(inventorySearch.toLowerCase()))
+                                        .map(p => (
+                                        <tr key={p.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-2">{p.name}</td>
+                                            <td className={`px-4 py-2 text-right font-bold ${p.stock < 10 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {p.stock}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                     <table className="min-w-full text-left text-sm">
+                        <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                            <tr>
+                                <th className="px-4 py-3">Thời gian</th>
+                                <th className="px-4 py-3">Loại</th>
+                                <th className="px-4 py-3">Sản phẩm</th>
+                                <th className="px-4 py-3 text-right">Số lượng</th>
+                                <th className="px-4 py-3">Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {transactions.map(t => (
+                                <tr key={t.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-gray-500">
+                                        {new Date(t.timestamp).toLocaleString('vi-VN')}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'IMPORT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {t.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-medium">{t.productName}</td>
+                                    <td className="px-4 py-3 text-right font-mono">{t.quantity}</td>
+                                    <td className="px-4 py-3 text-gray-500 italic">{t.note || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                     </table>
+                </div>
+            )}
+      </div>
+  );
+
   const renderAboutPageEditor = () => {
-    if (!aboutContent || !aboutSettings) return <div>Loading...</div>;
+    if (!aboutContent || !aboutSettings) return <div>Đang tải...</div>;
 
     return (
-        <div className="bg-white p-8 rounded-lg shadow-lg animate-fade-in-up">
-            <h2 className="text-2xl font-bold font-serif text-gray-800 mb-6">Chỉnh sửa Trang Giới Thiệu</h2>
-            {aboutFeedback && <div className="p-3 mb-6 bg-green-50 text-green-700 text-sm font-medium rounded">{aboutFeedback}</div>}
+        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
+                <EditIcon className="w-6 h-6"/> Chỉnh sửa trang Giới Thiệu
+            </h3>
             
             <form onSubmit={handleAboutSubmit} className="space-y-8">
-                {/* Hero Section */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-lg text-gray-700 mb-4">Phần Hero (Đầu trang)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* 1. Hero Section */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Phần Đầu Trang (Hero)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Tiêu đề chính</label>
-                            <input type="text" value={aboutContent.heroTitle} onChange={(e) => handleAboutContentChange('heroTitle', e.target.value)} className="mt-1 block w-full border p-2 rounded" />
+                            <label className="block text-sm font-medium text-gray-700">Tiêu đề lớn</label>
+                            <input type="text" value={aboutContent.heroTitle} onChange={(e) => handleAboutContentChange('heroTitle', e.target.value)} className="mt-1 w-full border rounded p-2" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Tiêu đề phụ</label>
-                            <input type="text" value={aboutContent.heroSubtitle} onChange={(e) => handleAboutContentChange('heroSubtitle', e.target.value)} className="mt-1 block w-full border p-2 rounded" />
+                             <label className="block text-sm font-medium text-gray-700">Tiêu đề phụ</label>
+                            <input type="text" value={aboutContent.heroSubtitle} onChange={(e) => handleAboutContentChange('heroSubtitle', e.target.value)} className="mt-1 w-full border rounded p-2" />
                         </div>
                         <div className="md:col-span-2">
                              <label className="block text-sm font-medium text-gray-700">Ảnh nền Hero</label>
-                             <div className="mt-2 flex items-center gap-4">
-                                <img src={aboutContent.heroImageUrl} alt="Hero Preview" className="h-20 w-32 object-cover rounded bg-gray-200" />
-                                <input type="file" onChange={(e) => handleAboutImageUpload(e, 'heroImageUrl')} className="text-sm" accept="image/*" />
-                             </div>
+                             <input type="file" accept="image/*" onChange={(e) => handleAboutImageUpload(e, 'heroImageUrl')} className="mt-1 w-full" />
+                             <img src={aboutContent.heroImageUrl} alt="Preview" className="h-32 object-cover mt-2 rounded" />
                         </div>
                     </div>
-                </div>
+                 </div>
 
-                {/* Welcome Section */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-lg text-gray-700 mb-4">Phần Chào mừng</h3>
+                 {/* 2. Welcome Section */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Lời Chào Mừng</h4>
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Tiêu đề chào mừng</label>
-                            <input type="text" value={aboutContent.welcomeHeadline} onChange={(e) => handleAboutContentChange('welcomeHeadline', e.target.value)} className="mt-1 block w-full border p-2 rounded" />
+                            <input type="text" value={aboutContent.welcomeHeadline} onChange={(e) => handleAboutContentChange('welcomeHeadline', e.target.value)} className="mt-1 w-full border rounded p-2" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Nội dung chào mừng</label>
-                            <textarea value={aboutContent.welcomeText} onChange={(e) => handleAboutContentChange('welcomeText', e.target.value)} rows={4} className="mt-1 block w-full border p-2 rounded" />
+                             <label className="block text-sm font-medium text-gray-700">Nội dung chào mừng</label>
+                            <textarea value={aboutContent.welcomeText} onChange={(e) => handleAboutContentChange('welcomeText', e.target.value)} rows={4} className="mt-1 w-full border rounded p-2" />
                         </div>
                     </div>
-                </div>
+                 </div>
 
-                {/* Philosophy Section */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-lg text-gray-700 mb-4">Phần Triết lý</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* 3. Philosophy Section */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Triết Lý Thương Hiệu</h4>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Tiêu đề</label>
-                            <input type="text" value={aboutContent.philosophyTitle} onChange={(e) => handleAboutContentChange('philosophyTitle', e.target.value)} className="mt-1 block w-full border p-2 rounded" />
+                            <label className="block text-sm font-medium text-gray-700">Tiêu đề triết lý</label>
+                            <input type="text" value={aboutContent.philosophyTitle} onChange={(e) => handleAboutContentChange('philosophyTitle', e.target.value)} className="mt-1 w-full border rounded p-2" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Đoạn văn 1</label>
-                            <textarea value={aboutContent.philosophyText1} onChange={(e) => handleAboutContentChange('philosophyText1', e.target.value)} rows={6} className="mt-1 block w-full border p-2 rounded" />
+                             <label className="block text-sm font-medium text-gray-700">Nội dung đoạn 1</label>
+                            <textarea value={aboutContent.philosophyText1} onChange={(e) => handleAboutContentChange('philosophyText1', e.target.value)} rows={5} className="mt-1 w-full border rounded p-2" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Đoạn văn 2</label>
-                            <textarea value={aboutContent.philosophyText2} onChange={(e) => handleAboutContentChange('philosophyText2', e.target.value)} rows={6} className="mt-1 block w-full border p-2 rounded" />
+                             <label className="block text-sm font-medium text-gray-700">Nội dung đoạn 2</label>
+                            <textarea value={aboutContent.philosophyText2} onChange={(e) => handleAboutContentChange('philosophyText2', e.target.value)} rows={5} className="mt-1 w-full border rounded p-2" />
                         </div>
-                         <div className="md:col-span-2">
+                        <div className="md:col-span-2">
                              <label className="block text-sm font-medium text-gray-700">Ảnh minh họa</label>
-                             <div className="mt-2 flex items-center gap-4">
-                                <img src={aboutContent.philosophyImageUrl} alt="Philosophy Preview" className="h-32 w-24 object-cover rounded bg-gray-200" />
-                                <input type="file" onChange={(e) => handleAboutImageUpload(e, 'philosophyImageUrl')} className="text-sm" accept="image/*" />
-                             </div>
+                             <input type="file" accept="image/*" onChange={(e) => handleAboutImageUpload(e, 'philosophyImageUrl')} className="mt-1 w-full" />
+                             <img src={aboutContent.philosophyImageUrl} alt="Preview" className="h-32 object-contain mt-2 rounded" />
                         </div>
                     </div>
-                </div>
-                
-                {/* Styling Settings */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-lg text-gray-700 mb-4">Cài đặt Giao diện (Styling)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                             <label className="block text-sm font-medium text-gray-700">Màu tiêu đề</label>
-                             <input type="color" value={aboutSettings.headingColor} onChange={(e) => handleAboutSettingsChange('headingColor', e.target.value)} className="mt-1 h-10 w-full rounded cursor-pointer" />
-                        </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700">Font tiêu đề</label>
-                             <select value={aboutSettings.headingFont} onChange={(e) => handleAboutSettingsChange('headingFont', e.target.value)} className="mt-1 block w-full border p-2 rounded h-10">
-                                <option value="Playfair Display">Playfair Display</option>
-                                <option value="Poppins">Poppins</option>
-                                <option value="Arial">Arial</option>
-                             </select>
-                        </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700">Màu văn bản</label>
-                             <input type="color" value={aboutSettings.paragraphColor} onChange={(e) => handleAboutSettingsChange('paragraphColor', e.target.value)} className="mt-1 h-10 w-full rounded cursor-pointer" />
-                        </div>
-                    </div>
-                </div>
+                 </div>
 
-                <div className="flex justify-end">
-                    <button type="submit" className="bg-[#00695C] text-white py-3 px-8 rounded-md hover:bg-[#004d40] font-bold shadow-md">
+                 {/* 4. Settings (Fonts & Colors) */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Cài đặt Giao diện</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Màu Tiêu đề</label>
+                            <input type="color" value={aboutSettings.headingColor} onChange={(e) => handleAboutSettingsChange('headingColor', e.target.value)} className="mt-1 w-full h-10 p-1 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Font Tiêu đề</label>
+                             <select value={aboutSettings.headingFont} onChange={(e) => handleAboutSettingsChange('headingFont', e.target.value)} className="mt-1 w-full border rounded p-2">
+                                <option value="Playfair Display">Playfair Display (Serif)</option>
+                                <option value="Poppins">Poppins (Sans-serif)</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700">Màu Nút Bấm</label>
+                            <input type="color" value={aboutSettings.buttonBgColor} onChange={(e) => handleAboutSettingsChange('buttonBgColor', e.target.value)} className="mt-1 w-full h-10 p-1 border rounded" />
+                        </div>
+                    </div>
+                 </div>
+
+                 <div className="flex justify-end pt-4">
+                    <button type="submit" className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-bold shadow hover:bg-[#b89b31] transition-transform transform hover:-translate-y-1">
                         Lưu Thay Đổi
                     </button>
-                </div>
+                 </div>
             </form>
+            {aboutFeedback && (
+                 <div className="mt-4 p-3 bg-green-100 text-green-700 rounded text-center font-medium animate-pulse">
+                     {aboutFeedback}
+                 </div>
+            )}
         </div>
     );
   };
 
-  const renderHomePageManager = () => {
+  const renderHomePageSettings = () => {
       if (!homeSettings) return <div>Loading...</div>;
-
-      const addPromoImage = () => {
-          if (!homeSettings.promoImageUrls) homeSettings.promoImageUrls = [];
-          handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, '']);
-      };
-
-      const updatePromoImage = (index: number, value: string) => {
-          const newImages = [...(homeSettings.promoImageUrls || [])];
-          newImages[index] = value;
-          handleHomePageSettingsChange('promoImageUrls', newImages);
-      };
-
-      const removePromoImage = (index: number) => {
-          const newImages = [...(homeSettings.promoImageUrls || [])];
-          newImages.splice(index, 1);
-          handleHomePageSettingsChange('promoImageUrls', newImages);
-      };
-
+      
       return (
-        <div className="bg-white p-8 rounded-lg shadow-lg animate-fade-in-up">
-            <h2 className="text-2xl font-bold font-serif text-gray-800 mb-6">Quản lý Trang Chủ</h2>
+        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
+                <EditIcon className="w-6 h-6"/> Tùy chỉnh Trang Chủ
+            </h3>
             
-            {/* --- HOME PAGE LIVE PREVIEW --- */}
-            <div className="mb-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Xem trước trực tiếp (Home Page Preview)
-                </div>
-                <div className="p-6 bg-[#F7F5F2] space-y-8">
-                    {/* 1. Headline Preview */}
-                    <div className="text-center">
-                        <h1 className="font-bold" style={{ color: homeSettings.headlineColor, fontFamily: homeSettings.headlineFont, fontSize: homeSettings.headlineSize || '3rem' }}>
-                            {homeSettings.headlineText}
-                        </h1>
-                        <p className="mt-2 text-lg" style={{ color: homeSettings.subtitleColor, fontFamily: homeSettings.subtitleFont }}>
-                            {homeSettings.subtitleText}
-                        </p>
-                    </div>
-
-                    {/* 2. Promo Banner Preview */}
-                    <div className="rounded-2xl overflow-hidden shadow-lg bg-white flex flex-col md:flex-row min-h-[300px]">
-                        <div className="md:w-1/2 relative bg-gray-200">
-                            {homeSettings.promoImageUrls && homeSettings.promoImageUrls.length > 0 ? (
-                                <img src={homeSettings.promoImageUrls[0]} alt="Promo Preview" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-400">No Image</div>
-                            )}
+            <form onSubmit={handleHomePageSubmit} className="space-y-8">
+                 {/* Hero Headline */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Tiêu đề chính (Headline)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">Nội dung tiêu đề</label>
+                            <input type="text" value={homeSettings.headlineText} onChange={(e) => handleHomePageSettingsChange('headlineText', e.target.value)} className="mt-1 w-full border rounded p-2" />
                         </div>
-                        <div className="md:w-1/2 p-8 flex flex-col justify-center" style={{ backgroundColor: homeSettings.promoBackgroundColor }}>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-bold px-2 py-1 rounded text-white uppercase" style={{ backgroundColor: homeSettings.promoAccentColor }}>{homeSettings.promoTag}</span>
-                                <span className="text-xs font-medium uppercase text-white/80">{homeSettings.promoSubTag}</span>
-                            </div>
-                            <h2 className="font-bold mb-4 leading-tight" style={{ fontFamily: homeSettings.promoTitleFont, color: homeSettings.promoTitleColor, fontSize: homeSettings.promoTitleSize || '2rem' }}>
-                                {homeSettings.promoTitle1} <br/> <span style={{ color: homeSettings.promoAccentColor }}>{homeSettings.promoTitleHighlight}</span> {homeSettings.promoTitle2}
-                            </h2>
-                            <p className="mb-6 font-light" style={{ fontFamily: homeSettings.promoDescriptionFont, color: homeSettings.promoDescriptionColor, fontSize: homeSettings.promoDescriptionSize || '1rem' }}>
-                                {homeSettings.promoDescription}
-                            </p>
-                            <div>
-                                <button className="font-semibold py-2 px-6 rounded-full shadow-lg" style={{ backgroundColor: homeSettings.promoButtonBgColor || homeSettings.promoAccentColor, color: homeSettings.promoButtonTextColor }}>
-                                    {homeSettings.promoButtonText}
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700">Màu chữ</label>
+                             <input type="color" value={homeSettings.headlineColor} onChange={(e) => handleHomePageSettingsChange('headlineColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700">Font chữ</label>
+                             <select value={homeSettings.headlineFont} onChange={(e) => handleHomePageSettingsChange('headlineFont', e.target.value)} className="mt-1 w-full border rounded p-2">
+                                <option value="Playfair Display">Serif (Playfair)</option>
+                                <option value="Poppins">Sans-serif (Poppins)</option>
+                             </select>
+                        </div>
+                         <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700">Nội dung phụ đề</label>
+                            <input type="text" value={homeSettings.subtitleText} onChange={(e) => handleHomePageSettingsChange('subtitleText', e.target.value)} className="mt-1 w-full border rounded p-2" />
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Promotion Section */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Banner Quảng cáo (Slider)</h4>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Danh sách Ảnh Banner (URL)</label>
+                            <div className="flex flex-col gap-2 mt-1">
+                                {homeSettings.promoImageUrls && homeSettings.promoImageUrls.map((url, idx) => (
+                                    <div key={idx} className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={url} 
+                                            onChange={(e) => {
+                                                const newUrls = [...homeSettings.promoImageUrls];
+                                                newUrls[idx] = e.target.value;
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }} 
+                                            className="w-full border rounded p-2"
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }}
+                                            className="text-red-500 font-bold px-2"
+                                        >X</button>
+                                    </div>
+                                ))}
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...(homeSettings.promoImageUrls || []), ''])}
+                                    className="self-start text-sm text-blue-600 hover:underline"
+                                >
+                                    + Thêm ảnh slide
                                 </button>
                             </div>
                         </div>
-                    </div>
-
-                    {/* 3. Registration Preview */}
-                    <div className="text-center p-8 rounded-2xl shadow-lg relative overflow-hidden" 
-                        style={{ 
-                            background: `linear-gradient(to right, ${homeSettings.regBgColorStart}, ${homeSettings.regBgColorEnd})`, 
-                            color: 'white',
-                            padding: homeSettings.regPadding || '3rem',
-                            borderRadius: homeSettings.regBorderRadius || '1rem'
-                        }}>
-                        <div className="relative z-10">
-                            <UserPlusIcon className="w-10 h-10 mx-auto mb-3" style={{ color: homeSettings.regButtonBgColor }}/>
-                            <h2 className="font-bold mb-2" style={{ color: homeSettings.regHeadlineColor, fontFamily: homeSettings.regHeadlineFont, fontSize: homeSettings.regHeadlineSize || '1.875rem' }}>{homeSettings.regHeadlineText}</h2>
-                            <p className="mb-6" style={{ color: homeSettings.regDescriptionColor, fontFamily: homeSettings.regDescriptionFont, fontSize: homeSettings.regDescriptionSize || '1.125rem' }}>{homeSettings.regDescriptionText}</p>
-                            <button className="font-bold py-2 px-6 shadow-lg" style={{ 
-                                backgroundColor: homeSettings.regButtonBgColor, 
-                                color: homeSettings.regButtonTextColor, 
-                                fontFamily: homeSettings.regButtonFont, 
-                                fontSize: homeSettings.regButtonFontSize, 
-                                borderRadius: '9999px' 
-                            }}>
-                                {homeSettings.regButtonText}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 4. Flash Sale Preview */}
-                    <div className="p-8 rounded-2xl shadow-lg" style={{ background: `linear-gradient(to right, ${homeSettings.flashSaleBgColorStart}, ${homeSettings.flashSaleBgColorEnd})` }}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <LightningIcon className="w-8 h-8" style={{ color: homeSettings.flashSaleTextColor }} />
-                            <h2 className="font-bold italic tracking-wider" style={{ color: homeSettings.flashSaleTitleColor, fontFamily: homeSettings.flashSaleTitleFont, fontSize: homeSettings.flashSaleTitleSize || '2rem' }}>{homeSettings.flashSaleTitleText || 'FLASH SALE'}</h2>
-                        </div>
-                        <div className="h-32 bg-white/10 rounded-lg flex items-center justify-center text-white/50 border-2 border-dashed border-white/20">
-                            [Product Grid Placeholder]
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {homeFeedback && <div className="p-3 mb-6 bg-green-50 text-green-700 text-sm font-medium rounded">{homeFeedback}</div>}
-
-            <form onSubmit={handleHomePageSubmit} className="space-y-8">
-                {/* Headline Section */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-700 mb-4">Tiêu đề chính</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                             <label className="block text-sm font-medium text-gray-700">Văn bản tiêu đề</label>
-                             <input type="text" value={homeSettings.headlineText} onChange={e => handleHomePageSettingsChange('headlineText', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-2 col-span-2">
+                        <div className="grid grid-cols-2 gap-4">
                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Màu chữ</label>
-                                <input type="color" value={homeSettings.headlineColor} onChange={e => handleHomePageSettingsChange('headlineColor', e.target.value)} className="mt-1 w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Font chữ</label>
-                                <select value={homeSettings.headlineFont} onChange={e => handleHomePageSettingsChange('headlineFont', e.target.value)} className="mt-1 w-full h-10 border rounded p-2">
-                                    <option value="Playfair Display">Playfair Display</option>
-                                    <option value="Poppins">Poppins</option>
-                                    <option value="Arial">Arial</option>
-                                </select>
-                             </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Cỡ chữ</label>
-                                <input type="text" value={homeSettings.headlineSize} onChange={e => handleHomePageSettingsChange('headlineSize', e.target.value)} className="mt-1 w-full h-10 border rounded p-2" placeholder="3rem" />
-                             </div>
-                        </div>
-
-                         <div className="col-span-2 border-t pt-4 mt-2">
-                             <label className="block text-sm font-medium text-gray-700">Văn bản phụ</label>
-                             <input type="text" value={homeSettings.subtitleText} onChange={e => handleHomePageSettingsChange('subtitleText', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 col-span-2">
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Màu chữ phụ</label>
-                                <input type="color" value={homeSettings.subtitleColor} onChange={e => handleHomePageSettingsChange('subtitleColor', e.target.value)} className="mt-1 w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Font chữ phụ</label>
-                                <select value={homeSettings.subtitleFont} onChange={e => handleHomePageSettingsChange('subtitleFont', e.target.value)} className="mt-1 w-full h-10 border rounded p-2">
-                                    <option value="Playfair Display">Playfair Display</option>
-                                    <option value="Poppins">Poppins</option>
-                                    <option value="Arial">Arial</option>
-                                </select>
-                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Promo Section */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-700 mb-4">Banner Khuyến mãi</h3>
-                    
-                    {/* Image Slider Management */}
-                    <div className="mb-4">
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh Banner (Slider)</label>
-                         {homeSettings.promoImageUrls && homeSettings.promoImageUrls.map((url, index) => (
-                             <div key={index} className="flex gap-2 mb-2">
-                                 <input 
-                                    type="text" 
-                                    value={url} 
-                                    onChange={e => updatePromoImage(index, e.target.value)} 
-                                    className="flex-1 border p-2 rounded text-sm"
-                                    placeholder="URL hình ảnh"
-                                 />
-                                 <button type="button" onClick={() => removePromoImage(index)} className="text-red-500 hover:text-red-700 px-2">Xóa</button>
-                             </div>
-                         ))}
-                         <button type="button" onClick={addPromoImage} className="text-sm text-blue-600 hover:underline mt-1">+ Thêm hình ảnh</button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                             <label className="block text-sm font-medium text-gray-700">Màu nền</label>
-                             <input type="color" value={homeSettings.promoBackgroundColor} onChange={e => handleHomePageSettingsChange('promoBackgroundColor', e.target.value)} className="mt-1 w-full h-10 rounded" />
-                        </div>
-                        <div>
-                             <label className="block text-sm font-medium text-gray-700">Màu nhấn (Button/Highlight)</label>
-                             <input type="color" value={homeSettings.promoAccentColor} onChange={e => handleHomePageSettingsChange('promoAccentColor', e.target.value)} className="mt-1 w-full h-10 rounded" />
-                        </div>
-                        <div>
-                             <label className="block text-sm font-medium text-gray-700">Tag nhỏ</label>
-                             <input type="text" value={homeSettings.promoTag} onChange={e => handleHomePageSettingsChange('promoTag', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700">Sub-tag</label>
-                             <input type="text" value={homeSettings.promoSubTag} onChange={e => handleHomePageSettingsChange('promoSubTag', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700">Tiêu đề dòng 1</label>
-                             <input type="text" value={homeSettings.promoTitle1} onChange={e => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700">Từ khóa nổi bật</label>
-                             <input type="text" value={homeSettings.promoTitleHighlight} onChange={e => handleHomePageSettingsChange('promoTitleHighlight', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                         <div className="col-span-2">
-                             <label className="block text-sm font-medium text-gray-700">Mô tả</label>
-                             <textarea value={homeSettings.promoDescription} onChange={e => handleHomePageSettingsChange('promoDescription', e.target.value)} rows={3} className="mt-1 w-full border p-2 rounded" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Registration Section Settings */}
-                <div className="p-4 bg-gray-900 rounded-lg border border-gray-800 text-white">
-                     <h3 className="font-bold text-white mb-4 border-b border-gray-700 pb-2">Phần Đăng Ký Thành Viên</h3>
-                     <div className="space-y-4">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className="block text-sm font-medium text-gray-700">Màu nền Banner</label>
+                                <input type="color" value={homeSettings.promoBackgroundColor} onChange={(e) => handleHomePageSettingsChange('promoBackgroundColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                            </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Tiêu đề</label>
-                                <input type="text" value={homeSettings.regHeadlineText} onChange={e => handleHomePageSettingsChange('regHeadlineText', e.target.value)} className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" />
+                                <label className="block text-sm font-medium text-gray-700">Màu nhấn (Nút/Text)</label>
+                                <input type="color" value={homeSettings.promoAccentColor} onChange={(e) => handleHomePageSettingsChange('promoAccentColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
-                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300">Màu chữ</label>
-                                    <input type="color" value={homeSettings.regHeadlineColor} onChange={e => handleHomePageSettingsChange('regHeadlineColor', e.target.value)} className="w-full h-10 bg-gray-800 rounded cursor-pointer" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300">Font</label>
-                                    <select value={homeSettings.regHeadlineFont} onChange={e => handleHomePageSettingsChange('regHeadlineFont', e.target.value)} className="w-full h-10 bg-gray-800 text-white border-gray-600 rounded">
-                                        <option value="Playfair Display">Playfair</option>
-                                        <option value="Poppins">Poppins</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300">Cỡ chữ</label>
-                                    <input type="text" value={homeSettings.regHeadlineSize || '1.875rem'} onChange={e => handleHomePageSettingsChange('regHeadlineSize', e.target.value)} className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" placeholder="1.875rem" />
-                                </div>
-                            </div>
-                         </div>
-
-                         <div>
-                             <label className="block text-sm font-medium text-gray-300">Mô tả</label>
-                             <textarea value={homeSettings.regDescriptionText} onChange={e => handleHomePageSettingsChange('regDescriptionText', e.target.value)} className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" rows={2} />
-                             <div className="grid grid-cols-3 gap-4 mt-2">
-                                 <input type="color" value={homeSettings.regDescriptionColor} onChange={e => handleHomePageSettingsChange('regDescriptionColor', e.target.value)} className="h-8 w-full rounded cursor-pointer" />
-                                 <select value={homeSettings.regDescriptionFont} onChange={e => handleHomePageSettingsChange('regDescriptionFont', e.target.value)} className="h-8 bg-gray-800 text-white border-gray-600 rounded text-sm">
-                                     <option value="Poppins">Poppins</option>
-                                     <option value="Playfair Display">Playfair</option>
-                                 </select>
-                                 <input type="text" value={homeSettings.regDescriptionSize || '1.125rem'} onChange={e => handleHomePageSettingsChange('regDescriptionSize', e.target.value)} className="h-8 bg-gray-800 border-gray-600 rounded px-2 text-white text-sm" placeholder="Size" />
-                             </div>
-                         </div>
-
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-300">Màu Nền (Gradient Start)</label>
-                                 <input type="color" value={homeSettings.regBgColorStart} onChange={e => handleHomePageSettingsChange('regBgColorStart', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-300">Màu Nền (Gradient End)</label>
-                                 <input type="color" value={homeSettings.regBgColorEnd} onChange={e => handleHomePageSettingsChange('regBgColorEnd', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                         </div>
-
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300">Kích thước khung (Padding)</label>
-                                <input type="text" value={homeSettings.regPadding} onChange={e => handleHomePageSettingsChange('regPadding', e.target.value)} className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" placeholder="3rem" />
-                            </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-300">Độ bo góc (Radius)</label>
-                                <input type="text" value={homeSettings.regBorderRadius} onChange={e => handleHomePageSettingsChange('regBorderRadius', e.target.value)} className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" placeholder="1rem" />
-                            </div>
-                         </div>
-
-                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 border-t border-gray-700 pt-4">
-                             <div className="md:col-span-2">
-                                 <label className="block text-sm font-medium text-gray-300">Text Nút</label>
-                                 <input type="text" value={homeSettings.regButtonText} onChange={e => handleHomePageSettingsChange('regButtonText', e.target.value)} className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-300">Màu nền</label>
-                                 <input type="color" value={homeSettings.regButtonBgColor} onChange={e => handleHomePageSettingsChange('regButtonBgColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-300">Màu chữ</label>
-                                 <input type="color" value={homeSettings.regButtonTextColor} onChange={e => handleHomePageSettingsChange('regButtonTextColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-300">Cỡ chữ</label>
-                                 <input type="text" value={homeSettings.regButtonFontSize || '1rem'} onChange={e => handleHomePageSettingsChange('regButtonFontSize', e.target.value)} className="w-full h-10 bg-gray-800 border-gray-600 rounded px-2 text-white" />
-                             </div>
-                         </div>
-                     </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Tag nhỏ (VD: Độc Quyền)</label>
+                            <input type="text" value={homeSettings.promoTag} onChange={(e) => handleHomePageSettingsChange('promoTag', e.target.value)} className="mt-1 w-full border rounded p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Tiêu đề dòng 1</label>
+                            <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="mt-1 w-full border rounded p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Từ khóa nổi bật (Màu khác)</label>
+                            <input type="text" value={homeSettings.promoTitleHighlight} onChange={(e) => handleHomePageSettingsChange('promoTitleHighlight', e.target.value)} className="mt-1 w-full border rounded p-2" />
+                        </div>
+                    </div>
                  </div>
 
-                {/* Flash Sale Section Config */}
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                    <h3 className="font-bold text-gray-700 mb-4">Cấu hình Flash Sale</h3>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-700">Nội dung Tiêu đề</label>
-                                <input 
-                                    type="text" 
-                                    value={homeSettings.flashSaleTitleText || 'FLASH SALE'} 
-                                    onChange={e => handleHomePageSettingsChange('flashSaleTitleText', e.target.value)} 
-                                    className="mt-1 w-full border p-2 rounded" 
-                                />
-                            </div>
-                            <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu nền bắt đầu</label>
-                                 <input type="color" value={homeSettings.flashSaleBgColorStart} onChange={e => handleHomePageSettingsChange('flashSaleBgColorStart', e.target.value)} className="mt-1 w-full h-10 rounded" />
-                            </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu nền kết thúc</label>
-                                 <input type="color" value={homeSettings.flashSaleBgColorEnd} onChange={e => handleHomePageSettingsChange('flashSaleBgColorEnd', e.target.value)} className="mt-1 w-full h-10 rounded" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu chữ Tiêu đề</label>
-                                 <input type="color" value={homeSettings.flashSaleTitleColor} onChange={e => handleHomePageSettingsChange('flashSaleTitleColor', e.target.value)} className="mt-1 w-full h-10 rounded" />
-                            </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Font Tiêu đề</label>
-                                <select value={homeSettings.flashSaleTitleFont || 'Playfair Display'} onChange={e => handleHomePageSettingsChange('flashSaleTitleFont', e.target.value)} className="mt-1 w-full h-10 border rounded p-2">
-                                    <option value="Playfair Display">Playfair Display</option>
-                                    <option value="Poppins">Poppins</option>
-                                    <option value="Arial">Arial</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Cỡ chữ (VD: 2.25rem)</label>
-                                <input type="text" value={homeSettings.flashSaleTitleSize || '2.25rem'} onChange={e => handleHomePageSettingsChange('flashSaleTitleSize', e.target.value)} className="mt-1 w-full h-10 border rounded p-2" />
-                            </div>
-                        </div>
-                        <div>
-                             <label className="block text-sm font-medium text-gray-700">Màu chữ phụ (Timer)</label>
-                             <input type="color" value={homeSettings.flashSaleTextColor} onChange={e => handleHomePageSettingsChange('flashSaleTextColor', e.target.value)} className="mt-1 w-full h-10 rounded cursor-pointer" style={{ maxWidth: '100px' }} />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex justify-end">
-                    <button type="submit" className="bg-[#00695C] text-white py-3 px-8 rounded-md hover:bg-[#004d40] font-bold shadow-md">
-                        Lưu Cấu Hình Trang Chủ
+                 <div className="flex justify-end pt-4">
+                    <button type="submit" className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-bold shadow hover:bg-[#b89b31]">
+                        Lưu Cấu Hình
                     </button>
-                </div>
+                 </div>
             </form>
+             {homeFeedback && (
+                 <div className="mt-4 p-3 bg-green-100 text-green-700 rounded text-center font-medium animate-pulse">
+                     {homeFeedback}
+                 </div>
+            )}
         </div>
       );
   };
 
-  const renderHeaderManager = () => {
-     if (!headerSettings) return <div>Loading...</div>;
-     return (
-        <div className="bg-white p-8 rounded-lg shadow-lg animate-fade-in-up">
-             <h2 className="text-2xl font-bold font-serif text-gray-800 mb-6">Quản lý Header & Menu</h2>
-             {headerFeedback && <div className="p-3 mb-6 bg-green-50 text-green-700 text-sm font-medium rounded">{headerFeedback}</div>}
-             
-             <form onSubmit={handleHeaderSubmit} className="space-y-8">
+  const renderHeaderSettings = () => {
+      if (!headerSettings) return <div>Loading...</div>;
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
+                <EditIcon className="w-6 h-6"/> Tùy chỉnh Thanh điều hướng (Header)
+            </h3>
+            
+            <form onSubmit={handleHeaderSubmit} className="space-y-8">
                  {/* Logo & Brand */}
-                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                     <h3 className="font-bold text-gray-700 mb-4">Logo & Tên Thương hiệu</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Logo & Tên Thương Hiệu</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Tên thương hiệu</label>
+                            <input type="text" value={headerSettings.brandName} onChange={(e) => handleHeaderSettingsChange('brandName', e.target.value)} className="mt-1 w-full border rounded p-2" />
+                        </div>
                          <div>
-                             <label className="block text-sm font-medium text-gray-700">Tên thương hiệu</label>
-                             <input type="text" value={headerSettings.brandName} onChange={e => handleHeaderSettingsChange('brandName', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                         </div>
-                          <div>
-                             <label className="block text-sm font-medium text-gray-700">Logo (Ảnh)</label>
-                             <div className="mt-1 flex items-center gap-4">
-                                 {headerSettings.logoUrl && <img src={headerSettings.logoUrl} alt="Logo" className="h-10 w-auto" />}
-                                 <input type="file" accept="image/*" onChange={handleHeaderLogoUpload} className="text-sm" />
-                             </div>
-                         </div>
-                         <div className="grid grid-cols-3 gap-2 md:col-span-2">
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu chữ</label>
-                                 <input type="color" value={headerSettings.brandColor} onChange={e => handleHeaderSettingsChange('brandColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Font chữ</label>
-                                 <select value={headerSettings.brandFont} onChange={e => handleHeaderSettingsChange('brandFont', e.target.value)} className="w-full h-10 border rounded p-2">
-                                     <option value="Playfair Display">Playfair Display</option>
-                                     <option value="Poppins">Poppins</option>
-                                 </select>
-                             </div>
-                              <div>
-                                 <label className="block text-sm font-medium text-gray-700">Cỡ chữ</label>
-                                 <input type="text" value={headerSettings.brandFontSize} onChange={e => handleHeaderSettingsChange('brandFontSize', e.target.value)} className="w-full border p-2 rounded" />
-                             </div>
-                         </div>
-                     </div>
+                            <label className="block text-sm font-medium text-gray-700">Màu chữ Logo</label>
+                            <input type="color" value={headerSettings.brandColor} onChange={(e) => handleHeaderSettingsChange('brandColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Font chữ Logo</label>
+                            <select value={headerSettings.brandFont} onChange={(e) => handleHeaderSettingsChange('brandFont', e.target.value)} className="mt-1 w-full border rounded p-2">
+                                <option value="Playfair Display">Playfair Display</option>
+                                <option value="Poppins">Poppins</option>
+                             </select>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700">Cỡ chữ</label>
+                             <input type="text" value={headerSettings.brandFontSize} onChange={(e) => handleHeaderSettingsChange('brandFontSize', e.target.value)} className="mt-1 w-full border rounded p-2" placeholder="e.g. 30px" />
+                        </div>
+                        <div className="md:col-span-2">
+                             <label className="block text-sm font-medium text-gray-700">Upload Logo Ảnh (Thay thế text)</label>
+                             <input type="file" accept="image/*" onChange={handleHeaderLogoUpload} className="mt-1 w-full" />
+                             {headerSettings.logoUrl && <img src={headerSettings.logoUrl} alt="Logo Preview" className="h-16 object-contain mt-2 border p-1 rounded bg-white" />}
+                        </div>
+                    </div>
                  </div>
 
-                 {/* Styling */}
-                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                     <h3 className="font-bold text-gray-700 mb-4">Giao diện chung</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* Colors */}
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Màu sắc nền & Menu</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Màu nền Header</label>
+                            <input type="text" value={headerSettings.brandBackgroundColor} onChange={(e) => handleHeaderSettingsChange('brandBackgroundColor', e.target.value)} className="mt-1 w-full border rounded p-2" placeholder="rgba(255,255,255,0.9)" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Màu viền dưới</label>
+                            <input type="color" value={headerSettings.borderColor} onChange={(e) => handleHeaderSettingsChange('borderColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
                          <div>
-                             <label className="block text-sm font-medium text-gray-700">Màu nền Header</label>
-                             <input type="text" value={headerSettings.brandBackgroundColor} onChange={e => handleHeaderSettingsChange('brandBackgroundColor', e.target.value)} className="mt-1 w-full border p-2 rounded" placeholder="rgba(255, 255, 255, 0.8) or #ffffff" />
-                         </div>
-                         <div className="grid grid-cols-3 gap-2">
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu viền</label>
-                                 <input type="color" value={headerSettings.borderColor} onChange={e => handleHeaderSettingsChange('borderColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Kiểu viền</label>
-                                 <select value={headerSettings.borderStyle} onChange={e => handleHeaderSettingsChange('borderStyle', e.target.value)} className="w-full h-10 border rounded p-2">
-                                     <option value="solid">Solid</option>
-                                     <option value="dashed">Dashed</option>
-                                     <option value="none">None</option>
-                                 </select>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Độ dày</label>
-                                 <input type="text" value={headerSettings.borderWidth} onChange={e => handleHeaderSettingsChange('borderWidth', e.target.value)} className="w-full border p-2 rounded" />
-                             </div>
-                         </div>
-                     </div>
-                 </div>
-
-                 {/* Navigation */}
-                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                     <h3 className="font-bold text-gray-700 mb-4">Menu Điều hướng</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <label className="block text-sm font-medium text-gray-700">Màu chữ Menu</label>
+                            <input type="color" value={headerSettings.navColor} onChange={(e) => handleHeaderSettingsChange('navColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
                          <div>
-                             <label className="block text-sm font-medium text-gray-700">Text "Cửa Hàng"</label>
-                             <input type="text" value={headerSettings.navStoreText} onChange={e => handleHeaderSettingsChange('navStoreText', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                         </div>
-                         <div>
-                             <label className="block text-sm font-medium text-gray-700">Text "Về Chúng Tôi"</label>
-                             <input type="text" value={headerSettings.navAboutText} onChange={e => handleHeaderSettingsChange('navAboutText', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                         </div>
-                         <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu chữ</label>
-                                 <input type="color" value={headerSettings.navColor} onChange={e => handleHeaderSettingsChange('navColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu Hover</label>
-                                 <input type="color" value={headerSettings.navHoverColor} onChange={e => handleHeaderSettingsChange('navHoverColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                             </div>
-                         </div>
-                          <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                 <label className="block text-sm font-medium text-gray-700">Font chữ</label>
-                                 <select value={headerSettings.navFont} onChange={e => handleHeaderSettingsChange('navFont', e.target.value)} className="w-full h-10 border rounded p-2">
-                                     <option value="Poppins">Poppins</option>
-                                     <option value="Playfair Display">Playfair Display</option>
-                                     <option value="Arial">Arial</option>
-                                 </select>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-medium text-gray-700">Cỡ chữ</label>
-                                 <input type="text" value={headerSettings.navFontSize} onChange={e => handleHeaderSettingsChange('navFontSize', e.target.value)} className="w-full border p-2 rounded" />
-                             </div>
-                         </div>
-                     </div>
+                            <label className="block text-sm font-medium text-gray-700">Màu khi Hover</label>
+                            <input type="color" value={headerSettings.navHoverColor} onChange={(e) => handleHeaderSettingsChange('navHoverColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
+                    </div>
                  </div>
 
                  {/* Login Button */}
-                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                     <h3 className="font-bold text-gray-700 mb-4">Nút Đăng nhập</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                         <div className="md:col-span-2">
-                             <label className="block text-sm font-medium text-gray-700">Text nút</label>
-                             <input type="text" value={headerSettings.loginBtnText} onChange={e => handleHeaderSettingsChange('loginBtnText', e.target.value)} className="mt-1 w-full border p-2 rounded" />
-                         </div>
-                          <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu nền</label>
-                                 <input type="color" value={headerSettings.loginBtnBgColor} onChange={e => handleHeaderSettingsChange('loginBtnBgColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                          </div>
-                          <div>
-                                 <label className="block text-sm font-medium text-gray-700">Màu chữ</label>
-                                 <input type="color" value={headerSettings.loginBtnTextColor} onChange={e => handleHeaderSettingsChange('loginBtnTextColor', e.target.value)} className="w-full h-10 rounded cursor-pointer" />
-                          </div>
-                     </div>
-                 </div>
-
-                 <div className="flex justify-end">
-                    <button type="submit" className="bg-[#00695C] text-white py-3 px-8 rounded-md hover:bg-[#004d40] font-bold shadow-md">
-                        Lưu Cấu Hình Header
-                    </button>
-                </div>
-             </form>
-        </div>
-     );
-  }
-
-  const renderSettingsManager = () => {
-      return (
-        <div className="bg-white p-8 rounded-lg shadow-lg animate-fade-in-up">
-             <h2 className="text-2xl font-bold font-serif text-gray-800 mb-6">Cài đặt Chung</h2>
-             {settingsFeedback && <div className="p-3 mb-6 bg-green-50 text-green-700 text-sm font-medium rounded">{settingsFeedback}</div>}
-
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                 {/* Admin Emails */}
-                 <div>
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
-                            <UserIcon className="w-5 h-5"/> Quản lý Email Admin
-                        </h3>
-                        <button 
-                            type="button"
-                            onClick={handleTestEmail}
-                            className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm transition-colors"
-                        >
-                            Gửi Email kiểm tra
-                        </button>
+                 <div className="p-4 bg-gray-50 rounded-lg border">
+                    <h4 className="font-bold text-gray-700 mb-4 border-b pb-2">Nút Đăng Nhập</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700">Nội dung nút</label>
+                            <input type="text" value={headerSettings.loginBtnText} onChange={(e) => handleHeaderSettingsChange('loginBtnText', e.target.value)} className="mt-1 w-full border rounded p-2" />
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700">Màu nền nút</label>
+                            <input type="color" value={headerSettings.loginBtnBgColor} onChange={(e) => handleHeaderSettingsChange('loginBtnBgColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700">Màu chữ nút</label>
+                            <input type="color" value={headerSettings.loginBtnTextColor} onChange={(e) => handleHeaderSettingsChange('loginBtnTextColor', e.target.value)} className="mt-1 w-full h-10 p-1 rounded border" />
+                        </div>
                     </div>
-                     <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận được thông báo khi có đơn hàng mới hoặc mã OTP đăng nhập.</p>
-                     
-                     <div className="space-y-3 mb-6">
-                         {adminEmails.map(email => (
-                             <div key={email} className="flex justify-between items-center bg-gray-50 p-3 rounded border border-gray-200">
-                                 <span className="text-gray-700">{email}</span>
-                                 {adminEmails.length > 1 && (
-                                     <button onClick={() => handleRemoveEmail(email)} className="text-red-500 hover:text-red-700 text-sm">Xóa</button>
-                                 )}
-                             </div>
-                         ))}
-                     </div>
-
-                     <form onSubmit={handleAddEmail} className="flex gap-2">
-                         <input 
-                            type="email" 
-                            value={newAdminEmail} 
-                            onChange={e => setNewAdminEmail(e.target.value)} 
-                            placeholder="nhap@email.com"
-                            className="flex-1 border border-gray-300 rounded px-3 py-2 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-                            required
-                         />
-                         <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded hover:bg-[#b89b31]">Thêm</button>
-                     </form>
                  </div>
 
-                 {/* Social Media Links */}
-                 <div>
-                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-                         <ClipboardListIcon className="w-5 h-5"/> Liên kết Mạng xã hội
-                     </h3>
-                     <form onSubmit={handleSocialSettingsSubmit} className="space-y-4">
-                         {socialSettings && Object.entries(socialSettings).map(([key, value]) => (
-                             <div key={key}>
-                                 <label className="block text-sm font-medium text-gray-700 capitalize mb-1">{key}</label>
-                                 <input 
-                                    type="url" 
-                                    value={value as string}
-                                    onChange={e => handleSocialSettingsChange(key as any, e.target.value)}
-                                    className="w-full border border-gray-300 rounded px-3 py-2"
-                                    placeholder={`Link to ${key}`}
-                                 />
-                             </div>
-                         ))}
-                         <button type="submit" className="w-full bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40] mt-2">Lưu Liên Kết</button>
-                     </form>
+                 <div className="flex justify-end pt-4">
+                    <button type="submit" className="bg-[#D4AF37] text-white px-8 py-3 rounded-lg font-bold shadow hover:bg-[#b89b31]">
+                        Lưu Header
+                    </button>
                  </div>
-             </div>
+            </form>
+             {headerFeedback && (
+                 <div className="mt-4 p-3 bg-green-100 text-green-700 rounded text-center font-medium animate-pulse">
+                     {headerFeedback}
+                 </div>
+            )}
         </div>
       );
-  }
+  };
 
-  // Main Render Logic
+  const renderSettings = () => (
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+          <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Email Management */}
+              <div>
+                  <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
+                  <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
+                  
+                  <ul className="mb-4 space-y-2">
+                      {adminEmails.map((email, idx) => (
+                          <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
+                              <span className="text-gray-700">{email}</span>
+                              <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-sm hover:underline">Xóa</button>
+                          </li>
+                      ))}
+                  </ul>
+
+                  <form onSubmit={handleAddEmail} className="flex gap-2">
+                      <input 
+                          type="email" 
+                          value={newAdminEmail}
+                          onChange={(e) => setNewAdminEmail(e.target.value)}
+                          placeholder="Thêm email mới..."
+                          className="flex-1 border rounded px-3 py-2 focus:ring-[#D4AF37]"
+                          required
+                      />
+                      <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
+                  </form>
+                  
+                  <div className="mt-6 border-t pt-4">
+                      <button 
+                        onClick={handleTestEmail}
+                        className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                         Gửi Email kiểm tra
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2 text-center">Gửi mail test đến {adminEmails[0]} để xác nhận cấu hình Server.</p>
+                  </div>
+              </div>
+
+              {/* Social Media Links */}
+              <div>
+                  <h4 className="font-bold text-gray-700 mb-4">Liên kết Mạng xã hội (Footer)</h4>
+                  {socialSettings && (
+                      <form onSubmit={handleSocialSettingsSubmit} className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Facebook URL</label>
+                              <input type="url" value={socialSettings.facebook} onChange={(e) => handleSocialSettingsChange('facebook', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Instagram URL</label>
+                              <input type="url" value={socialSettings.instagram} onChange={(e) => handleSocialSettingsChange('instagram', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">TikTok URL</label>
+                              <input type="url" value={socialSettings.tiktok} onChange={(e) => handleSocialSettingsChange('tiktok', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700">Twitter/X URL</label>
+                              <input type="url" value={socialSettings.twitter} onChange={(e) => handleSocialSettingsChange('twitter', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                          <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded hover:bg-[#b89b31]">
+                              Cập nhật Liên kết
+                          </button>
+                      </form>
+                  )}
+              </div>
+          </div>
+          
+           {settingsFeedback && (
+                 <div className="mt-6 p-3 bg-green-100 text-green-700 rounded text-center font-medium animate-pulse">
+                     {settingsFeedback}
+                 </div>
+            )}
+      </div>
+  );
+
+  const renderContent = () => {
+    switch(activeTab) {
+      case 'dashboard': return renderDashboard();
+      case 'products': return renderProductManager();
+      case 'orders': return renderOrderManager();
+      case 'inventory': return renderInventoryManager();
+      case 'customers': return renderCustomerManager();
+      case 'about': return renderAboutPageEditor();
+      case 'home': return renderHomePageSettings();
+      case 'header': return renderHeaderSettings();
+      case 'settings': return renderSettings();
+      default: return renderDashboard();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row">
-        {/* Sidebar Navigation */}
-        <aside className="bg-white w-full md:w-64 shadow-lg flex-shrink-0 z-10 flex flex-col md:h-screen sticky top-0">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between md:block">
-                <h1 className="text-2xl font-bold font-serif text-[#00695C]">Admin Panel</h1>
-                <button onClick={handleLogout} className="md:hidden text-gray-500"><UserIcon className="w-6 h-6"/></button>
-            </div>
-            <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-                <button 
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <BarChart2 className="w-5 h-5"/> Dashboard
-                </button>
-                <button 
-                    onClick={() => setActiveTab('products')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'products' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <LayersIcon className="w-5 h-5"/> Sản phẩm
-                </button>
-                <button 
-                    onClick={() => setActiveTab('orders')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'orders' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <ClipboardListIcon className="w-5 h-5"/> Đơn hàng
-                </button>
-                <button 
-                    onClick={() => setActiveTab('inventory')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'inventory' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <PackageIcon className="w-5 h-5"/> Kho hàng
-                </button>
-                <button 
-                    onClick={() => setActiveTab('customers')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'customers' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <UsersIcon className="w-5 h-5"/> Khách hàng
-                </button>
-                
-                <div className="pt-4 pb-2">
-                    <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Cấu hình Web</p>
+      {/* Sidebar */}
+      <aside className="bg-[#111827] text-white w-full md:w-64 flex-shrink-0">
+        <div className="p-6 border-b border-gray-700 flex items-center gap-3">
+          <div className="bg-[#D4AF37] p-2 rounded-lg">
+             <BarChart2 className="w-6 h-6 text-white" />
+          </div>
+          <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
+        </div>
+        <nav className="p-4 space-y-2">
+           <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <BarChart2 className="w-5 h-5" /> Tổng quan
+          </button>
+           <button 
+            onClick={() => setActiveTab('products')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <PackageIcon className="w-5 h-5" /> Sản phẩm
+          </button>
+          <button 
+            onClick={() => setActiveTab('orders')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
+          </button>
+          <button 
+            onClick={() => setActiveTab('inventory')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <BarChart2 className="w-5 h-5" /> Kho hàng
+          </button>
+           <button 
+            onClick={() => setActiveTab('customers')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <UsersIcon className="w-5 h-5" /> Khách hàng
+          </button>
+          
+          <div className="pt-4 mt-4 border-t border-gray-700">
+            <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Giao diện</p>
+            <button 
+                onClick={() => setActiveTab('home')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <EditIcon className="w-5 h-5" /> Trang chủ
+            </button>
+             <button 
+                onClick={() => setActiveTab('header')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <LayersIcon className="w-5 h-5" /> Header/Menu
+            </button>
+             <button 
+                onClick={() => setActiveTab('about')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <EditIcon className="w-5 h-5" /> Giới thiệu
+            </button>
+            <button 
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <UserIcon className="w-5 h-5" /> Cài đặt chung
+            </button>
+          </div>
+        </nav>
+        
+        <div className="p-4 mt-auto border-t border-gray-700">
+             <a href="#/" className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 px-4 text-sm">
+                ← Về Cửa hàng
+             </a>
+             <button onClick={handleLogout} className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors font-medium text-sm">
+                Đăng xuất
+             </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <header className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 font-serif">
+                {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
+                 activeTab === 'products' ? 'Quản lý Sản phẩm' : 
+                 activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
+                 activeTab === 'inventory' ? 'Nhập xuất Kho' : 
+                 activeTab === 'customers' ? 'Danh sách Khách hàng' :
+                 activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
+                 activeTab === 'home' ? 'Cấu hình Trang chủ' :
+                 activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
+            </h2>
+            <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
+                <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                    A
                 </div>
-
-                <button 
-                    onClick={() => setActiveTab('home')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'home' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <EditIcon className="w-5 h-5"/> Trang Chủ
-                </button>
-                <button 
-                    onClick={() => setActiveTab('about')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'about' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <EditIcon className="w-5 h-5"/> Trang Giới Thiệu
-                </button>
-                <button 
-                    onClick={() => setActiveTab('header')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'header' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <EditIcon className="w-5 h-5"/> Header & Menu
-                </button>
-                <button 
-                    onClick={() => setActiveTab('settings')}
-                    className={`w-full text-left px-4 py-3 rounded-md flex items-center gap-3 transition-colors ${activeTab === 'settings' ? 'bg-[#00695C] text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                    <UserIcon className="w-5 h-5"/> Cài đặt Chung
-                </button>
-            </nav>
-            <div className="p-4 border-t border-gray-200">
-                <button onClick={handleLogout} className="w-full bg-red-50 text-red-600 py-2 rounded-md hover:bg-red-100 font-medium transition-colors flex items-center justify-center gap-2">
-                   Đăng xuất
-                </button>
-                <a href="#/" onClick={(e) => handleNavigate(e, '/')} className="block text-center text-sm text-gray-500 mt-4 hover:text-[#00695C]">
-                    Về trang cửa hàng
-                </a>
             </div>
-        </aside>
+        </header>
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 md:p-8 overflow-auto h-screen">
-            <div className="max-w-7xl mx-auto">
-                {activeTab === 'dashboard' && renderDashboard()}
-                {activeTab === 'products' && renderProductManager()}
-                {activeTab === 'orders' && renderOrderManager()}
-                {activeTab === 'inventory' && renderInventoryManager()}
-                {activeTab === 'customers' && renderCustomerManager()}
-                {activeTab === 'home' && renderHomePageManager()}
-                {activeTab === 'about' && renderAboutPageEditor()}
-                {activeTab === 'header' && renderHeaderManager()}
-                {activeTab === 'settings' && renderSettingsManager()}
-            </div>
-        </main>
+        {renderContent()}
+      </main>
 
-        <style>{`
-            @keyframes fade-in-up {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in-up {
-                animation: fade-in-up 0.3s ease-out forwards;
-            }
-            .input-style {
-                border: 1px solid #D1D5DB;
-                border-radius: 0.375rem;
-                padding: 0.5rem 0.75rem;
-                transition: all 0.2s;
-            }
-            .input-style:focus {
-                outline: none;
-                ring: 2px solid #00695C;
-                border-color: #00695C;
-            }
-        `}</style>
+      <style>{`
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fade-in-up 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };
