@@ -13,6 +13,7 @@ interface OldAdminSettings {
 }
 
 const STORAGE_KEY = 'sigma_vie_admin_settings';
+const MASTER_EMAIL = 'sigmavieshop@gmail.com';
 
 // Super simple "hashing" for demo purposes.
 // In a real app, NEVER do this. Use a proper library like bcrypt.
@@ -30,7 +31,7 @@ const simpleHash = (s: string) => {
 const getDefaultSettings = (): AdminSettings => ({
   username: 'admin',
   passwordHash: simpleHash('admin'),
-  emails: ['sigmavieshop@gmail.com'],
+  emails: [MASTER_EMAIL],
 });
 
 const getSettings = (): AdminSettings => {
@@ -45,10 +46,23 @@ const getSettings = (): AdminSettings => {
           passwordHash: parsed.passwordHash,
           emails: [parsed.email]
         };
+        // Ensure master email is present even during migration
+        if (!migratedSettings.emails.includes(MASTER_EMAIL)) {
+            migratedSettings.emails.unshift(MASTER_EMAIL);
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedSettings));
         return migratedSettings;
       }
-      return parsed as AdminSettings;
+      
+      const settings = parsed as AdminSettings;
+      
+      // Self-healing: Ensure master email exists (in case user accidentally deleted it)
+      if (!settings.emails.includes(MASTER_EMAIL)) {
+          settings.emails.unshift(MASTER_EMAIL);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      }
+      
+      return settings;
     } else {
       const defaultSettings = getDefaultSettings();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSettings));
@@ -71,7 +85,7 @@ export const getAdminEmails = (): string[] => {
 
 export const getPrimaryAdminEmail = (): string => {
     const emails = getAdminEmails();
-    return emails.length > 0 ? emails[0] : '';
+    return emails.length > 0 ? emails[0] : MASTER_EMAIL;
 }
 
 export const addAdminEmail = (email: string): void => {
@@ -85,8 +99,15 @@ export const addAdminEmail = (email: string): void => {
 
 export const removeAdminEmail = (emailToRemove: string): void => {
   const settings = getSettings();
+  // Prevent deleting the master email
+  if (emailToRemove === MASTER_EMAIL) {
+      alert("Không thể xóa email quản trị chính (Master Email).");
+      return;
+  }
+  
   // Prevent deleting the last email
   if (settings.emails.length <= 1) return;
+  
   settings.emails = settings.emails.filter(email => email !== emailToRemove);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
