@@ -30,7 +30,7 @@ const simpleHash = (s: string) => {
 const getDefaultSettings = (): AdminSettings => ({
   username: 'admin',
   passwordHash: simpleHash('admin'),
-  emails: ['admin@example.com'],
+  emails: ['sigmavieshop@gmail.com'],
 });
 
 const getSettings = (): AdminSettings => {

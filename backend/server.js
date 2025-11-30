@@ -164,7 +164,7 @@ const parsePrice = (priceStr) => {
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER, // e.g. dongphonui1975@gmail.com
+    user: process.env.EMAIL_USER, // e.g. sigmavieshop@gmail.com
     pass: process.env.EMAIL_PASS  // App Password 16 ký tự
   }
 });

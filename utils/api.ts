@@ -19,7 +19,7 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
   sessionStorage.setItem('otpVerification', JSON.stringify({ otp, expiry }));
   
   // Gửi email thật qua Backend
-  const primaryEmail = adminEmails[0]; // Gửi cho email đầu tiên trong danh sách (dongphonui1975@gmail.com)
+  const primaryEmail = adminEmails[0]; // Gửi cho email đầu tiên trong danh sách (sigmavieshop@gmail.com)
   
   const subject = "Mã xác thực OTP - Sigma Vie Admin";
   const html = `
