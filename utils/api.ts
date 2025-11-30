@@ -35,16 +35,22 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
     </div>
   `;
 
+  // Gọi API gửi mail
   const result = await sendEmail(primaryEmail, subject, html);
   
+  // Kiểm tra kết quả
   if (result && result.success) {
     console.log(`OTP đã được gửi đến email ${primaryEmail}`);
     return { success: true };
   } else {
-    console.error('Gửi email thất bại, chuyển sang chế độ cứu hộ.');
-    // Fallback mode: Show OTP in alert if email fails
-    // Điều này giúp bạn luôn đăng nhập được để sửa lỗi cấu hình
-    alert(`(Chế độ Cứu hộ) Gửi email thất bại.\n\nMã OTP khẩn cấp của bạn là: ${otp}\n\nVui lòng dùng mã này để đăng nhập và kiểm tra lại cấu hình Email trên Render.`);
+    // Nếu thất bại (do sai pass, lỗi mạng...), bật chế độ cứu hộ
+    console.error('Gửi email thất bại. Đang kích hoạt chế độ Fallback.');
+    
+    // Sử dụng setTimeout để đảm bảo Alert hiện ra sau khi UI render xong (tránh bị block)
+    setTimeout(() => {
+        alert(`⚠️ CHẾ ĐỘ CỨU HỘ (EMAIL FAILED)\n\nHệ thống không thể gửi email đến ${primaryEmail}.\nCó thể do Mật khẩu ứng dụng trên Render bị sai.\n\n👉 MÃ OTP KHẨN CẤP CỦA BẠN: ${otp}\n\nHãy dùng mã này để đăng nhập và kiểm tra lại cấu hình.`);
+    }, 100);
+
     return { success: true };
   }
 };
