@@ -16,6 +16,7 @@ import { getDashboardMetrics, type DashboardData } from '../utils/analytics';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../utils/categoryStorage';
 import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
+import { sendEmail } from '../utils/apiClient';
 
 
 const ImagePlus: React.FC<{className?: string}> = ({className}) => (
@@ -571,6 +572,32 @@ const AdminPage: React.FC = () => {
   const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     e.preventDefault();
     window.location.hash = path;
+  };
+
+  const handleTestEmail = async () => {
+      const emails = getAdminEmails();
+      if (emails.length === 0) return;
+      
+      const targetEmail = emails[0];
+      setSettingsFeedback(`Đang gửi email test đến ${targetEmail}...`);
+      
+      try {
+          const result = await sendEmail(
+              targetEmail, 
+              'Kiểm tra cấu hình Email Sigma Vie', 
+              '<div style="padding: 20px; font-family: sans-serif;"><h2>Kiểm tra thành công!</h2><p>Hệ thống gửi email của bạn đang hoạt động tốt.</p></div>'
+          );
+          
+          if (result && result.success) {
+              setSettingsFeedback('Thành công: Cấu hình Email hoạt động tốt!');
+          } else {
+              setSettingsFeedback(`Lỗi: ${result?.message || 'Gửi thất bại'}`);
+          }
+      } catch (e) {
+          setSettingsFeedback('Lỗi kết nối hoặc cấu hình.');
+      }
+      
+      setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
   // ... (renderDashboard, renderCategoryManager, renderProductManager, renderOrderManager, renderInventoryManager, renderAboutPageEditor kept same) ...
@@ -1825,9 +1852,18 @@ const AdminPage: React.FC = () => {
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                  {/* Admin Emails */}
                  <div>
-                     <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-                         <UserIcon className="w-5 h-5"/> Quản lý Email Admin
-                     </h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-gray-700 flex items-center gap-2">
+                            <UserIcon className="w-5 h-5"/> Quản lý Email Admin
+                        </h3>
+                        <button 
+                            type="button"
+                            onClick={handleTestEmail}
+                            className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 shadow-sm transition-colors"
+                        >
+                            Gửi Email kiểm tra
+                        </button>
+                    </div>
                      <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận được thông báo khi có đơn hàng mới hoặc mã OTP đăng nhập.</p>
                      
                      <div className="space-y-3 mb-6">
