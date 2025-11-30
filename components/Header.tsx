@@ -44,8 +44,8 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
     fontFamily: `'${settings.brandFont}', serif`,
     textShadow: settings.brandColor === '#00695C' ? `
       1px 1px 0px #b2dfdb, 
-      2px 2px 0px #80cbc4,
-      3px 3px 0px #4db6ac,
+      2px 2px 0px #80cbc4, 
+      3px 3px 0px #4db6ac, 
       4px 4px 8px rgba(0, 0, 0, 0.2)` : 'none'
   } : {};
 
@@ -150,7 +150,13 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                                         <p className="text-sm font-medium text-gray-900 truncate">{currentUser.fullName}</p>
                                         <p className="text-xs text-gray-500 truncate">{currentUser.email || currentUser.phoneNumber}</p>
                                     </div>
-                                    <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Đơn hàng của tôi</a>
+                                    <a 
+                                        href="#/my-orders" 
+                                        onClick={(e) => handleNavigate(e, '/my-orders')}
+                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    >
+                                        Đơn hàng của tôi
+                                    </a>
                                     <button 
                                         onClick={handleLogout}
                                         className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
