@@ -161,20 +161,20 @@ const parsePrice = (priceStr) => {
 };
 
 // --- NODEMAILER CONFIGURATION ---
-// Sử dụng cấu hình SMTP chi tiết (Port 587 STARTTLS) để tránh timeout trên Render
-// Tăng timeout lên 60s để đảm bảo kết nối ổn định
+// Cập nhật cấu hình SMTP sang cổng 465 (SSL) - Ổn định nhất cho Render
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // true for 465, false for other ports
+  host: 'smtp.googlemail.com', // Dùng googlemail đôi khi bypass được bộ lọc IP
+  port: 465, // Cổng SSL chuẩn
+  secure: true, // Bật SSL
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS
   },
   tls: {
-      rejectUnauthorized: false // Giúp tránh lỗi chứng chỉ trên một số môi trường proxy
+      // Không từ chối chứng chỉ tự ký (giúp tránh lỗi bắt tay SSL trên cloud)
+      rejectUnauthorized: false 
   },
-  connectionTimeout: 60000, // 60 giây (Tăng lên để fix ETIMEDOUT)
+  connectionTimeout: 60000, // 60 giây chờ kết nối
   greetingTimeout: 30000,
   socketTimeout: 60000,
   logger: true, // Log chi tiết hoạt động SMTP
@@ -189,7 +189,7 @@ transporter.verify(function (error, success) {
     console.error(error);
     console.error("Gợi ý: Kiểm tra biến môi trường EMAIL_PASS trên Render. Đảm bảo không có dấu cách thừa.");
   } else {
-    console.log("✅ Kết nối Email (SMTP) sẵn sàng! Server có thể gửi mail.");
+    console.log("✅ Kết nối Email (SMTP) cổng 465 sẵn sàng! Server có thể gửi mail.");
   }
 });
 

@@ -6,7 +6,9 @@ const AdminOTPPage: React.FC = () => {
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
-  // const [demoOtp, setDemoOtp] = useState(''); // Removed Demo State
+  
+  // State để lưu mã OTP thực (để hiển thị khẩn cấp)
+  const [emergencyOtp, setEmergencyOtp] = useState<string | null>(null);
 
   useEffect(() => {
     setAdminEmails(getAdminEmails());
@@ -21,7 +23,8 @@ const AdminOTPPage: React.FC = () => {
         sessionStorage.removeItem('otpVerification');
         return;
     }
-    // setDemoOtp(otpData.otp); // Removed Demo display
+    // Lưu mã OTP vào state để dùng cho nút khẩn cấp
+    setEmergencyOtp(otpData.otp);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,6 +54,12 @@ const AdminOTPPage: React.FC = () => {
     }
   };
 
+  const handleRevealOtp = () => {
+      if (emergencyOtp) {
+          alert(`MÃ OTP KHẨN CẤP CỦA BẠN LÀ: ${emergencyOtp}\n\nHãy sử dụng mã này để đăng nhập.`);
+      }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F5F2] px-4">
       <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
@@ -61,8 +70,6 @@ const AdminOTPPage: React.FC = () => {
           </p>
         </div>
         
-        {/* Removed Demo Alert Box */}
-
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="otp" className="block text-sm font-medium text-gray-700">Mã OTP</label>
@@ -86,9 +93,18 @@ const AdminOTPPage: React.FC = () => {
             </button>
           </div>
         </form>
-         <div className="text-center mt-4">
+
+        <div className="mt-6 flex flex-col gap-3 text-center">
+             <button 
+                type="button"
+                onClick={handleRevealOtp}
+                className="text-sm text-red-500 hover:text-red-700 font-medium hover:underline"
+            >
+                Không nhận được mã? Bấm vào đây để lấy mã khẩn cấp
+            </button>
+
             <a href="#/login" onClick={(e) => { e.preventDefault(); window.location.hash = '/login'; }} className="text-sm text-[#D4AF37] hover:underline">
-                Thử lại đăng nhập
+                Quay lại trang Đăng nhập
             </a>
         </div>
       </div>
