@@ -299,6 +299,16 @@ app.post('/api/products/sync', async (req, res) => {
 // NEW API: ATOMIC STOCK UPDATE (Quan trọng cho vấn đề Race Condition)
 app.post('/api/products/stock', async (req, res) => {
   const { id, quantityChange } = req.body;
+  
+  // ÉP KIỂU SỐ NGUYÊN (QUAN TRỌNG)
+  const productId = parseInt(id, 10);
+  const qty = parseInt(quantityChange, 10);
+
+  if (isNaN(productId) || isNaN(qty)) {
+      console.error("Invalid input for stock update:", { id, quantityChange });
+      return res.status(400).json({ success: false, message: "Invalid ID or Quantity" });
+  }
+
   try {
     // Sử dụng logic cộng dồn trực tiếp trên DB: stock = stock + $1
     // Điều này đảm bảo tính toàn vẹn dữ liệu ngay cả khi có nhiều request cùng lúc
@@ -308,12 +318,13 @@ app.post('/api/products/stock', async (req, res) => {
       WHERE id = $2
       RETURNING stock;
     `;
-    const result = await pool.query(query, [quantityChange, id]);
+    const result = await pool.query(query, [qty, productId]);
 
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
+    console.log(`Updated stock for ID ${productId}: change ${qty}, new stock ${result.rows[0].stock}`);
     res.json({ success: true, newStock: result.rows[0].stock });
   } catch (err) {
     console.error(err);

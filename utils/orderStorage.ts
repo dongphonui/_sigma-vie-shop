@@ -92,16 +92,21 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
         const oldStatus = order.status;
 
         // LOGIC MỚI: HOÀN TRẢ KHO KHI HỦY ĐƠN
+        // Chỉ hoàn trả nếu đơn hàng chưa từng bị hủy trước đó
         if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
-            const success = updateProductStock(order.productId, order.quantity);
+            // Ép kiểu số nguyên để đảm bảo không cộng chuỗi
+            const pid = Number(order.productId);
+            const qty = Number(order.quantity);
+
+            const success = updateProductStock(pid, qty);
             
             if (success) {
                 // Ghi lại lịch sử giao dịch là NHẬP KHO (Hoàn trả)
                 addTransaction({
-                    productId: order.productId,
+                    productId: pid,
                     productName: order.productName,
                     type: 'IMPORT',
-                    quantity: order.quantity,
+                    quantity: qty,
                     note: `Hoàn trả tồn kho do hủy đơn hàng ${order.id}`
                 });
             }
