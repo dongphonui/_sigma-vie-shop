@@ -88,6 +88,25 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
     const orders = getOrders();
     const index = orders.findIndex(o => o.id === orderId);
     if (index !== -1) {
+        const order = orders[index];
+        const oldStatus = order.status;
+
+        // LOGIC MỚI: HOÀN TRẢ KHO KHI HỦY ĐƠN
+        if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+            const success = updateProductStock(order.productId, order.quantity);
+            
+            if (success) {
+                // Ghi lại lịch sử giao dịch là NHẬP KHO (Hoàn trả)
+                addTransaction({
+                    productId: order.productId,
+                    productName: order.productName,
+                    type: 'IMPORT',
+                    quantity: order.quantity,
+                    note: `Hoàn trả tồn kho do hủy đơn hàng ${order.id}`
+                });
+            }
+        }
+
         orders[index].status = newStatus;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
         
