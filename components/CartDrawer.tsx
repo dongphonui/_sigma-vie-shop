@@ -4,7 +4,7 @@ import type { CartItem, Customer } from '../types';
 import { updateCartQuantity, removeFromCart, clearCart } from '../utils/cartStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
-import { sendEmail } from '../utils/apiClient';
+// Removed sendEmail import
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -41,71 +41,23 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       }
 
       setIsProcessing(true);
-      const adminEmail = getPrimaryAdminEmail();
+      // const adminEmail = getPrimaryAdminEmail(); // Không cần dùng đến nếu không gửi mail
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
-      const emailItems: {name: string, quantity: number, price: string, total: string}[] = [];
-
+      
       // Process orders for each item
       items.forEach(item => {
           // Note: createOrder handles stock check and deduction
           const result = createOrder(currentUser, item, item.quantity);
           if (result.success && result.order) {
               successfulOrders.push(`${item.name} (x${item.quantity})`);
-              emailItems.push({
-                  name: item.name,
-                  quantity: item.quantity,
-                  price: formatPrice(item.selectedPrice),
-                  total: formatPrice(item.selectedPrice * item.quantity)
-              });
           } else {
               failedItems.push(item.name);
           }
       });
 
       if (successfulOrders.length > 0) {
-          // Gửi email thông báo cho Admin
-          const subject = `Đơn hàng mới từ ${currentUser.fullName} - ${successfulOrders.length} sản phẩm`;
-          const html = `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #00695C;">Đơn hàng mới đã được đặt!</h2>
-              <p><strong>Khách hàng:</strong> ${currentUser.fullName}</p>
-              <p><strong>Liên hệ:</strong> ${currentUser.email || currentUser.phoneNumber}</p>
-              <p><strong>Địa chỉ:</strong> ${currentUser.address || 'Chưa cung cấp'}</p>
-              
-              <h3 style="border-bottom: 1px solid #eee; padding-bottom: 10px;">Chi tiết đơn hàng:</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background-color: #f9fafb; text-align: left;">
-                        <th style="padding: 10px;">Sản phẩm</th>
-                        <th style="padding: 10px;">SL</th>
-                        <th style="padding: 10px;">Giá</th>
-                        <th style="padding: 10px;">Thành tiền</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${emailItems.map(item => `
-                        <tr>
-                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
-                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.quantity}</td>
-                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.price}</td>
-                            <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.total}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold;">Tổng cộng:</td>
-                        <td style="padding: 15px; font-weight: bold; color: #D4AF37;">${formatPrice(totalPrice)}</td>
-                    </tr>
-                </tfoot>
-              </table>
-              <p style="margin-top: 20px; font-size: 12px; color: #666;">Vui lòng truy cập trang quản trị để xử lý đơn hàng.</p>
-            </div>
-          `;
-          
-          // Gửi mail không chặn luồng UI (fire and forget)
-          sendEmail(adminEmail, subject, html).catch(err => console.error("Lỗi gửi mail đơn hàng:", err));
+          // Logic gửi email thông báo đơn hàng đã được tắt theo yêu cầu.
           
           clearCart(); 
           onClose();
