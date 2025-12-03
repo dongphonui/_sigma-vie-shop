@@ -7,7 +7,7 @@ import {
 import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
-import { getAdminEmails, addAdminEmail, removeAdminEmail } from '../utils/adminSettingsStorage';
+import { getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
 import { getHeaderSettings, updateHeaderSettings } from '../utils/headerSettingsStorage';
@@ -440,6 +440,8 @@ const AdminPage: React.FC = () => {
   const handleOrderStatusChange = (orderId: string, newStatus: Order['status']) => {
       updateOrderStatus(orderId, newStatus);
       refreshOrders();
+      refreshProducts(); // Refresh products immediately to reflect stock changes
+      refreshInventory(); // Refresh inventory history
   };
 
   // Customer Handlers
@@ -645,12 +647,21 @@ const AdminPage: React.FC = () => {
     window.location.hash = path;
   };
 
-  // --- EMAIL TEST DISABLED ---
-  /*
   const handleTestEmail = async () => {
-      // Disabled logic
+      const email = getPrimaryAdminEmail();
+      const result = await sendEmail(
+          email, 
+          'Kiểm tra cấu hình Email Sigma Vie', 
+          '<h1>Xin chào!</h1><p>Nếu bạn nhận được email này, hệ thống gửi mail đang hoạt động tốt.</p>'
+      );
+      
+      if(result && result.success) {
+          setSettingsFeedback('Thành công: Email kiểm tra đã được gửi.');
+      } else {
+          setSettingsFeedback('Lỗi: Không thể gửi email. Vui lòng kiểm tra Log trên Render.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 5000);
   };
-  */
 
   const renderDashboard = () => {
     if (!dashboardData) return <div>Đang tải dữ liệu...</div>;
@@ -1942,12 +1953,12 @@ const AdminPage: React.FC = () => {
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
                   <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
                   
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                      <p className="text-sm text-yellow-700 font-bold">
-                          ⚠️ Hệ thống Email đang tạm tắt. 
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                      <p className="text-sm text-blue-700 font-bold">
+                          ℹ️ Hệ thống Email đang hoạt động.
                       </p>
-                      <p className="text-xs text-yellow-600">
-                          Mã OTP sẽ hiển thị trực tiếp khi đăng nhập.
+                      <p className="text-xs text-blue-600">
+                          Nếu gửi lỗi, mã OTP sẽ tự động hiển thị trên màn hình (Chế độ Fallback).
                       </p>
                   </div>
 
@@ -1960,7 +1971,7 @@ const AdminPage: React.FC = () => {
                       ))}
                   </ul>
 
-                  <form onSubmit={handleAddEmail} className="flex gap-2">
+                  <form onSubmit={handleAddEmail} className="flex gap-2 mb-4">
                       <input 
                           type="email" 
                           value={newAdminEmail}
@@ -1972,7 +1983,12 @@ const AdminPage: React.FC = () => {
                       <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
                   
-                  {/* Test Email Button Removed */}
+                  <button 
+                      onClick={handleTestEmail}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                  >
+                      📧 Gửi Email kiểm tra
+                  </button>
               </div>
 
               {/* Social Media Links */}
@@ -2005,7 +2021,7 @@ const AdminPage: React.FC = () => {
           </div>
           
            {settingsFeedback && (
-                 <div className="mt-6 p-3 bg-green-100 text-green-700 rounded text-center font-medium animate-pulse">
+                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
             )}

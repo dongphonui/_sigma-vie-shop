@@ -5,7 +5,7 @@ import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
 import { addToCart } from '../utils/cartStorage';
-// import { sendEmail } from '../utils/apiClient'; // Tạm tắt
+import { sendEmail } from '../utils/apiClient';
 
 interface ProductModalProps {
   product: Product;
@@ -98,13 +98,25 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       const result = createOrder(customer, productForOrder, quantity);
 
       if (result.success && result.order) {
-          // --- EMAIL TẠM TẮT ---
-          /* 
           if (managerEmail) {
-             // Logic gửi email cũ ở đây
-             await sendEmail(managerEmail, subject, html);
+             const subject = `Đơn hàng mới: ${product.name} từ ${customer.fullName}`;
+             const totalPrice = result.order.totalPrice;
+             const html = `
+               <div style="font-family: sans-serif; padding: 20px;">
+                 <h2 style="color: #00695C;">Đơn hàng mới!</h2>
+                 <p><strong>Khách hàng:</strong> ${customer.fullName}</p>
+                 <p><strong>Email/SĐT:</strong> ${customer.email || customer.phoneNumber}</p>
+                 <p><strong>Địa chỉ:</strong> ${customer.address || 'Chưa cung cấp'}</p>
+                 <hr/>
+                 <h3>Sản phẩm:</h3>
+                 <p><strong>Tên:</strong> ${product.name}</p>
+                 <p><strong>Số lượng:</strong> ${quantity}</p>
+                 <p><strong>Tổng tiền:</strong> ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalPrice)}</p>
+               </div>
+             `;
+             // Gửi mail không chặn luồng (fire and forget)
+             sendEmail(managerEmail, subject, html).catch(err => console.error(err));
           }
-          */
           setOrderStatus('SUCCESS');
       } else {
           setFeedbackMsg(result.message);
@@ -130,7 +142,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                 <h3 className="text-2xl font-bold text-green-700 mb-2">Đặt hàng thành công!</h3>
                 <p className="text-gray-600 mb-6">
                     Đơn hàng của bạn đã được ghi nhận vào hệ thống.<br/>
-                    Chúng tôi sẽ sớm liên hệ để xác nhận.
+                    Chúng tôi sẽ gửi email xác nhận ngay bây giờ.
                 </p>
                 <button 
                     onClick={onClose}
