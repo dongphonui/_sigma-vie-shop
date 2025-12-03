@@ -148,6 +148,9 @@ export const verifyTotpToken = (token: string): boolean => {
     const settings = getSettings();
     if (!settings.totpSecret || !settings.isTotpEnabled) return false;
 
+    // Tự động xóa khoảng trắng
+    const cleanToken = token.replace(/\s/g, '');
+
     const totp = new OTPAuth.TOTP({
         algorithm: 'SHA1',
         digits: 6,
@@ -156,18 +159,23 @@ export const verifyTotpToken = (token: string): boolean => {
     });
 
     // validate returns the delta (0 for current, -1 for prev, 1 for next) or null if invalid
-    const delta = totp.validate({ token, window: 1 });
+    // Tăng window lên 6 (khoảng +/- 3 phút) để tránh lỗi lệch giờ
+    const delta = totp.validate({ token: cleanToken, window: 6 });
     return delta !== null;
 };
 
 // Helper to verify a token against a temporary secret (during setup)
 export const verifyTempTotpToken = (token: string, tempSecret: string): boolean => {
+    // Tự động xóa khoảng trắng
+    const cleanToken = token.replace(/\s/g, '');
+
     const totp = new OTPAuth.TOTP({
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
         secret: OTPAuth.Secret.fromBase32(tempSecret)
     });
-    const delta = totp.validate({ token, window: 1 });
+    // Tăng window lên 6 để dễ kích hoạt hơn
+    const delta = totp.validate({ token: cleanToken, window: 6 });
     return delta !== null;
 };

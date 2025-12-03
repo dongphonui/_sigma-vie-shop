@@ -609,15 +609,19 @@ const AdminPage: React.FC = () => {
 
   const handleVerifyAndEnableTotp = (e: React.FormEvent) => {
       e.preventDefault();
-      if (verifyTempTotpToken(verificationCode, tempTotpSecret)) {
+      // Auto-clean spaces from the input code
+      const cleanCode = verificationCode.replace(/\s/g, '');
+      console.log('Verifying TOTP code (cleaned):', cleanCode);
+
+      if (verifyTempTotpToken(cleanCode, tempTotpSecret)) {
           enableTotp(tempTotpSecret);
           refreshSettings();
           setShowTotpSetup(false);
-          setSettingsFeedback('Đã bật bảo mật 2 lớp thành công! Từ giờ bạn hãy dùng app Google Authenticator để lấy mã.');
+          setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công! Từ giờ bạn hãy dùng app Google Authenticator để lấy mã.');
       } else {
-          setSettingsFeedback('Mã xác nhận không đúng. Vui lòng thử lại.');
+          setSettingsFeedback('❌ Mã xác nhận không đúng. Vui lòng kiểm tra lại đồng hồ điện thoại hoặc quét lại mã QR.');
       }
-      setTimeout(() => setSettingsFeedback(''), 5000);
+      setTimeout(() => setSettingsFeedback(''), 6000);
   };
 
   const handleDisableTotp = () => {
