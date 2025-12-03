@@ -1,20 +1,30 @@
 
 import React, { useState, useEffect } from 'react';
-import { getAdminEmails } from '../utils/adminSettingsStorage';
+import { getAdminEmails, verifyTotpToken } from '../utils/adminSettingsStorage';
 
 const AdminOTPPage: React.FC = () => {
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
+  const [authMethod, setAuthMethod] = useState<'EMAIL' | 'TOTP'>('EMAIL');
   
-  // State để lưu mã OTP thực (để hiển thị khẩn cấp)
+  // State để lưu mã OTP thực (để hiển thị khẩn cấp - chỉ dùng cho Email)
   const [emergencyOtp, setEmergencyOtp] = useState<string | null>(null);
 
   useEffect(() => {
     setAdminEmails(getAdminEmails());
+    const method = sessionStorage.getItem('authMethod') as 'EMAIL' | 'TOTP';
+    setAuthMethod(method || 'EMAIL');
+
+    if (method === 'TOTP') {
+        // Nếu dùng Google Auth thì không cần check session OTP
+        return;
+    }
+
+    // Nếu dùng Email thì check session
     const otpDataString = sessionStorage.getItem('otpVerification');
     if (!otpDataString) {
-      setError("Không tìm thấy yêu cầu xác thực. Vui lòng đăng nhập lại để nhận mã OTP mới.");
+      setError("Không tìm thấy yêu cầu xác thực. Vui lòng đăng nhập lại.");
       return;
     }
     const otpData = JSON.parse(otpDataString);
@@ -23,7 +33,6 @@ const AdminOTPPage: React.FC = () => {
         sessionStorage.removeItem('otpVerification');
         return;
     }
-    // Lưu mã OTP vào state để dùng cho nút khẩn cấp
     setEmergencyOtp(otpData.otp);
   }, []);
 
@@ -31,26 +40,39 @@ const AdminOTPPage: React.FC = () => {
     e.preventDefault();
     setError('');
     
-    const otpDataString = sessionStorage.getItem('otpVerification');
-    if (!otpDataString) {
-      setError('Phiên đã hết hạn. Vui lòng đăng nhập lại.');
-      return;
-    }
-
-    const otpData = JSON.parse(otpDataString);
-
-    if (Date.now() > otpData.expiry) {
-      setError('Mã OTP đã hết hạn. Vui lòng thử đăng nhập lại.');
-      sessionStorage.removeItem('otpVerification');
-      return;
-    }
-
-    if (otp === otpData.otp) {
-      sessionStorage.removeItem('otpVerification');
-      sessionStorage.setItem('isAuthenticated', 'true');
-      window.location.hash = '/admin';
+    if (authMethod === 'TOTP') {
+        // Validate Google Authenticator Code
+        if (verifyTotpToken(otp)) {
+            sessionStorage.removeItem('authMethod');
+            sessionStorage.setItem('isAuthenticated', 'true');
+            window.location.hash = '/admin';
+        } else {
+            setError('Mã xác thực không đúng. Vui lòng kiểm tra lại ứng dụng Google Authenticator.');
+        }
     } else {
-      setError('Mã OTP không hợp lệ.');
+        // Validate Email OTP
+        const otpDataString = sessionStorage.getItem('otpVerification');
+        if (!otpDataString) {
+            setError('Phiên đã hết hạn. Vui lòng đăng nhập lại.');
+            return;
+        }
+
+        const otpData = JSON.parse(otpDataString);
+
+        if (Date.now() > otpData.expiry) {
+            setError('Mã OTP đã hết hạn. Vui lòng thử đăng nhập lại.');
+            sessionStorage.removeItem('otpVerification');
+            return;
+        }
+
+        if (otp === otpData.otp) {
+            sessionStorage.removeItem('otpVerification');
+            sessionStorage.removeItem('authMethod');
+            sessionStorage.setItem('isAuthenticated', 'true');
+            window.location.hash = '/admin';
+        } else {
+            setError('Mã OTP không hợp lệ.');
+        }
     }
   };
 
@@ -66,13 +88,16 @@ const AdminOTPPage: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold font-serif text-gray-900">Xác thực hai yếu tố</h1>
           <p className="text-gray-600 mt-2">
-             Mã xác thực đã được gửi đến email: <strong>{adminEmails[0]}</strong>
+             {authMethod === 'TOTP' 
+                ? 'Vui lòng nhập mã từ ứng dụng Google Authenticator.' 
+                : <span>Mã xác thực đã được gửi đến email: <strong>{adminEmails[0]}</strong></span>
+             }
           </p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="otp" className="block text-sm font-medium text-gray-700">Mã OTP</label>
+            <label htmlFor="otp" className="block text-sm font-medium text-gray-700">Mã Xác Thực (6 số)</label>
             <input
               type="text"
               id="otp"
@@ -81,6 +106,7 @@ const AdminOTPPage: React.FC = () => {
               className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#D4AF37] focus:border-[#D4AF37] text-center text-2xl tracking-widest"
               required
               maxLength={6}
+              autoFocus
             />
           </div>
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -95,13 +121,15 @@ const AdminOTPPage: React.FC = () => {
         </form>
 
         <div className="mt-6 flex flex-col gap-3 text-center">
-             <button 
-                type="button"
-                onClick={handleRevealOtp}
-                className="text-sm text-red-500 hover:text-red-700 font-medium hover:underline"
-            >
-                Không nhận được mã? Bấm vào đây để lấy mã khẩn cấp
-            </button>
+             {authMethod === 'EMAIL' && (
+                 <button 
+                    type="button"
+                    onClick={handleRevealOtp}
+                    className="text-sm text-red-500 hover:text-red-700 font-medium hover:underline"
+                >
+                    Không nhận được mã? Bấm vào đây để lấy mã khẩn cấp
+                </button>
+             )}
 
             <a href="#/login" onClick={(e) => { e.preventDefault(); window.location.hash = '/login'; }} className="text-sm text-[#D4AF37] hover:underline">
                 Quay lại trang Đăng nhập

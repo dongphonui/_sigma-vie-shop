@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { verifyCredentials } from '../utils/adminSettingsStorage';
+import { verifyCredentials, isTotpEnabled } from '../utils/adminSettingsStorage';
 import { sendOtpRequest } from '../utils/api';
 
 const LoginPage: React.FC = () => {
@@ -15,10 +15,21 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     if (verifyCredentials(username, password)) {
+      
+      // Check if 2FA (TOTP) is enabled
+      if (isTotpEnabled()) {
+          sessionStorage.setItem('authMethod', 'TOTP');
+          // If 2FA enabled, skip email sending and go straight to OTP page
+          window.location.hash = '/otp';
+          setIsLoading(false);
+          return;
+      }
+
+      // Default: Fallback to Email OTP
+      sessionStorage.setItem('authMethod', 'EMAIL');
       try {
         const response = await sendOtpRequest();
         if (response.success) {
-          // Yêu cầu API mô phỏng thành công, chuyển hướng đến trang OTP
           window.location.hash = '/otp';
         } else {
           setError('Không thể gửi mã OTP. Vui lòng thử lại.');

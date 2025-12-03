@@ -4,10 +4,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   LineChart, Line, AreaChart, Area
 } from 'recharts';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
-import { getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
+import { 
+    getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
+    isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTempTotpToken
+} from '../utils/adminSettingsStorage';
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
 import { getHeaderSettings, updateHeaderSettings } from '../utils/headerSettingsStorage';
@@ -98,6 +102,10 @@ const XCircleIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
 );
 
+const ShieldCheckIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
@@ -168,6 +176,13 @@ const AdminPage: React.FC = () => {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [socialSettings, setSocialSettings] = useState<SocialSettings | null>(null);
   const [settingsFeedback, setSettingsFeedback] = useState('');
+  
+  // 2FA State
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [tempTotpSecret, setTempTotpSecret] = useState('');
+  const [tempTotpUri, setTempTotpUri] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [showTotpSetup, setShowTotpSetup] = useState(false);
 
   // Home Page State
   const [homeSettings, setHomeSettings] = useState<HomePageSettings | null>(null);
@@ -215,6 +230,7 @@ const AdminPage: React.FC = () => {
   const refreshSettings = useCallback(() => {
     setAdminEmails(getAdminEmails());
     setSocialSettings(getSocialSettings());
+    setTotpEnabled(isTotpEnabled());
   }, []);
 
   const refreshHomeSettings = useCallback(() => {
@@ -581,6 +597,37 @@ const AdminPage: React.FC = () => {
       setSettingsFeedback(`Đã xóa email ${email}.`);
       setTimeout(() => setSettingsFeedback(''), 3000);
   }
+
+  // TOTP Handlers
+  const handleStartTotpSetup = () => {
+      const secret = generateTotpSecret();
+      setTempTotpSecret(secret);
+      setTempTotpUri(getTotpUri(secret));
+      setShowTotpSetup(true);
+      setVerificationCode('');
+  };
+
+  const handleVerifyAndEnableTotp = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (verifyTempTotpToken(verificationCode, tempTotpSecret)) {
+          enableTotp(tempTotpSecret);
+          refreshSettings();
+          setShowTotpSetup(false);
+          setSettingsFeedback('Đã bật bảo mật 2 lớp thành công! Từ giờ bạn hãy dùng app Google Authenticator để lấy mã.');
+      } else {
+          setSettingsFeedback('Mã xác nhận không đúng. Vui lòng thử lại.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 5000);
+  };
+
+  const handleDisableTotp = () => {
+      if (window.confirm('Bạn có chắc chắn muốn tắt bảo mật 2 lớp không? Tài khoản của bạn sẽ kém an toàn hơn.')) {
+          disableTotp();
+          refreshSettings();
+          setSettingsFeedback('Đã tắt bảo mật 2 lớp.');
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
 
   // Social Settings Handler
   const handleSocialSettingsChange = (field: keyof SocialSettings, value: string) => {
@@ -1057,6 +1104,7 @@ const AdminPage: React.FC = () => {
     );
   };
 
+  // ... (Keep other render methods like renderProductManager, renderCategoryManager, renderInventoryManager, renderAboutPageEditor, renderHomePageSettings, renderHeaderSettings) ...
   const renderCategoryManager = () => (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up mb-8">
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-gray-800">
@@ -1947,7 +1995,7 @@ const AdminPage: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8">
               {/* Email Management */}
               <div>
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
@@ -1991,8 +2039,87 @@ const AdminPage: React.FC = () => {
                   </button>
               </div>
 
+              {/* 2FA Setup Section */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
+                      Bảo mật 2 lớp (Google Authenticator)
+                  </h4>
+                  
+                  {totpEnabled ? (
+                      <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                          <div className="flex items-center gap-3 mb-2">
+                              <div className="bg-green-500 text-white rounded-full p-1">
+                                  <CheckIcon className="w-4 h-4" />
+                              </div>
+                              <h5 className="font-bold text-green-800">Đã kích hoạt</h5>
+                          </div>
+                          <p className="text-sm text-green-700 mb-4">
+                              Tài khoản của bạn đang được bảo vệ bởi Google Authenticator. Bạn cần nhập mã từ ứng dụng khi đăng nhập.
+                          </p>
+                          <button 
+                              onClick={handleDisableTotp}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium underline"
+                          >
+                              Tắt bảo mật 2 lớp
+                          </button>
+                      </div>
+                  ) : (
+                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                          {!showTotpSetup ? (
+                              <>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    Tăng cường bảo mật bằng cách sử dụng Google Authenticator. Bạn sẽ không cần phụ thuộc vào Email để lấy OTP nữa.
+                                </p>
+                                <button 
+                                    onClick={handleStartTotpSetup}
+                                    className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] transition-colors"
+                                >
+                                    Thiết lập ngay
+                                </button>
+                              </>
+                          ) : (
+                              <div className="space-y-4 animate-fade-in-up">
+                                  <h5 className="font-bold text-gray-800">Cài đặt Google Authenticator</h5>
+                                  <div className="flex flex-col md:flex-row gap-6">
+                                      <div className="bg-white p-2 rounded border inline-block">
+                                          <QRCodeSVG value={tempTotpUri} size={150} />
+                                      </div>
+                                      <div className="flex-1 space-y-3">
+                                          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-2">
+                                              <li>Tải ứng dụng <strong>Google Authenticator</strong> trên điện thoại.</li>
+                                              <li>Mở ứng dụng và chọn <strong>Quét mã QR</strong>.</li>
+                                              <li>Quét mã bên cạnh.</li>
+                                              <li>Nhập mã 6 số hiển thị trong ứng dụng vào ô dưới đây để xác nhận.</li>
+                                          </ol>
+                                          
+                                          <form onSubmit={handleVerifyAndEnableTotp} className="mt-4 flex gap-2">
+                                              <input 
+                                                  type="text" 
+                                                  placeholder="Nhập mã 6 số (VD: 123456)"
+                                                  value={verificationCode}
+                                                  onChange={(e) => setVerificationCode(e.target.value)}
+                                                  className="border rounded px-3 py-2 w-48 text-center tracking-widest font-mono"
+                                                  maxLength={6}
+                                                  required
+                                              />
+                                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">
+                                                  Kích hoạt
+                                              </button>
+                                          </form>
+                                          <button onClick={() => setShowTotpSetup(false)} className="text-sm text-gray-500 hover:text-gray-700 underline">
+                                              Hủy bỏ
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                  )}
+              </div>
+
               {/* Social Media Links */}
-              <div>
+              <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Liên kết Mạng xã hội (Footer)</h4>
                   {socialSettings && (
                       <form onSubmit={handleSocialSettingsSubmit} className="space-y-4">
@@ -2021,7 +2148,7 @@ const AdminPage: React.FC = () => {
           </div>
           
            {settingsFeedback && (
-                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không đúng') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
             )}
