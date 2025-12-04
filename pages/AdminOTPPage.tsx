@@ -8,6 +8,7 @@ const AdminOTPPage: React.FC = () => {
   const [error, setError] = useState('');
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
   const [authMethod, setAuthMethod] = useState<'EMAIL' | 'TOTP'>('EMAIL');
+  const [isLoading, setIsLoading] = useState(false);
   
   // State để lưu mã OTP thực (để hiển thị khẩn cấp - chỉ dùng cho Email)
   const [emergencyOtp, setEmergencyOtp] = useState<string | null>(null);
@@ -37,26 +38,29 @@ const AdminOTPPage: React.FC = () => {
     setEmergencyOtp(otpData.otp);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     
     if (authMethod === 'TOTP') {
         // Validate Google Authenticator Code
         if (verifyTotpToken(otp)) {
-            recordAdminLogin('GOOGLE_AUTH', 'SUCCESS');
+            await recordAdminLogin('GOOGLE_AUTH', 'SUCCESS');
             sessionStorage.removeItem('authMethod');
             sessionStorage.setItem('isAuthenticated', 'true');
             window.location.hash = '/admin';
         } else {
             // recordAdminLogin('GOOGLE_AUTH', 'FAILED'); // Optional: Record failed attempts
             setError('Mã xác thực không đúng. Vui lòng kiểm tra lại ứng dụng Google Authenticator.');
+            setIsLoading(false);
         }
     } else {
         // Validate Email OTP
         const otpDataString = sessionStorage.getItem('otpVerification');
         if (!otpDataString) {
             setError('Phiên đã hết hạn. Vui lòng đăng nhập lại.');
+            setIsLoading(false);
             return;
         }
 
@@ -65,17 +69,19 @@ const AdminOTPPage: React.FC = () => {
         if (Date.now() > otpData.expiry) {
             setError('Mã OTP đã hết hạn. Vui lòng thử đăng nhập lại.');
             sessionStorage.removeItem('otpVerification');
+            setIsLoading(false);
             return;
         }
 
         if (otp === otpData.otp) {
-            recordAdminLogin('EMAIL_OTP', 'SUCCESS');
+            await recordAdminLogin('EMAIL_OTP', 'SUCCESS');
             sessionStorage.removeItem('otpVerification');
             sessionStorage.removeItem('authMethod');
             sessionStorage.setItem('isAuthenticated', 'true');
             window.location.hash = '/admin';
         } else {
             setError('Mã OTP không hợp lệ.');
+            setIsLoading(false);
         }
     }
   };
@@ -111,15 +117,17 @@ const AdminOTPPage: React.FC = () => {
               required
               maxLength={6}
               autoFocus
+              disabled={isLoading}
             />
           </div>
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
           <div>
             <button
               type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors"
+              disabled={isLoading}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors disabled:opacity-70"
             >
-              Xác thực
+              {isLoading ? 'Đang xác thực...' : 'Xác thực'}
             </button>
           </div>
         </form>

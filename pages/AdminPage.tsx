@@ -2055,10 +2055,25 @@ const AdminPage: React.FC = () => {
 
               {/* Login Logs Section (NEW) */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <ActivityIcon className="w-5 h-5 text-gray-600" />
-                      Nhật ký đăng nhập
-                  </h4>
+                  <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                          <ActivityIcon className="w-5 h-5 text-gray-600" />
+                          Nhật ký đăng nhập
+                      </h4>
+                      <button 
+                          onClick={() => {
+                              fetchAdminLoginLogs().then(logs => {
+                                  if (logs) setAdminLogs(logs);
+                                  setSettingsFeedback('Đã làm mới nhật ký.');
+                                  setTimeout(() => setSettingsFeedback(''), 3000);
+                              });
+                          }}
+                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                          Làm mới
+                      </button>
+                  </div>
                   <div className="bg-gray-50 border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
                       <table className="min-w-full text-xs text-left text-gray-600">
                           <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">

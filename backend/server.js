@@ -176,12 +176,19 @@ const parsePrice = (priceStr) => {
 // --- NODEMAILER CONFIGURATION ---
 // Cập nhật cấu hình SMTP sang cổng 465 (SSL) - Ổn định nhất cho Render
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Fallback to simple service configuration to let Nodemailer handle port negotiation
+  host: 'smtp.googlemail.com', // Sử dụng host chính xác của Google
+  port: 465, // Port SSL chuẩn
+  secure: true, // Bắt buộc dùng SSL
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS
   },
-  // Bỏ các timeout quá ngắn, để mặc định hoặc dài hơn
+  // Tăng thời gian chờ để tránh timeout trên Render
+  connectionTimeout: 60000, 
+  greetingTimeout: 30000, 
+  socketTimeout: 60000,
+  logger: true, // Log chi tiết quá trình gửi
+  debug: true
 });
 
 // --- VERIFY EMAIL CONNECTION ON STARTUP ---
