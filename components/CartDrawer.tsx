@@ -3,8 +3,7 @@ import React, { useMemo, useState } from 'react';
 import type { CartItem, Customer } from '../types';
 import { updateCartQuantity, removeFromCart, clearCart } from '../utils/cartStorage';
 import { createOrder } from '../utils/orderStorage';
-import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
-// Removed sendEmail import
+import PaymentModal from './PaymentModal';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -24,6 +23,9 @@ const TrashIcon: React.FC<{className?: string}> = ({className}) => (
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, currentUser, onOpenAuth }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BANK_TRANSFER'>('COD');
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState('');
 
   const totalPrice = useMemo(() => {
     return items.reduce((sum, item) => sum + (item.selectedPrice * item.quantity), 0);
@@ -41,31 +43,55 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       }
 
       setIsProcessing(true);
-      // const adminEmail = getPrimaryAdminEmail(); // Không cần dùng đến nếu không gửi mail
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
       
-      // Process orders for each item
-      items.forEach(item => {
-          // Note: createOrder handles stock check and deduction
-          const result = createOrder(currentUser, item, item.quantity);
+      // We will generate a SINGLE Order ID for the whole cart for payment simplicity in this demo,
+      // but strictly speaking, our system creates 1 order per product. 
+      // To adapt to "1 QR code for many items", we can just use the ID of the first created order as the reference,
+      // or sum them up. For simplicity here:
+      // 1. Create all orders.
+      // 2. Sum up amount.
+      // 3. Show QR.
+      
+      // Let's create orders first
+      const createdOrders = [];
+
+      for (const item of items) {
+          const result = createOrder(currentUser, item, item.quantity, paymentMethod);
           if (result.success && result.order) {
               successfulOrders.push(`${item.name} (x${item.quantity})`);
+              createdOrders.push(result.order);
           } else {
               failedItems.push(item.name);
           }
-      });
+      }
 
       if (successfulOrders.length > 0) {
-          // Logic gửi email thông báo đơn hàng đã được tắt theo yêu cầu.
-          
-          clearCart(); 
-          onClose();
-          alert('Đơn hàng đã được đặt thành công! Chúng tôi sẽ sớm liên hệ với bạn.');
+          // If Bank Transfer, show Modal
+          if (paymentMethod === 'BANK_TRANSFER') {
+              // Use the first order ID as reference or a combined one if we had a "Cart Order" concept.
+              // Since we split orders, let's use the ID of the first order for the transaction reference.
+              setLastOrderId(createdOrders[0].id);
+              setShowQrModal(true);
+              // Don't close drawer yet, wait for user confirmation
+          } else {
+              // COD
+              clearCart(); 
+              onClose();
+              alert('Đơn hàng đã được đặt thành công (Thanh toán khi nhận hàng)!');
+          }
       } else {
           alert(`Không thể đặt hàng. Có thể sản phẩm đã hết hàng. Lỗi: ${failedItems.join(', ')}`);
       }
       setIsProcessing(false);
+  };
+
+  const handleConfirmPayment = () => {
+      setShowQrModal(false);
+      clearCart();
+      onClose();
+      alert('Cảm ơn bạn! Đơn hàng đang được chờ xác nhận thanh toán.');
   };
 
   return (
@@ -143,6 +169,24 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
 
         {items.length > 0 && (
             <div className="p-4 border-t border-gray-200 bg-gray-50">
+                <div className="mb-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Phương thức thanh toán:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button 
+                            onClick={() => setPaymentMethod('COD')}
+                            className={`py-2 px-2 text-xs sm:text-sm border rounded-lg font-medium transition-colors ${paymentMethod === 'COD' ? 'bg-[#D4AF37] text-white border-[#D4AF37]' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            Tiền mặt (COD)
+                        </button>
+                        <button 
+                            onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                            className={`py-2 px-2 text-xs sm:text-sm border rounded-lg font-medium transition-colors ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#00695C] text-white border-[#00695C]' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            Chuyển khoản (QR)
+                        </button>
+                    </div>
+                </div>
+
                 <div className="flex justify-between items-center mb-4">
                     <span className="text-gray-600">Tổng cộng:</span>
                     <span className="text-2xl font-bold text-[#D4AF37]">{formatPrice(totalPrice)}</span>
@@ -152,11 +196,19 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                     disabled={isProcessing}
                     className="w-full bg-[#00695C] text-white py-3 rounded-full font-bold shadow-lg hover:bg-[#004d40] transition-transform transform hover:-translate-y-0.5 disabled:opacity-70"
                 >
-                    {isProcessing ? 'Đang xử lý...' : 'Tiến hành Đặt hàng'}
+                    {isProcessing ? 'Đang xử lý...' : (paymentMethod === 'BANK_TRANSFER' ? 'Tạo mã QR Thanh toán' : 'Tiến hành Đặt hàng')}
                 </button>
             </div>
         )}
       </div>
+
+      <PaymentModal 
+        isOpen={showQrModal} 
+        onClose={() => setShowQrModal(false)}
+        orderId={lastOrderId}
+        amount={totalPrice}
+        onConfirmPayment={handleConfirmPayment}
+      />
     </>
   );
 };

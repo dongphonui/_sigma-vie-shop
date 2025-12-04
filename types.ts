@@ -61,6 +61,7 @@ export interface Order {
   totalPrice: number;
   status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
   timestamp: number;
+  paymentMethod?: 'COD' | 'BANK_TRANSFER'; // NEW
 }
 
 export interface AdminLoginLog {
@@ -189,4 +190,11 @@ export interface SocialSettings {
   instagram: string;
   twitter: string;
   tiktok: string;
+}
+
+export interface BankSettings {
+  bankId: string; // e.g., 'VCB', 'MB'
+  accountNumber: string;
+  accountName: string;
+  template: string; // 'qr_only', 'compact', 'compact2', 'print'
 }

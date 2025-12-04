@@ -40,7 +40,8 @@ const parsePrice = (priceStr: string): number => {
 export const createOrder = (
     customer: Customer,
     product: Product,
-    quantity: number
+    quantity: number,
+    paymentMethod: 'COD' | 'BANK_TRANSFER' = 'COD' // Added Parameter
 ): { success: boolean; message: string; order?: Order } => {
     
     if (product.stock < quantity) {
@@ -59,7 +60,8 @@ export const createOrder = (
         quantity: quantity,
         totalPrice: pricePerUnit * quantity,
         status: 'PENDING',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        paymentMethod: paymentMethod // NEW
     };
 
     const stockUpdated = updateProductStock(product.id, -quantity);
@@ -78,7 +80,7 @@ export const createOrder = (
         productName: product.name,
         type: 'EXPORT',
         quantity: quantity,
-        note: `Đơn hàng trực tuyến từ ${customer.fullName} (${newOrder.id})`
+        note: `Đơn hàng trực tuyến từ ${customer.fullName} (${newOrder.id}) [${paymentMethod}]`
     });
 
     return { success: true, message: 'Đặt hàng thành công!', order: newOrder };
@@ -92,9 +94,7 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
         const oldStatus = order.status;
 
         // LOGIC MỚI: HOÀN TRẢ KHO KHI HỦY ĐƠN
-        // Chỉ hoàn trả nếu đơn hàng chưa từng bị hủy trước đó
         if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
-            // Ép kiểu số nguyên để đảm bảo không cộng chuỗi
             const pid = Number(order.productId);
             const qty = Number(order.quantity);
 

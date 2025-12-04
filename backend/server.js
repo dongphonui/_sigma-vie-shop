@@ -11,15 +11,13 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
 // --- CẤU HÌNH KẾT NỐI DATABASE (Update cho Render) ---
-// Nếu có DATABASE_URL (Render cung cấp), ưu tiên dùng nó.
-// Nếu không, dùng các biến lẻ (DB_USER, DB_HOST...) cho localhost.
 const isProduction = !!process.env.DATABASE_URL;
 
 const poolConfig = isProduction
   ? {
       connectionString: process.env.DATABASE_URL,
       ssl: {
-        rejectUnauthorized: false // Bắt buộc cho kết nối SSL trên Cloud (Render/Neon/Heroku)
+        rejectUnauthorized: false
       }
     }
   : {
@@ -32,29 +30,23 @@ const poolConfig = isProduction
 
 const pool = new Pool(poolConfig);
 
-// Log debug để kiểm tra kết nối
 if (isProduction) {
     console.log("--- DEBUG CONNECTION ---");
-    // Che giấu mật khẩu trong log
     const maskedUrl = process.env.DATABASE_URL.replace(/:([^:@]+)@/, ':****@');
     console.log("Using DATABASE_URL:", maskedUrl);
 } else {
     console.log("Using Local Config:", poolConfig.host);
 }
 
-// Xử lý lỗi ngầm định của Pool để tránh crash app
 pool.on('error', (err, client) => {
   console.error('Unexpected error on idle client', err);
-  // Không exit process ở đây để giữ server sống trên Render
 });
 
 // --- KHỞI TẠO DATABASE & BẢNG ---
 const initDb = async () => {
   let client;
   try {
-    // Thử kết nối, nếu sai thông tin DB thì sẽ nhảy vào catch ngay
     client = await pool.connect();
-    
     await client.query('BEGIN');
     
     console.log("Đang kiểm tra và khởi tạo bảng...");
@@ -119,6 +111,13 @@ const initDb = async () => {
         timestamp BIGINT
       );
     `);
+    
+    // MIGRATION: Thêm cột payment_method nếu chưa có
+    try {
+        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
+    } catch (err) {
+        console.log("Column payment_method already exists or error adding it:", err.message);
+    }
 
     // 5. Inventory Transactions Table
     await client.query(`
@@ -151,15 +150,12 @@ const initDb = async () => {
   } catch (e) {
     if (client) await client.query('ROLLBACK');
     console.error("--- LỖI KẾT NỐI DATABASE ---");
-    console.error("Vui lòng kiểm tra lại biến môi trường DATABASE_URL hoặc thông tin DB.");
     console.error("Chi tiết lỗi:", e.message);
-    // Không throw lỗi tiếp để Server vẫn khởi động được
   } finally {
     if (client) client.release();
   }
 };
 
-// Gọi hàm khởi tạo nhưng bắt lỗi global để chắc chắn không crash
 initDb().catch(err => {
     console.error("Critical Init Error:", err);
 });
@@ -174,30 +170,24 @@ const parsePrice = (priceStr) => {
 };
 
 // --- NODEMAILER CONFIGURATION ---
-// Cập nhật cấu hình SMTP sang cổng 465 (SSL) - Ổn định nhất cho Render
 const transporter = nodemailer.createTransport({
-  host: 'smtp.googlemail.com', // Sử dụng host chính xác của Google
-  port: 465, // Port SSL chuẩn
-  secure: true, // Bắt buộc dùng SSL
+  host: 'smtp.googlemail.com', 
+  port: 465, 
+  secure: true, 
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS
   },
-  // Tăng thời gian chờ để tránh timeout trên Render
   connectionTimeout: 60000, 
   greetingTimeout: 30000, 
   socketTimeout: 60000,
-  logger: true, // Log chi tiết quá trình gửi
+  logger: true,
   debug: true
 });
 
-// --- VERIFY EMAIL CONNECTION ON STARTUP ---
-// Tự động kiểm tra kết nối Email khi server khởi động
 transporter.verify(function (error, success) {
   if (error) {
-    console.error("❌ Lỗi kết nối Email (SMTP):");
-    console.error(error);
-    console.error("Gợi ý: Kiểm tra biến môi trường EMAIL_PASS trên Render. Đảm bảo không có dấu cách thừa.");
+    console.error("❌ Lỗi kết nối Email (SMTP):", error);
   } else {
     console.log("✅ Kết nối Email sẵn sàng!");
   }
@@ -205,20 +195,6 @@ transporter.verify(function (error, success) {
 
 // --- API ENDPOINTS ---
 
-// Middleware kiểm tra DB connection trước khi xử lý request
-const checkDbConnection = async (req, res, next) => {
-    try {
-        // Chỉ check nhanh pool
-        if (pool.totalCount === 0 && !isProduction) { 
-            // Nếu local và chưa có connect nào thì có thể warn
-        }
-        next();
-    } catch (e) {
-        res.status(500).json({ error: 'Database connection failed' });
-    }
-}
-
-// 0. SEND EMAIL API
 app.post('/api/send-email', async (req, res) => {
   const { to, subject, html } = req.body;
 
@@ -226,7 +202,6 @@ app.post('/api/send-email', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Email configuration missing on server.' });
   }
 
-  // Lấy tên người gửi từ biến môi trường hoặc dùng mặc định
   const senderName = process.env.EMAIL_FROM_NAME || "Sigma Vie Store";
 
   const mailOptions = {
@@ -270,7 +245,6 @@ app.get('/api/products', async (req, res) => {
     res.json(products);
   } catch (err) {
     console.error(err);
-    // Trả về mảng rỗng hoặc lỗi 500 nhưng không crash
     res.status(500).send(err.message);
   }
 });
@@ -306,22 +280,17 @@ app.post('/api/products/sync', async (req, res) => {
   }
 });
 
-// NEW API: ATOMIC STOCK UPDATE (Quan trọng cho vấn đề Race Condition)
+// NEW API: ATOMIC STOCK UPDATE
 app.post('/api/products/stock', async (req, res) => {
   const { id, quantityChange } = req.body;
-  
-  // ÉP KIỂU SỐ NGUYÊN (QUAN TRỌNG)
   const productId = parseInt(id, 10);
   const qty = parseInt(quantityChange, 10);
 
   if (isNaN(productId) || isNaN(qty)) {
-      console.error("Invalid input for stock update:", { id, quantityChange });
       return res.status(400).json({ success: false, message: "Invalid ID or Quantity" });
   }
 
   try {
-    // Sử dụng logic cộng dồn trực tiếp trên DB: stock = stock + $1
-    // Điều này đảm bảo tính toàn vẹn dữ liệu ngay cả khi có nhiều request cùng lúc
     const query = `
       UPDATE products
       SET stock = stock + $1
@@ -333,8 +302,6 @@ app.post('/api/products/stock', async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
-
-    console.log(`Updated stock for ID ${productId}: change ${qty}, new stock ${result.rows[0].stock}`);
     res.json({ success: true, newStock: result.rows[0].stock });
   } catch (err) {
     console.error(err);
@@ -387,7 +354,6 @@ app.post('/api/customers/sync', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// API Update Customer
 app.put('/api/customers/:id', async (req, res) => {
     const id = req.params.id;
     const { fullName, email, phoneNumber, address } = req.body;
@@ -403,7 +369,6 @@ app.put('/api/customers/:id', async (req, res) => {
     }
 });
 
-// API Delete Customer
 app.delete('/api/customers/:id', async (req, res) => {
     const id = req.params.id;
     try {
@@ -423,7 +388,8 @@ app.get('/api/orders', async (req, res) => {
         id: r.id, customerId: r.customer_id, customerName: r.customer_name,
         customerContact: r.customer_contact, customerAddress: r.customer_address,
         productId: r.product_id, productName: r.product_name, quantity: r.quantity,
-        totalPrice: parseFloat(r.total_price), status: r.status, timestamp: parseInt(r.timestamp)
+        totalPrice: parseFloat(r.total_price), status: r.status, timestamp: parseInt(r.timestamp),
+        paymentMethod: r.payment_method // NEW field
     }));
     res.json(orders);
   } catch (err) { res.status(500).send(err.message); }
@@ -433,10 +399,10 @@ app.post('/api/orders/sync', async (req, res) => {
   const o = req.body;
   try {
     await pool.query(
-      `INSERT INTO orders (id, customer_id, customer_name, customer_contact, customer_address, product_id, product_name, quantity, total_price, status, timestamp)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status`,
-      [o.id, o.customerId, o.customerName, o.customerContact, o.customerAddress, o.productId, o.productName, o.quantity, o.totalPrice, o.status, o.timestamp]
+      `INSERT INTO orders (id, customer_id, customer_name, customer_contact, customer_address, product_id, product_name, quantity, total_price, status, timestamp, payment_method)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payment_method = EXCLUDED.payment_method`,
+      [o.id, o.customerId, o.customerName, o.customerContact, o.customerAddress, o.productId, o.productName, o.quantity, o.totalPrice, o.status, o.timestamp, o.paymentMethod]
     );
     res.json({ success: true });
   } catch (err) { 
@@ -473,7 +439,6 @@ app.post('/api/inventory/sync', async (req, res) => {
 // 6. ADMIN LOGIN LOGS
 app.post('/api/admin/logs', async (req, res) => {
     const { username, method, status, timestamp } = req.body;
-    // Get IP address
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
 

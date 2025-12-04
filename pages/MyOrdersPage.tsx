@@ -32,15 +32,21 @@ const XCircleIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
 );
 
+const CreditCardIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+);
+
+const DollarSignIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+);
+
 const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVisible, cartItemCount, onOpenCart }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (currentUser) {
-        // Load orders for current customer
         const customerOrders = getOrdersByCustomerId(currentUser.id);
-        // Sort by newest first
         setOrders(customerOrders.sort((a, b) => b.timestamp - a.timestamp));
     }
     setLoading(false);
@@ -49,7 +55,6 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
   const handleCancelOrder = (orderId: string) => {
       if (window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này không?")) {
           updateOrderStatus(orderId, 'CANCELLED');
-          // Refresh list
           if (currentUser) {
               const customerOrders = getOrdersByCustomerId(currentUser.id);
               setOrders(customerOrders.sort((a, b) => b.timestamp - a.timestamp));
@@ -135,8 +140,17 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                                         <p className="text-sm text-gray-500">Mã đơn hàng: <span className="font-mono font-bold text-gray-800">{order.id}</span></p>
                                         <p className="text-sm text-gray-500">Ngày đặt: {new Date(order.timestamp).toLocaleDateString('vi-VN')} {new Date(order.timestamp).toLocaleTimeString('vi-VN')}</p>
                                     </div>
-                                    <div>
+                                    <div className="flex flex-col items-end gap-2">
                                         {getStatusBadge(order.status)}
+                                        {order.paymentMethod === 'BANK_TRANSFER' ? (
+                                            <span className="text-xs text-[#00695C] font-bold flex items-center gap-1 border border-[#00695C] px-2 py-0.5 rounded">
+                                                <CreditCardIcon className="w-3 h-3" /> Chuyển khoản
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-600 font-bold flex items-center gap-1 border border-gray-300 px-2 py-0.5 rounded">
+                                                <DollarSignIcon className="w-3 h-3" /> Tiền mặt (COD)
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 
