@@ -31,7 +31,7 @@ const ImagePlus: React.FC<{className?: string}> = ({className}) => (
 );
 
 const Trash2Icon: React.FC<{className?: string}> = ({className}) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
 );
 
 const EditIcon: React.FC<{className?: string}> = ({className}) => (
@@ -108,6 +108,10 @@ const CreditCardIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
 );
 
+const DollarSignIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
@@ -119,12 +123,12 @@ const AdminPage: React.FC = () => {
   
   // Product Form State
   const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null); // Track product being edited
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  const [isManagingCategories, setIsManagingCategories] = useState(false); // Toggle Category Manager
+  const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
-  const [newProductImportPrice, setNewProductImportPrice] = useState(''); // NEW: Import Price
+  const [newProductImportPrice, setNewProductImportPrice] = useState('');
   const [newProductSku, setNewProductSku] = useState('');
   const [newProductCategory, setNewProductCategory] = useState('');
   const [newProductBrand, setNewProductBrand] = useState('');
@@ -178,8 +182,8 @@ const AdminPage: React.FC = () => {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [socialSettings, setSocialSettings] = useState<SocialSettings | null>(null);
   const [settingsFeedback, setSettingsFeedback] = useState('');
-  const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]); // New state for logs
-  const [bankSettings, setBankSettings] = useState<BankSettings | null>(null); // Bank Settings State
+  const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
+  const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
   
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
@@ -203,7 +207,7 @@ const AdminPage: React.FC = () => {
   const [inventoryNote, setInventoryNote] = useState('');
   const [inventoryType, setInventoryType] = useState<'IMPORT' | 'EXPORT'>('IMPORT');
   const [inventoryFeedback, setInventoryFeedback] = useState('');
-  const [inventoryView, setInventoryView] = useState<'stock' | 'history'>('stock'); // 'stock' or 'history'
+  const [inventoryView, setInventoryView] = useState<'stock' | 'history'>('stock');
   const [inventorySearch, setInventorySearch] = useState('');
 
   // Dashboard State
@@ -290,7 +294,6 @@ const AdminPage: React.FC = () => {
     window.location.hash = '/';
   };
 
-  // ... (Keep all handlers as previously defined) ...
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -739,9 +742,912 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
-  // ... (Keep existing render methods) ...
-  // Keeping renderDashboard, renderProductManager, etc. as they are. 
-  // Just inserting Bank Settings into renderSettings.
+  // --- RENDER FUNCTIONS IMPLEMENTATION ---
+
+  const renderDashboard = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+                  <div className="flex justify-between items-center">
+                      <div>
+                          <p className="text-gray-500 text-sm font-medium uppercase">Doanh thu hôm nay</p>
+                          <p className="text-2xl font-bold text-gray-800">
+                              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(dashboardData?.totalRevenueToday || 0)}
+                          </p>
+                      </div>
+                      <div className="bg-blue-100 p-3 rounded-full">
+                          <DollarSignIcon className="w-6 h-6 text-blue-600" />
+                      </div>
+                  </div>
+              </div>
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
+                  <div className="flex justify-between items-center">
+                      <div>
+                          <p className="text-gray-500 text-sm font-medium uppercase">Đơn hàng mới</p>
+                          <p className="text-2xl font-bold text-gray-800">{orders.filter(o => o.status === 'PENDING').length}</p>
+                      </div>
+                      <div className="bg-green-100 p-3 rounded-full">
+                          <ClipboardListIcon className="w-6 h-6 text-green-600" />
+                      </div>
+                  </div>
+              </div>
+               <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
+                  <div className="flex justify-between items-center">
+                      <div>
+                          <p className="text-gray-500 text-sm font-medium uppercase">Tổng sản phẩm</p>
+                          <p className="text-2xl font-bold text-gray-800">{products.length}</p>
+                      </div>
+                      <div className="bg-purple-100 p-3 rounded-full">
+                          <PackageIcon className="w-6 h-6 text-purple-600" />
+                      </div>
+                  </div>
+              </div>
+               <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
+                  <div className="flex justify-between items-center">
+                      <div>
+                          <p className="text-gray-500 text-sm font-medium uppercase">Sắp hết hàng</p>
+                          <p className="text-2xl font-bold text-gray-800">{dashboardData?.lowStockProducts.length || 0}</p>
+                      </div>
+                      <div className="bg-red-100 p-3 rounded-full">
+                          <ActivityIcon className="w-6 h-6 text-red-600" />
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Doanh số 7 ngày qua</h3>
+                  <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={dashboardData?.dailySales}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <RechartsTooltip formatter={(value) => new Intl.NumberFormat('vi-VN').format(value as number)} />
+                              <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} name="Doanh thu" />
+                          </AreaChart>
+                      </ResponsiveContainer>
+                  </div>
+              </div>
+               <div className="bg-white p-6 rounded-lg shadow-md">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Tồn kho theo sản phẩm</h3>
+                   <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={dashboardData?.stockData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <RechartsTooltip />
+                              <Bar dataKey="value" fill="#00695C" name="Số lượng" />
+                          </BarChart>
+                      </ResponsiveContainer>
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderProductManager = () => (
+    <div className="space-y-6 animate-fade-in-up">
+        {/* Toggle Category Manager */}
+        <div className="flex justify-end">
+             <button 
+                onClick={() => setIsManagingCategories(!isManagingCategories)}
+                className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50"
+            >
+                {isManagingCategories ? 'Quay lại Quản lý Sản phẩm' : 'Quản lý Danh mục'}
+            </button>
+        </div>
+
+        {isManagingCategories ? (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                 <h3 className="text-lg font-bold text-gray-800 mb-4">Quản lý Danh mục</h3>
+                 <form onSubmit={handleSaveCategory} className="mb-6 flex gap-4">
+                     <input 
+                        type="text" 
+                        placeholder="Tên danh mục" 
+                        value={newCategoryName} 
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="border rounded px-3 py-2 flex-1"
+                        required
+                     />
+                     <input 
+                        type="text" 
+                        placeholder="Mô tả" 
+                        value={newCategoryDesc} 
+                        onChange={(e) => setNewCategoryDesc(e.target.value)}
+                        className="border rounded px-3 py-2 flex-1"
+                     />
+                     <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                         {editingCategory ? 'Cập nhật' : 'Thêm mới'}
+                     </button>
+                     {editingCategory && (
+                         <button type="button" onClick={handleCancelEdit} className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Hủy</button>
+                     )}
+                 </form>
+
+                 <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm text-left text-gray-500">
+                        <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                            <tr>
+                                <th className="px-4 py-3">ID</th>
+                                <th className="px-4 py-3">Tên</th>
+                                <th className="px-4 py-3">Mô tả</th>
+                                <th className="px-4 py-3 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {categories.map((cat) => (
+                                <tr key={cat.id} className="border-b hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-mono">{cat.id}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-800">{cat.name}</td>
+                                    <td className="px-4 py-3">{cat.description}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <button onClick={() => handleEditCategory(cat)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                        <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                 </div>
+            </div>
+        ) : (
+            <>
+                {/* Product List & Form */}
+                <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+                    <div className="flex gap-4">
+                        <div className="relative">
+                            <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <input 
+                                type="text" 
+                                placeholder="Tìm kiếm..." 
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                                className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-64"
+                            />
+                        </div>
+                        <select 
+                            value={filterStatus} 
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="border rounded-md px-3 py-2"
+                        >
+                            <option value="all">Tất cả trạng thái</option>
+                            <option value="active">Đang bán</option>
+                            <option value="draft">Nháp</option>
+                            <option value="archived">Lưu trữ</option>
+                        </select>
+                    </div>
+                    <button 
+                        onClick={() => { setIsAddingProduct(!isAddingProduct); setEditingProduct(null); handleCancelProductEdit(); }}
+                        className="bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#b89b31]"
+                    >
+                        {isAddingProduct ? 'Quay lại danh sách' : 'Thêm sản phẩm'}
+                    </button>
+                </div>
+
+                {isAddingProduct ? (
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <h3 className="text-lg font-bold text-gray-800 mb-6">{editingProduct ? 'Chỉnh sửa Sản phẩm' : 'Thêm Sản phẩm Mới'}</h3>
+                        <form onSubmit={handleProductSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên sản phẩm *</label>
+                                    <input type="text" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+                                    <input type="text" value={newProductSku} onChange={(e) => setNewProductSku(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Tự động tạo nếu để trống" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá bán *</label>
+                                    <input type="text" value={newProductPrice} onChange={(e) => setNewProductPrice(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá nhập (Vốn)</label>
+                                    <input type="text" value={newProductImportPrice} onChange={(e) => setNewProductImportPrice(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
+                                    <select value={newProductCategory} onChange={(e) => setNewProductCategory(e.target.value)} className="w-full border rounded px-3 py-2">
+                                        <option value="">-- Chọn danh mục --</option>
+                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu</label>
+                                    <input type="text" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                                    <select value={newProductStatus} onChange={(e) => setNewProductStatus(e.target.value as any)} className="w-full border rounded px-3 py-2">
+                                        <option value="active">Đang bán</option>
+                                        <option value="draft">Nháp</option>
+                                        <option value="archived">Lưu trữ</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            {/* FLASH SALE SETTINGS */}
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                                <label className="flex items-center gap-2 mb-4 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={newProductIsFlashSale} 
+                                        onChange={(e) => setNewProductIsFlashSale(e.target.checked)} 
+                                        className="w-4 h-4 text-red-600 rounded"
+                                    />
+                                    <span className="font-bold text-red-700 flex items-center gap-1"><LightningIcon className="w-4 h-4"/> Bật Flash Sale</span>
+                                </label>
+                                {newProductIsFlashSale && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Giá khuyến mãi *</label>
+                                            <input type="text" value={newProductSalePrice} onChange={(e) => setNewProductSalePrice(e.target.value)} className="w-full border rounded px-3 py-2 border-red-300" placeholder="VD: 1,500,000đ" required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian bắt đầu</label>
+                                            <input type="datetime-local" value={newProductFlashSaleStartTime} onChange={(e) => setNewProductFlashSaleStartTime(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian kết thúc</label>
+                                            <input type="datetime-local" value={newProductFlashSaleEndTime} onChange={(e) => setNewProductFlashSaleEndTime(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                                <textarea rows={4} value={newProductDescription} onChange={(e) => setNewProductDescription(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Hình ảnh sản phẩm *</label>
+                                <div className="flex items-center gap-4">
+                                    <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded inline-flex items-center">
+                                        <ImagePlus className="w-4 h-4 mr-2" />
+                                        <span>Chọn ảnh</span>
+                                        <input id="image-upload" type="file" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
+                                    </label>
+                                    {newProductImage && (
+                                        <img src={newProductImage} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <button type="button" onClick={handleCancelProductEdit} className="bg-gray-200 text-gray-700 px-6 py-2 rounded font-medium hover:bg-gray-300">Hủy</button>
+                                <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold hover:bg-[#b89b31]">{editingProduct ? 'Lưu thay đổi' : 'Tạo sản phẩm'}</button>
+                            </div>
+                        </form>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                        <table className="min-w-full text-sm text-left text-gray-500">
+                            <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                                <tr>
+                                    <th className="px-4 py-3">Sản phẩm</th>
+                                    <th className="px-4 py-3">Giá</th>
+                                    <th className="px-4 py-3">Tồn kho</th>
+                                    <th className="px-4 py-3">Danh mục</th>
+                                    <th className="px-4 py-3">Trạng thái</th>
+                                    <th className="px-4 py-3 text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {products
+                                    .filter(p => 
+                                        (filterStatus === 'all' || p.status === filterStatus) &&
+                                        (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
+                                    )
+                                    .map((product) => (
+                                    <tr key={product.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <img src={product.imageUrl} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{product.name}</p>
+                                                    <p className="text-xs text-gray-500">{product.sku}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {product.isFlashSale ? (
+                                                <div>
+                                                    <span className="text-red-600 font-bold block">{product.salePrice}</span>
+                                                    <span className="text-xs text-gray-400 line-through">{product.price}</span>
+                                                </div>
+                                            ) : (
+                                                product.price
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                                {product.stock}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">{product.category}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold 
+                                                ${product.status === 'active' ? 'bg-green-100 text-green-700' : 
+                                                  product.status === 'draft' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                {product.status === 'active' ? 'Đang bán' : product.status === 'draft' ? 'Nháp' : 'Lưu trữ'}
+                                            </span>
+                                            {product.isFlashSale && <span className="ml-1 text-xs text-red-500 font-bold">⚡</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                            <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </>
+        )}
+        {productFeedback && (
+             <div className={`mt-4 p-3 rounded text-center font-medium animate-pulse ${productFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 {productFeedback}
+             </div>
+        )}
+    </div>
+  );
+
+  const renderOrderManager = () => (
+      <div className="space-y-6 animate-fade-in-up">
+           <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+              <div className="relative">
+                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input 
+                      type="text" 
+                      placeholder="Tìm mã đơn, tên KH..." 
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-64"
+                  />
+              </div>
+              <select 
+                  value={orderFilterStatus} 
+                  onChange={(e) => setOrderFilterStatus(e.target.value)}
+                  className="border rounded-md px-3 py-2"
+              >
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="PENDING">Chờ xử lý</option>
+                  <option value="CONFIRMED">Đã xác nhận</option>
+                  <option value="SHIPPED">Đã giao hàng</option>
+                  <option value="CANCELLED">Đã hủy</option>
+              </select>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <table className="min-w-full text-sm text-left text-gray-500">
+                  <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                      <tr>
+                          <th className="px-4 py-3">Mã Đơn</th>
+                          <th className="px-4 py-3">Khách hàng</th>
+                          <th className="px-4 py-3">Sản phẩm</th>
+                          <th className="px-4 py-3">Tổng tiền</th>
+                          <th className="px-4 py-3">Thanh toán</th>
+                          <th className="px-4 py-3">Trạng thái</th>
+                          <th className="px-4 py-3">Thao tác</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                      {orders
+                          .filter(order => 
+                              (orderFilterStatus === 'all' || order.status === orderFilterStatus) &&
+                              (order.id.toLowerCase().includes(orderSearch.toLowerCase()) || order.customerName.toLowerCase().includes(orderSearch.toLowerCase()))
+                          )
+                          .sort((a, b) => b.timestamp - a.timestamp)
+                          .slice((orderCurrentPage - 1) * ordersPerPage, orderCurrentPage * ordersPerPage)
+                          .map((order) => (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-mono text-xs">{order.id}</td>
+                              <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900">{order.customerName}</div>
+                                  <div className="text-xs text-gray-400">{order.customerContact}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                  <div>{order.productName}</div>
+                                  <div className="text-xs text-gray-400">x{order.quantity}</div>
+                              </td>
+                              <td className="px-4 py-3 font-bold text-gray-800">
+                                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice)}
+                              </td>
+                              <td className="px-4 py-3">
+                                  {order.paymentMethod === 'BANK_TRANSFER' ? (
+                                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200 font-bold">Chuyển khoản</span>
+                                  ) : (
+                                      <span className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded border font-bold">COD</span>
+                                  )}
+                              </td>
+                              <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 rounded text-xs font-bold 
+                                      ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
+                                        order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' : 
+                                        order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                      {order.status === 'PENDING' ? 'Chờ xử lý' : 
+                                       order.status === 'CONFIRMED' ? 'Đã xác nhận' : 
+                                       order.status === 'SHIPPED' ? 'Đã giao' : 'Đã hủy'}
+                                  </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                  <select 
+                                      value={order.status} 
+                                      onChange={(e) => handleOrderStatusChange(order.id, e.target.value as any)}
+                                      className="border rounded px-2 py-1 text-xs"
+                                  >
+                                      <option value="PENDING">Chờ xử lý</option>
+                                      <option value="CONFIRMED">Xác nhận</option>
+                                      <option value="SHIPPED">Giao hàng</option>
+                                      <option value="CANCELLED">Hủy đơn</option>
+                                  </select>
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+              {/* Pagination (Simple) */}
+              <div className="p-4 border-t flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Trang {orderCurrentPage}</span>
+                  <div className="flex gap-2">
+                      <button 
+                          disabled={orderCurrentPage === 1}
+                          onClick={() => setOrderCurrentPage(c => c - 1)}
+                          className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50"
+                      >
+                          <ChevronLeftIcon className="w-4 h-4"/>
+                      </button>
+                      <button 
+                          onClick={() => setOrderCurrentPage(c => c + 1)}
+                          className="px-3 py-1 border rounded hover:bg-gray-100"
+                      >
+                          <ChevronRightIcon className="w-4 h-4"/>
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderInventoryManager = () => (
+      <div className="space-y-6 animate-fade-in-up">
+           <div className="flex border-b border-gray-200 mb-6">
+                <button 
+                    onClick={() => setInventoryView('stock')}
+                    className={`px-6 py-3 font-medium transition-colors border-b-2 ${inventoryView === 'stock' ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    Nhập/Xuất Kho
+                </button>
+                <button 
+                    onClick={() => setInventoryView('history')}
+                    className={`px-6 py-3 font-medium transition-colors border-b-2 ${inventoryView === 'history' ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    Lịch sử Giao dịch
+                </button>
+           </div>
+
+           {inventoryView === 'stock' ? (
+                <div className="bg-white p-6 rounded-lg shadow-md max-w-2xl">
+                    <h3 className="text-lg font-bold text-gray-800 mb-6">Điều chỉnh Tồn kho</h3>
+                    <form onSubmit={handleInventorySubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Chọn sản phẩm</label>
+                            <select 
+                                value={selectedProductForInventory} 
+                                onChange={(e) => setSelectedProductForInventory(e.target.value)}
+                                className="w-full border rounded px-3 py-2"
+                                required
+                            >
+                                <option value="">-- Chọn sản phẩm --</option>
+                                {products.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} (Hiện có: {p.stock})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Loại giao dịch</label>
+                                <select 
+                                    value={inventoryType} 
+                                    onChange={(e) => setInventoryType(e.target.value as any)}
+                                    className="w-full border rounded px-3 py-2"
+                                >
+                                    <option value="IMPORT">Nhập kho (+)</option>
+                                    <option value="EXPORT">Xuất kho (-)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    value={inventoryQuantity}
+                                    onChange={(e) => setInventoryQuantity(e.target.value)}
+                                    className="w-full border rounded px-3 py-2"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                            <textarea 
+                                value={inventoryNote} 
+                                onChange={(e) => setInventoryNote(e.target.value)}
+                                className="w-full border rounded px-3 py-2"
+                                rows={2}
+                            />
+                        </div>
+                        <button type="submit" className="w-full bg-[#00695C] text-white py-2 rounded font-bold hover:bg-[#004d40]">
+                            Thực hiện
+                        </button>
+                        {inventoryFeedback && (
+                             <div className={`mt-2 text-center text-sm font-medium ${inventoryFeedback.includes('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                                 {inventoryFeedback}
+                             </div>
+                        )}
+                    </form>
+                </div>
+           ) : (
+                <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                     <div className="p-4 border-b">
+                         <input 
+                            type="text" 
+                            placeholder="Tìm kiếm giao dịch..." 
+                            value={inventorySearch}
+                            onChange={(e) => setInventorySearch(e.target.value)}
+                            className="border rounded px-3 py-2 w-full max-w-sm"
+                         />
+                     </div>
+                     <table className="min-w-full text-sm text-left text-gray-500">
+                        <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                            <tr>
+                                <th className="px-4 py-3">Thời gian</th>
+                                <th className="px-4 py-3">Sản phẩm</th>
+                                <th className="px-4 py-3">Loại</th>
+                                <th className="px-4 py-3">Số lượng</th>
+                                <th className="px-4 py-3">Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {transactions
+                                .filter(t => t.productName.toLowerCase().includes(inventorySearch.toLowerCase()) || t.note?.toLowerCase().includes(inventorySearch.toLowerCase()))
+                                .map((t) => (
+                                <tr key={t.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900">{t.productName}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'IMPORT' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                                            {t.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-bold">{t.quantity}</td>
+                                    <td className="px-4 py-3 italic text-gray-400">{t.note || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                     </table>
+                </div>
+           )}
+      </div>
+  );
+
+  const renderCustomerManager = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-between">
+              <div className="relative">
+                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input 
+                      type="text" 
+                      placeholder="Tìm khách hàng..." 
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-64"
+                  />
+              </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+               <table className="min-w-full text-sm text-left text-gray-500">
+                  <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                      <tr>
+                          <th className="px-4 py-3">ID</th>
+                          <th className="px-4 py-3">Họ tên</th>
+                          <th className="px-4 py-3">Email</th>
+                          <th className="px-4 py-3">SĐT</th>
+                          <th className="px-4 py-3">Ngày tham gia</th>
+                          <th className="px-4 py-3 text-right">Thao tác</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                      {customers
+                        .filter(c => 
+                            c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
+                            c.email?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                            c.phoneNumber?.includes(customerSearch)
+                        )
+                        .map((c) => (
+                          <tr key={c.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-mono text-xs">{c.id}</td>
+                              <td className="px-4 py-3 font-medium text-gray-900">{c.fullName}</td>
+                              <td className="px-4 py-3">{c.email || '-'}</td>
+                              <td className="px-4 py-3">{c.phoneNumber || '-'}</td>
+                              <td className="px-4 py-3">{new Date(c.createdAt).toLocaleDateString('vi-VN')}</td>
+                              <td className="px-4 py-3 text-right">
+                                  <button onClick={() => handleEditCustomer(c)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                  <button onClick={() => handleDeleteCustomer(c.id, c.fullName)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+               </table>
+          </div>
+
+          {isEditingCustomer && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white p-6 rounded-lg w-full max-w-md animate-fade-in-up">
+                      <h3 className="text-lg font-bold mb-4">Sửa thông tin Khách hàng</h3>
+                      <form onSubmit={handleSaveCustomer} className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium mb-1">Họ tên</label>
+                              <input type="text" value={editCustName} onChange={(e) => setEditCustName(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium mb-1">Email</label>
+                              <input type="email" value={editCustEmail} onChange={(e) => setEditCustEmail(e.target.value)} className="w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium mb-1">Số điện thoại</label>
+                              <input type="tel" value={editCustPhone} onChange={(e) => setEditCustPhone(e.target.value)} className="w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium mb-1">Địa chỉ</label>
+                              <input type="text" value={editCustAddress} onChange={(e) => setEditCustAddress(e.target.value)} className="w-full border rounded px-3 py-2" />
+                          </div>
+                          <div className="flex justify-end gap-2 mt-6">
+                              <button type="button" onClick={() => { setIsEditingCustomer(false); setEditingCustomer(null); }} className="bg-gray-200 text-gray-700 px-4 py-2 rounded">Hủy</button>
+                              <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">Lưu</button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+          )}
+           {customerFeedback && (
+             <div className="fixed bottom-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow-lg animate-fade-in-up">
+                 {customerFeedback}
+             </div>
+           )}
+      </div>
+  );
+
+  const renderAboutPageEditor = () => (
+    <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+        {aboutContent && aboutSettings ? (
+            <form onSubmit={handleAboutSubmit} className="space-y-6">
+                {/* Hero Section */}
+                <div className="border-b pb-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Hero (Đầu trang)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề chính</label>
+                            <input type="text" value={aboutContent.heroTitle} onChange={(e) => handleAboutContentChange('heroTitle', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phụ đề</label>
+                            <input type="text" value={aboutContent.heroSubtitle} onChange={(e) => handleAboutContentChange('heroSubtitle', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                         <div className="col-span-2">
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Hình ảnh nền Hero</label>
+                             <div className="flex items-center gap-4">
+                                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded inline-flex items-center">
+                                    <ImagePlus className="w-4 h-4 mr-2" />
+                                    <span>Tải ảnh lên</span>
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAboutImageUpload(e, 'heroImageUrl')} />
+                                </label>
+                                <img src={aboutContent.heroImageUrl} alt="Hero" className="h-20 w-32 object-cover rounded border" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Welcome Section */}
+                <div className="border-b pb-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Chào mừng</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề</label>
+                            <input type="text" value={aboutContent.welcomeHeadline} onChange={(e) => handleAboutContentChange('welcomeHeadline', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nội dung</label>
+                            <textarea rows={3} value={aboutContent.welcomeText} onChange={(e) => handleAboutContentChange('welcomeText', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Styling Settings */}
+                <div className="border-b pb-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Cài đặt Giao diện</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu tiêu đề</label>
+                            <input type="color" value={aboutSettings.headingColor} onChange={(e) => handleAboutSettingsChange('headingColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Font tiêu đề</label>
+                            <select value={aboutSettings.headingFont} onChange={(e) => handleAboutSettingsChange('headingFont', e.target.value)} className="w-full border rounded px-3 py-2">
+                                <option value="Playfair Display">Playfair Display (Serif)</option>
+                                <option value="Poppins">Poppins (Sans-serif)</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu nút bấm</label>
+                            <input type="color" value={aboutSettings.buttonBgColor} onChange={(e) => handleAboutSettingsChange('buttonBgColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" className="w-full bg-[#D4AF37] text-white py-3 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu Hình Trang</button>
+                 {aboutFeedback && (
+                     <div className="mt-4 text-center text-green-600 font-medium animate-pulse">{aboutFeedback}</div>
+                 )}
+            </form>
+        ) : <p>Đang tải dữ liệu...</p>}
+    </div>
+  );
+
+  const renderHomePageSettings = () => (
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+           {homeSettings ? (
+               <form onSubmit={handleHomePageSubmit} className="space-y-6">
+                   <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Trang Chủ</h3>
+                   
+                   {/* Hero Headline */}
+                   <div className="border p-4 rounded-lg bg-gray-50">
+                       <h4 className="font-bold text-gray-700 mb-3">Tiêu đề chính (Headline)</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <input type="text" value={homeSettings.headlineText} onChange={(e) => handleHomePageSettingsChange('headlineText', e.target.value)} className="border rounded px-3 py-2" placeholder="Nội dung tiêu đề" />
+                           <input type="color" value={homeSettings.headlineColor} onChange={(e) => handleHomePageSettingsChange('headlineColor', e.target.value)} className="w-full h-10 p-1 border rounded" title="Màu chữ" />
+                           <select value={homeSettings.headlineFont} onChange={(e) => handleHomePageSettingsChange('headlineFont', e.target.value)} className="border rounded px-3 py-2">
+                               <option value="Playfair Display">Playfair Display</option>
+                               <option value="Poppins">Poppins</option>
+                           </select>
+                            <input type="text" value={homeSettings.headlineSize} onChange={(e) => handleHomePageSettingsChange('headlineSize', e.target.value)} className="border rounded px-3 py-2" placeholder="Kích thước (VD: 3rem)" />
+                       </div>
+                   </div>
+
+                   {/* Promotion Section */}
+                   <div className="border p-4 rounded-lg bg-gray-50">
+                       <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
+                       <div className="space-y-3">
+                           <div>
+                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
+                               {homeSettings.promoImageUrls.map((url, idx) => (
+                                   <div key={idx} className="flex gap-2 mb-2">
+                                       <input 
+                                            type="text" 
+                                            value={url} 
+                                            onChange={(e) => {
+                                                const newUrls = [...homeSettings.promoImageUrls];
+                                                newUrls[idx] = e.target.value;
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }}
+                                            className="border rounded px-3 py-2 flex-1 text-sm" 
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }}
+                                            className="text-red-500 text-xs hover:underline"
+                                        >
+                                            Xóa
+                                        </button>
+                                   </div>
+                               ))}
+                               <button 
+                                    type="button" 
+                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
+                                    className="text-blue-600 text-sm hover:underline"
+                                >
+                                    + Thêm ảnh
+                                </button>
+                           </div>
+                           <div className="grid grid-cols-2 gap-4">
+                               <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
+                               <input type="text" value={homeSettings.promoTitle2} onChange={(e) => handleHomePageSettingsChange('promoTitle2', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 2" />
+                               <input type="text" value={homeSettings.promoTitleHighlight} onChange={(e) => handleHomePageSettingsChange('promoTitleHighlight', e.target.value)} className="border rounded px-3 py-2" placeholder="Từ khóa nổi bật" />
+                               <input type="color" value={homeSettings.promoBackgroundColor} onChange={(e) => handleHomePageSettingsChange('promoBackgroundColor', e.target.value)} className="w-full h-10 p-1 border rounded" title="Màu nền" />
+                           </div>
+                       </div>
+                   </div>
+
+                   {/* Flash Sale Section */}
+                    <div className="border p-4 rounded-lg bg-gray-50">
+                       <h4 className="font-bold text-gray-700 mb-3">Banner Flash Sale</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <input type="text" value={homeSettings.flashSaleTitleText} onChange={(e) => handleHomePageSettingsChange('flashSaleTitleText', e.target.value)} className="border rounded px-3 py-2" placeholder="Tiêu đề Flash Sale" />
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-500 block">Màu bắt đầu (Gradient)</label>
+                                    <input type="color" value={homeSettings.flashSaleBgColorStart} onChange={(e) => handleHomePageSettingsChange('flashSaleBgColorStart', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-500 block">Màu kết thúc</label>
+                                    <input type="color" value={homeSettings.flashSaleBgColorEnd} onChange={(e) => handleHomePageSettingsChange('flashSaleBgColorEnd', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                   <button type="submit" className="w-full bg-[#D4AF37] text-white py-3 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu Hình Trang Chủ</button>
+                   {homeFeedback && <p className="text-center text-green-600 mt-2 font-medium">{homeFeedback}</p>}
+               </form>
+           ) : <p>Đang tải...</p>}
+      </div>
+  );
+
+  const renderHeaderSettings = () => (
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
+           {headerSettings ? (
+                <form onSubmit={handleHeaderSubmit} className="space-y-6">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Header & Logo</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Tên thương hiệu (Brand Name)</label>
+                             <input type="text" value={headerSettings.brandName} onChange={(e) => handleHeaderSettingsChange('brandName', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu thương hiệu</label>
+                             <input type="color" value={headerSettings.brandColor} onChange={(e) => handleHeaderSettingsChange('brandColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                        <div className="col-span-2">
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Logo (Hình ảnh)</label>
+                             <div className="flex items-center gap-4">
+                                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded inline-flex items-center">
+                                    <ImagePlus className="w-4 h-4 mr-2" />
+                                    <span>Tải Logo lên</span>
+                                    <input type="file" className="hidden" accept="image/*" onChange={handleHeaderLogoUpload} />
+                                </label>
+                                {headerSettings.logoUrl && (
+                                    <img src={headerSettings.logoUrl} alt="Logo Preview" className="h-12 object-contain border rounded p-1 bg-gray-50" />
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu nền Header</label>
+                             <input type="text" value={headerSettings.brandBackgroundColor} onChange={(e) => handleHeaderSettingsChange('brandBackgroundColor', e.target.value)} className="w-full border rounded px-3 py-2" placeholder="VD: rgba(255, 255, 255, 0.9)" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Font chữ Menu</label>
+                             <select value={headerSettings.navFont} onChange={(e) => handleHeaderSettingsChange('navFont', e.target.value)} className="w-full border rounded px-3 py-2">
+                                <option value="Poppins">Poppins</option>
+                                <option value="Playfair Display">Playfair Display</option>
+                             </select>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu chữ Menu</label>
+                             <input type="color" value={headerSettings.navColor} onChange={(e) => handleHeaderSettingsChange('navColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                         <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu Hover Menu</label>
+                             <input type="color" value={headerSettings.navHoverColor} onChange={(e) => handleHeaderSettingsChange('navHoverColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                    </div>
+
+                    <button type="submit" className="w-full bg-[#D4AF37] text-white py-3 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu Hình Header</button>
+                    {headerFeedback && <p className="text-center text-green-600 mt-2 font-medium">{headerFeedback}</p>}
+                </form>
+           ) : <p>Đang tải...</p>}
+      </div>
+  );
 
   const renderSettings = () => (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
@@ -1016,7 +1922,6 @@ const AdminPage: React.FC = () => {
       </div>
   );
 
-  // ... (Keep existing renderContent) ...
   const renderContent = () => {
     switch(activeTab) {
       case 'dashboard': return renderDashboard();
@@ -1032,7 +1937,6 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // ... (Return JSX) ...
   return (
     <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row">
       <aside className="bg-[#111827] text-white w-full md:w-64 flex-shrink-0">
