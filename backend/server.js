@@ -133,6 +133,19 @@ const initDb = async () => {
       );
     `);
 
+    // 6. Admin Login Logs Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_login_logs (
+        id SERIAL PRIMARY KEY,
+        username TEXT,
+        method VARCHAR(50),
+        ip_address TEXT,
+        user_agent TEXT,
+        timestamp BIGINT,
+        status VARCHAR(20)
+      );
+    `);
+
     await client.query('COMMIT');
     console.log("-> Cơ sở dữ liệu đã sẵn sàng.");
   } catch (e) {
@@ -163,22 +176,12 @@ const parsePrice = (priceStr) => {
 // --- NODEMAILER CONFIGURATION ---
 // Cập nhật cấu hình SMTP sang cổng 465 (SSL) - Ổn định nhất cho Render
 const transporter = nodemailer.createTransport({
-  host: 'smtp.googlemail.com', // Dùng googlemail đôi khi bypass được bộ lọc IP
-  port: 465, // Cổng SSL chuẩn
-  secure: true, // Bật SSL
+  service: 'gmail', // Fallback to simple service configuration to let Nodemailer handle port negotiation
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS
   },
-  tls: {
-      // Không từ chối chứng chỉ tự ký (giúp tránh lỗi bắt tay SSL trên cloud)
-      rejectUnauthorized: false 
-  },
-  connectionTimeout: 60000, // 60 giây chờ kết nối
-  greetingTimeout: 30000,
-  socketTimeout: 60000,
-  logger: true, // Log chi tiết hoạt động SMTP
-  debug: true   // Bật chế độ debug
+  // Bỏ các timeout quá ngắn, để mặc định hoặc dài hơn
 });
 
 // --- VERIFY EMAIL CONNECTION ON STARTUP ---
@@ -189,7 +192,7 @@ transporter.verify(function (error, success) {
     console.error(error);
     console.error("Gợi ý: Kiểm tra biến môi trường EMAIL_PASS trên Render. Đảm bảo không có dấu cách thừa.");
   } else {
-    console.log("✅ Kết nối Email (SMTP) cổng 465 sẵn sàng! Server có thể gửi mail.");
+    console.log("✅ Kết nối Email sẵn sàng!");
   }
 });
 
@@ -458,6 +461,44 @@ app.post('/api/inventory/sync', async (req, res) => {
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// 6. ADMIN LOGIN LOGS
+app.post('/api/admin/logs', async (req, res) => {
+    const { username, method, status, timestamp } = req.body;
+    // Get IP address
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    try {
+        await pool.query(
+            `INSERT INTO admin_login_logs (username, method, ip_address, user_agent, timestamp, status)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [username, method, ip, userAgent, timestamp, status]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.get('/api/admin/logs', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM admin_login_logs ORDER BY timestamp DESC LIMIT 50');
+        const logs = result.rows.map(r => ({
+            id: r.id,
+            username: r.username,
+            method: r.method,
+            ip_address: r.ip_address,
+            user_agent: r.user_agent,
+            timestamp: parseInt(r.timestamp),
+            status: r.status
+        }));
+        res.json(logs);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
 const PORT = process.env.PORT || 5000;

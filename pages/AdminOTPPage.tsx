@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getAdminEmails, verifyTotpToken } from '../utils/adminSettingsStorage';
+import { recordAdminLogin } from '../utils/apiClient';
 
 const AdminOTPPage: React.FC = () => {
   const [otp, setOtp] = useState('');
@@ -43,10 +44,12 @@ const AdminOTPPage: React.FC = () => {
     if (authMethod === 'TOTP') {
         // Validate Google Authenticator Code
         if (verifyTotpToken(otp)) {
+            recordAdminLogin('GOOGLE_AUTH', 'SUCCESS');
             sessionStorage.removeItem('authMethod');
             sessionStorage.setItem('isAuthenticated', 'true');
             window.location.hash = '/admin';
         } else {
+            // recordAdminLogin('GOOGLE_AUTH', 'FAILED'); // Optional: Record failed attempts
             setError('Mã xác thực không đúng. Vui lòng kiểm tra lại ứng dụng Google Authenticator.');
         }
     } else {
@@ -66,6 +69,7 @@ const AdminOTPPage: React.FC = () => {
         }
 
         if (otp === otpData.otp) {
+            recordAdminLogin('EMAIL_OTP', 'SUCCESS');
             sessionStorage.removeItem('otpVerification');
             sessionStorage.removeItem('authMethod');
             sessionStorage.setItem('isAuthenticated', 'true');

@@ -59,6 +59,26 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
   }
 };
 
+// Admin Logs
+export const recordAdminLogin = async (method: 'EMAIL_OTP' | 'GOOGLE_AUTH', status: 'SUCCESS' | 'FAILED') => {
+    try {
+        await fetch(`${API_BASE_URL}/admin/logs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: 'admin',
+                method,
+                status,
+                timestamp: Date.now()
+            })
+        });
+    } catch (e) {
+        console.warn('Could not record login log');
+    }
+};
+
+export const fetchAdminLoginLogs = () => fetchData('admin/logs');
+
 // Products
 export const fetchProductsFromDB = () => fetchData('products');
 export const syncProductToDB = (product: any) => syncData('products', product);

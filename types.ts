@@ -63,6 +63,16 @@ export interface Order {
   timestamp: number;
 }
 
+export interface AdminLoginLog {
+  id: string;
+  username: string;
+  method: 'EMAIL_OTP' | 'GOOGLE_AUTH';
+  ip_address?: string;
+  user_agent?: string;
+  timestamp: number;
+  status: 'SUCCESS' | 'FAILED';
+}
+
 export interface AboutPageContent {
   heroTitle: string;
   heroSubtitle: string;
