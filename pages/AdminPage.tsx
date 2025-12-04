@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings } from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, StoreSettings } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -22,6 +22,7 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
+import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsStorage';
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 
@@ -31,7 +32,7 @@ const ImagePlus: React.FC<{className?: string}> = ({className}) => (
 );
 
 const Trash2Icon: React.FC<{className?: string}> = ({className}) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
 );
 
 const EditIcon: React.FC<{className?: string}> = ({className}) => (
@@ -116,6 +117,10 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
 
+const StoreIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
@@ -188,6 +193,7 @@ const AdminPage: React.FC = () => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
@@ -248,6 +254,7 @@ const AdminPage: React.FC = () => {
     setSocialSettings(getSocialSettings());
     setTotpEnabled(isTotpEnabled());
     setBankSettings(getBankSettings());
+    setStoreSettings(getStoreSettings());
     
     // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
@@ -484,10 +491,14 @@ const AdminPage: React.FC = () => {
       refreshInventory(); // Refresh inventory history
   };
 
-  // Printer Handler (NEW)
+  // Printer Handler
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
+
+      const storeName = storeSettings?.name || 'Sigma Vie Store';
+      const storePhone = storeSettings?.phoneNumber || '0912.345.678';
+      const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
 
       const html = `
         <!DOCTYPE html>
@@ -517,7 +528,7 @@ const AdminPage: React.FC = () => {
         </head>
         <body>
             <div class="header">
-                <h1>SIGMA VIE STORE</h1>
+                <h1>${storeName.toUpperCase()}</h1>
                 <p>Phiếu Giao Hàng / Hóa Đơn</p>
                 <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
             </div>
@@ -525,9 +536,9 @@ const AdminPage: React.FC = () => {
             <div class="info-section">
                 <div class="box">
                     <h3>NGƯỜI GỬI</h3>
-                    <p><strong>Sigma Vie Store</strong></p>
-                    <p>SĐT: 0912.345.678</p>
-                    <p>Đ/C: Hà Nội, Việt Nam</p>
+                    <p><strong>${storeName}</strong></p>
+                    <p>SĐT: ${storePhone}</p>
+                    <p>Đ/C: ${storeAddress}</p>
                 </div>
                 <div class="box">
                     <h3>NGƯỜI NHẬN</h3>
@@ -562,7 +573,7 @@ const AdminPage: React.FC = () => {
             </div>
 
             <div class="footer">
-                <p>Cảm ơn quý khách đã mua hàng tại Sigma Vie!</p>
+                <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
                 <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
             </div>
         </body>
@@ -782,6 +793,22 @@ const AdminPage: React.FC = () => {
           setSecurityCode('');
       } else {
           alert('Mã xác thực không đúng! Vui lòng thử lại.');
+      }
+  };
+
+  // Store Settings Handlers (NEW)
+  const handleStoreSettingsChange = (field: keyof StoreSettings, value: string) => {
+      if (storeSettings) {
+          setStoreSettings({ ...storeSettings, [field]: value });
+      }
+  };
+
+  const handleStoreSettingsSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (storeSettings) {
+          updateStoreSettings(storeSettings);
+          setSettingsFeedback('Đã cập nhật thông tin cửa hàng thành công!');
+          setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
@@ -1639,7 +1666,7 @@ const AdminPage: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Font tiêu đề</label>
                             <select value={aboutSettings.headingFont} onChange={(e) => handleAboutSettingsChange('headingFont', e.target.value)} className="w-full border rounded px-3 py-2">
                                 <option value="Playfair Display">Playfair Display (Serif)</option>
-                                <option value="Poppins">Poppins (Sans-serif)</option>
+                                <option value="Poppins">Poppins</option>
                             </select>
                         </div>
                          <div>
@@ -1992,6 +2019,53 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
+              {/* Store Info Settings (NEW) */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <StoreIcon className="w-5 h-5 text-gray-600" />
+                      Thông tin Cửa hàng (Hóa đơn)
+                  </h4>
+                  {storeSettings && (
+                      <form onSubmit={handleStoreSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Tên Cửa hàng</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.name} 
+                                      onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required 
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.phoneNumber} 
+                                      onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required 
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.address} 
+                                      onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required 
+                                  />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                              Lưu thông tin Cửa hàng
+                          </button>
+                      </form>
+                  )}
+              </div>
+
               {/* Bank Settings Section (NEW with Security) */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
@@ -2220,7 +2294,6 @@ const AdminPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800 font-serif">

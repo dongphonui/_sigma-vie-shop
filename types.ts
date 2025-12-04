@@ -198,3 +198,10 @@ export interface BankSettings {
   accountName: string;
   template: string; // 'qr_only', 'compact', 'compact2', 'print'
 }
+
+export interface StoreSettings {
+  name: string;
+  phoneNumber: string;
+  address: string;
+  email?: string;
+}
