@@ -10,7 +10,7 @@ import { getProducts, addProduct, deleteProduct, updateProductStock, updateProdu
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
-    isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTempTotpToken
+    isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTotpToken, verifyTempTotpToken
 } from '../utils/adminSettingsStorage';
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
@@ -31,7 +31,7 @@ const ImagePlus: React.FC<{className?: string}> = ({className}) => (
 );
 
 const Trash2Icon: React.FC<{className?: string}> = ({className}) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
 );
 
 const EditIcon: React.FC<{className?: string}> = ({className}) => (
@@ -110,6 +110,10 @@ const CreditCardIcon: React.FC<{className?: string}> = ({className}) => (
 
 const DollarSignIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+);
+
+const LockIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
 );
 
 
@@ -191,6 +195,10 @@ const AdminPage: React.FC = () => {
   const [tempTotpUri, setTempTotpUri] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [showTotpSetup, setShowTotpSetup] = useState(false);
+
+  // Bank Security Modal State
+  const [showBankSecurityModal, setShowBankSecurityModal] = useState(false);
+  const [securityCode, setSecurityCode] = useState('');
 
   // Home Page State
   const [homeSettings, setHomeSettings] = useState<HomePageSettings | null>(null);
@@ -648,19 +656,43 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // Bank Settings Handler (NEW)
+  // Bank Settings Handler (NEW with Security)
   const handleBankSettingsChange = (field: keyof BankSettings, value: string) => {
       if (bankSettings) {
           setBankSettings({ ...bankSettings, [field]: value });
       }
   };
 
-  const handleBankSettingsSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
+  const executeBankUpdate = () => {
       if (bankSettings) {
           updateBankSettings(bankSettings);
           setSettingsFeedback('Đã cập nhật thông tin Ngân hàng thành công!');
           setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const handleBankSettingsSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (isTotpEnabled()) {
+          // If 2FA enabled, show modal
+          setShowBankSecurityModal(true);
+          setSecurityCode('');
+      } else {
+          // If not enabled, warn but allow (or force enable - here we allow with warning)
+          if(confirm('Cảnh báo: Bạn chưa bật bảo mật 2 lớp. Hành động này kém an toàn. Bạn có muốn tiếp tục lưu không?')) {
+              executeBankUpdate();
+          }
+      }
+  };
+
+  const handleVerifyBankUpdate = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (verifyTotpToken(securityCode)) {
+          executeBankUpdate();
+          setShowBankSecurityModal(false);
+          setSecurityCode('');
+      } else {
+          alert('Mã xác thực không đúng! Vui lòng thử lại.');
       }
   };
 
@@ -1845,7 +1877,7 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* Bank Settings Section (NEW) */}
+              {/* Bank Settings Section (NEW with Security) */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <CreditCardIcon className="w-5 h-5 text-gray-600" />
@@ -1929,6 +1961,51 @@ const AdminPage: React.FC = () => {
                  <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không đúng') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
+            )}
+
+            {/* Bank Security Modal */}
+            {showBankSecurityModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 animate-fade-in-up">
+                        <div className="text-center mb-6">
+                            <div className="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <ShieldCheckIcon className="w-6 h-6 text-yellow-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-800">Xác thực Bảo mật</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Vui lòng nhập mã từ Google Authenticator để xác nhận thay đổi thông tin ngân hàng.
+                            </p>
+                        </div>
+                        
+                        <form onSubmit={handleVerifyBankUpdate}>
+                            <input 
+                                type="text" 
+                                placeholder="Nhập mã 6 số"
+                                value={securityCode}
+                                onChange={(e) => setSecurityCode(e.target.value)}
+                                className="w-full text-center text-xl tracking-widest font-mono border rounded px-3 py-3 mb-4 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                                maxLength={6}
+                                autoFocus
+                                required
+                            />
+                            <div className="flex gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setShowBankSecurityModal(false); setSecurityCode(''); }}
+                                    className="flex-1 py-2 border rounded text-gray-700 hover:bg-gray-50"
+                                >
+                                    Hủy
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="flex-1 py-2 bg-[#D4AF37] text-white rounded font-bold hover:bg-[#b89b31]"
+                                >
+                                    Xác nhận
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
       </div>
   );
