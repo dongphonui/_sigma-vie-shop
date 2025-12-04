@@ -25,7 +25,7 @@ import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorag
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 
-
+// --- ICONS ---
 const ImagePlus: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12H3"/><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
 );
@@ -112,8 +112,8 @@ const DollarSignIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
 );
 
-const LockIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
 
 
@@ -482,6 +482,95 @@ const AdminPage: React.FC = () => {
       refreshOrders();
       refreshProducts(); // Refresh products immediately to reflect stock changes
       refreshInventory(); // Refresh inventory history
+  };
+
+  // Printer Handler (NEW)
+  const handlePrintOrder = (order: Order) => {
+      const printWindow = window.open('', '', 'width=800,height=600');
+      if (!printWindow) return;
+
+      const html = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+            <meta charset="UTF-8">
+            <title>Hóa đơn ${order.id}</title>
+            <style>
+                body { font-family: 'Times New Roman', sans-serif; padding: 20px; color: #000; }
+                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                .header h1 { margin: 0; font-size: 24px; font-weight: bold; }
+                .header p { margin: 5px 0; font-size: 14px; }
+                .info-section { margin-bottom: 20px; display: flex; justify-content: space-between; }
+                .box { border: 1px solid #000; padding: 10px; width: 48%; }
+                .box h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+                .order-details { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
+                .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
+                .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
+                
+                @media print {
+                    @page { margin: 0.5cm; }
+                    body { margin: 0; }
+                    .box { width: 45%; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>SIGMA VIE STORE</h1>
+                <p>Phiếu Giao Hàng / Hóa Đơn</p>
+                <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
+            </div>
+
+            <div class="info-section">
+                <div class="box">
+                    <h3>NGƯỜI GỬI</h3>
+                    <p><strong>Sigma Vie Store</strong></p>
+                    <p>SĐT: 0912.345.678</p>
+                    <p>Đ/C: Hà Nội, Việt Nam</p>
+                </div>
+                <div class="box">
+                    <h3>NGƯỜI NHẬN</h3>
+                    <p><strong>${order.customerName}</strong></p>
+                    <p>SĐT: <strong>${order.customerContact}</strong></p>
+                    <p>Đ/C: ${order.customerAddress}</p>
+                </div>
+            </div>
+
+            <table class="order-details">
+                <thead>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>SL</th>
+                        <th>Đơn giá</th>
+                        <th>Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${order.productName}</td>
+                        <td>${order.quantity}</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice / order.quantity)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice)}đ</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="total-section">
+                <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
+                ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
+            </div>
+
+            <div class="footer">
+                <p>Cảm ơn quý khách đã mua hàng tại Sigma Vie!</p>
+                <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
+            </div>
+        </body>
+        </html>
+      `;
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.print();
   };
 
   // Customer Handlers
@@ -1176,7 +1265,7 @@ const AdminPage: React.FC = () => {
                           <th className="px-4 py-3">Tổng tiền</th>
                           <th className="px-4 py-3">Thanh toán</th>
                           <th className="px-4 py-3">Trạng thái</th>
-                          <th className="px-4 py-3">Thao tác</th>
+                          <th className="px-4 py-3 text-center">Thao tác</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -1218,18 +1307,44 @@ const AdminPage: React.FC = () => {
                                        order.status === 'SHIPPED' ? 'Đã giao' : 'Đã hủy'}
                                   </span>
                               </td>
-                              <td className="px-4 py-3">
-                                  <select 
-                                      value={order.status} 
-                                      onChange={(e) => handleOrderStatusChange(order.id, e.target.value as any)}
-                                      className="border rounded px-2 py-1 text-xs"
-                                  >
-                                      <option value="PENDING">Chờ xử lý</option>
-                                      <option value="CONFIRMED">Xác nhận</option>
-                                      <option value="SHIPPED">Giao hàng</option>
-                                      <option value="CANCELLED">Hủy đơn</option>
-                                  </select>
-                              </td>
+                              <td className="px-4 py-3 text-center">
+                                     <div className="flex items-center justify-center gap-2">
+                                        <button
+                                            onClick={() => handlePrintOrder(order)}
+                                            title="In hóa đơn"
+                                            className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                                        >
+                                            <PrinterIcon className="w-4 h-4" />
+                                        </button>
+                                        {order.status === 'PENDING' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'CONFIRMED')}
+                                                title="Xác nhận đơn hàng"
+                                                className="p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                                            >
+                                                <CheckIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {order.status === 'CONFIRMED' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'SHIPPED')}
+                                                title="Giao hàng"
+                                                className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                                            >
+                                                <TruckIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {order.status !== 'CANCELLED' && order.status !== 'SHIPPED' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'CANCELLED')}
+                                                title="Hủy đơn hàng"
+                                                className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                                            >
+                                                <XCircleIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                     </div>
+                                </td>
                           </tr>
                       ))}
                   </tbody>
@@ -2105,6 +2220,7 @@ const AdminPage: React.FC = () => {
         </div>
       </aside>
 
+      {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800 font-serif">
