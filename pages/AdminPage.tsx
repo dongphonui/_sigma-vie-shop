@@ -31,7 +31,7 @@ const ImagePlus: React.FC<{className?: string}> = ({className}) => (
 );
 
 const Trash2Icon: React.FC<{className?: string}> = ({className}) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
 );
 
 const EditIcon: React.FC<{className?: string}> = ({className}) => (
@@ -334,10 +334,7 @@ const AdminPage: React.FC = () => {
       setIsAddingProduct(true);
   };
 
-  const handleCancelProductEdit = () => {
-      setIsAddingProduct(false);
-      setEditingProduct(null);
-      // Reset form
+  const resetProductForm = () => {
       setNewProductName('');
       setNewProductPrice('');
       setNewProductImportPrice('');
@@ -351,6 +348,12 @@ const AdminPage: React.FC = () => {
       setNewProductSalePrice('');
       setNewProductFlashSaleStartTime('');
       setNewProductFlashSaleEndTime('');
+  };
+
+  const handleCancelProductEdit = () => {
+      setIsAddingProduct(false);
+      setEditingProduct(null);
+      resetProductForm();
   };
 
   const handleProductSubmit = (e: React.FormEvent) => {
@@ -922,7 +925,15 @@ const AdminPage: React.FC = () => {
                         </select>
                     </div>
                     <button 
-                        onClick={() => { setIsAddingProduct(!isAddingProduct); setEditingProduct(null); handleCancelProductEdit(); }}
+                        onClick={() => { 
+                            if (isAddingProduct) {
+                                handleCancelProductEdit();
+                            } else {
+                                resetProductForm();
+                                setEditingProduct(null);
+                                setIsAddingProduct(true);
+                            }
+                        }}
                         className="bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#b89b31]"
                     >
                         {isAddingProduct ? 'Quay lại danh sách' : 'Thêm sản phẩm'}
