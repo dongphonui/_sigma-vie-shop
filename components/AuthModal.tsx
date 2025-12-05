@@ -16,6 +16,10 @@ const ScanIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="10" x="7" y="7" rx="2"/><path d="M7 17v4"/><path d="M17 17v4"/><path d="M17 7V3"/><path d="M7 7V3"/></svg>
 );
 
+const UserCircleIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg>
+);
+
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, initialMode = 'LOGIN' }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(initialMode);
   
@@ -72,8 +76,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
               dob: cccdData.dob
           }));
           setShowScanner(false);
-          setSuccessMsg(`Đã quét CCCD thành công! Xin chào ${cccdData.fullName}`);
-          setTimeout(() => setSuccessMsg(''), 5000);
+          setSuccessMsg(`Đã xác thực CCCD thành công!`);
+          setTimeout(() => setSuccessMsg(''), 3000);
       } else {
           alert("Mã QR không đúng định dạng CCCD hoặc không đọc được. Vui lòng thử lại.");
       }
@@ -153,17 +157,46 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             {/* Registration Method Toggles */}
             {mode === 'REGISTER' && (
                 <>
+                    {/* Digital ID Card Display */}
+                    {formData.cccdNumber && (
+                        <div className="mb-6 relative overflow-hidden rounded-xl shadow-lg border border-gray-200 bg-gradient-to-br from-blue-50 to-white p-4">
+                            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-100 rounded-full opacity-50"></div>
+                            
+                            <div className="relative z-10 flex gap-4 items-start">
+                                <div className="w-16 h-20 bg-gray-100 rounded-lg border border-gray-300 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
+                                    <UserCircleIcon className="w-10 h-10 text-gray-400" />
+                                </div>
+                                <div className="flex-1 space-y-1 min-w-0">
+                                    <h4 className="text-[#00695C] font-bold text-xs uppercase tracking-wide border-b border-gray-200 pb-1 mb-1">Căn cước công dân</h4>
+                                    <p className="text-sm truncate"><span className="text-gray-500 text-[10px] uppercase mr-1">Số:</span> <span className="font-mono font-bold text-gray-800">{formData.cccdNumber}</span></p>
+                                    <p className="text-sm truncate"><span className="text-gray-500 text-[10px] uppercase mr-1">Tên:</span> <span className="font-bold text-gray-900 uppercase">{formData.fullName}</span></p>
+                                    <div className="flex gap-3">
+                                        <p className="text-xs"><span className="text-gray-500 text-[10px] uppercase mr-1">Sinh:</span> <span className="font-medium">{formData.dob}</span></p>
+                                        <p className="text-xs"><span className="text-gray-500 text-[10px] uppercase mr-1">Giới tính:</span> <span className="font-medium">{formData.gender}</span></p>
+                                    </div>
+                                    <p className="text-xs text-gray-600 line-clamp-1 mt-0.5"><span className="text-gray-500 text-[10px] uppercase mr-1">Đ/C:</span> {formData.address}</p>
+                                </div>
+                            </div>
+                            
+                            {/* Smart Fill Badge */}
+                            <div className="absolute bottom-2 right-2 bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                Đã xác thực Chip
+                            </div>
+                        </div>
+                    )}
+
                     <button 
                         type="button"
                         onClick={() => setShowScanner(true)}
-                        className="w-full mb-6 bg-blue-600 text-white py-2 rounded-lg font-bold shadow hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors"
+                        className="w-full mb-6 bg-[#00695C] text-white py-2.5 rounded-lg font-bold shadow hover:bg-[#004d40] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                         <ScanIcon className="w-5 h-5" />
-                        Quét QR Căn cước công dân
+                        {formData.cccdNumber ? 'Quét lại CCCD' : 'Quét QR Căn cước công dân'}
                     </button>
 
                     <div className="flex justify-center mb-6 space-x-4">
-                        <label className="flex items-center cursor-pointer">
+                        <label className="flex items-center cursor-pointer group">
                             <input 
                                 type="radio" 
                                 name="regMethod" 
@@ -171,9 +204,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                 checked={registerMethod === 'EMAIL'}
                                 onChange={() => { setRegisterMethod('EMAIL'); }}
                             />
-                            <span className="text-sm font-medium text-gray-700">Dùng Email</span>
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-[#00695C]">Dùng Email</span>
                         </label>
-                        <label className="flex items-center cursor-pointer">
+                        <label className="flex items-center cursor-pointer group">
                             <input 
                                 type="radio" 
                                 name="regMethod" 
@@ -181,7 +214,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                 checked={registerMethod === 'PHONE'}
                                 onChange={() => { setRegisterMethod('PHONE'); }}
                             />
-                            <span className="text-sm font-medium text-gray-700">Dùng Số ĐT</span>
+                            <span className="text-sm font-medium text-gray-700 group-hover:text-[#00695C]">Dùng Số ĐT</span>
                         </label>
                     </div>
                 </>
@@ -189,27 +222,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === 'REGISTER' && (
-                    <>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
-                            <input 
-                                type="text" 
-                                name="fullName"
-                                required
-                                value={formData.fullName}
-                                onChange={handleChange}
-                                placeholder="Nhập họ tên hoặc quét CCCD"
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
-                            />
-                        </div>
-                        {formData.cccdNumber && (
-                            <div className="bg-gray-50 p-3 rounded border text-xs text-gray-600 space-y-1">
-                                <p><strong>Số CCCD:</strong> {formData.cccdNumber}</p>
-                                <p><strong>Ngày sinh:</strong> {formData.dob}</p>
-                                <p><strong>Giới tính:</strong> {formData.gender}</p>
-                            </div>
-                        )}
-                    </>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
+                        <input 
+                            type="text" 
+                            name="fullName"
+                            required
+                            value={formData.fullName}
+                            onChange={handleChange}
+                            placeholder="Nhập họ tên hoặc quét CCCD"
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
+                        />
+                    </div>
                 )}
                 
                 <div>
@@ -269,12 +293,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                     </>
                 )}
 
-                {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-                {successMsg && <p className="text-sm text-green-600 text-center">{successMsg}</p>}
+                {error && <p className="text-sm text-red-600 text-center bg-red-50 p-2 rounded">{error}</p>}
+                {successMsg && <p className="text-sm text-green-600 text-center bg-green-50 p-2 rounded">{successMsg}</p>}
 
                 <button 
                     type="submit" 
-                    className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#00695C] hover:bg-[#004d40] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#00695C] transition-colors"
+                    className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors font-bold uppercase"
                 >
                     {mode === 'LOGIN' ? 'Đăng Nhập' : 'Đăng Ký'}
                 </button>

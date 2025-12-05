@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
@@ -13,6 +14,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [scanStatus, setScanStatus] = useState<string>('Đang khởi động Camera...');
+  const [isSuccess, setIsSuccess] = useState(false); // New State for Success Animation
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,15 +31,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             setVideoInputDevices(devices);
             
             if (devices.length > 0) {
-                // Try to find the best back camera (usually the last one on Android/iOS)
-                // Filtering for 'back' or 'environment' often helps select the main high-res camera
+                // Try to find the best back camera
                 const backCameras = devices.filter(device => 
                     device.label.toLowerCase().includes('back') || 
                     device.label.toLowerCase().includes('sau') ||
                     device.label.toLowerCase().includes('environment')
                 );
                 
-                // Ưu tiên camera sau cuối cùng (thường là cam chính hoặc tele trên máy nhiều cam)
                 const initialDeviceId = backCameras.length > 0 
                     ? backCameras[backCameras.length - 1].deviceId 
                     : devices[devices.length - 1].deviceId;
@@ -63,10 +63,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   }, []);
 
   useEffect(() => {
-      if (selectedDeviceId && videoRef.current) {
+      if (selectedDeviceId && videoRef.current && !isSuccess) {
           startDecoding(selectedDeviceId);
       }
-  }, [selectedDeviceId]);
+  }, [selectedDeviceId, isSuccess]);
 
   const startDecoding = async (deviceId: string) => {
       codeReader.current.reset();
@@ -75,13 +75,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
       isScanRunning.current = true;
       
       try {
-          // Config video constraints for highest possible resolution/focus
           const constraints = {
               video: {
                   deviceId: { exact: deviceId },
-                  width: { ideal: 1920 }, // Full HD
+                  width: { ideal: 1920 },
                   height: { ideal: 1080 },
-                  focusMode: 'continuous', // Try to force auto-focus
+                  focusMode: 'continuous',
               }
           };
 
@@ -105,7 +104,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   };
 
   const handleSuccess = (text: string) => {
-      setScanStatus('✅ Đã bắt được mã!');
+      if (isSuccess) return; // Prevent multiple triggers
+      
+      setIsSuccess(true); // Trigger animation
       isScanRunning.current = false;
       codeReader.current.reset();
       
@@ -113,12 +114,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.play().catch(() => {});
       
-      onScanSuccess(text);
+      // Delay callback to show animation
+      setTimeout(() => {
+          onScanSuccess(text);
+      }, 1500);
   };
 
   const handleSwitchCamera = () => {
       if (videoInputDevices.length <= 1) return;
-      
       const currentIndex = videoInputDevices.findIndex(d => d.deviceId === selectedDeviceId);
       const nextIndex = (currentIndex + 1) % videoInputDevices.length;
       setSelectedDeviceId(videoInputDevices[nextIndex].deviceId);
@@ -131,11 +134,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
           try {
               const file = e.target.files[0];
               const imageUrl = URL.createObjectURL(file);
-              
               const imgElement = document.createElement('img');
               imgElement.src = imageUrl;
-              
-              // Wait for image to load
               await new Promise((resolve) => { imgElement.onload = resolve; });
 
               const result = await codeReader.current.decodeFromImageElement(imgElement);
@@ -147,8 +147,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
               alert("Không tìm thấy mã QR trong ảnh này. Vui lòng chụp rõ nét mã QR trên thẻ CCCD.");
               setScanStatus('Thử lại...');
               setLoading(false);
-              // Restart live camera
-              if (selectedDeviceId) startDecoding(selectedDeviceId);
+              if (selectedDeviceId && !isSuccess) startDecoding(selectedDeviceId);
           }
       }
   };
@@ -182,7 +181,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
 
         {/* Camera Area */}
         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-            {loading && !errorMsg && (
+            {/* Success Overlay */}
+            {isSuccess && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center shadow-lg mb-4 animate-bounce">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <h3 className="text-white text-2xl font-bold tracking-wide drop-shadow-md">Quét thành công!</h3>
+                    <p className="text-green-300 text-sm mt-2">Đang tự động điền thông tin...</p>
+                </div>
+            )}
+
+            {loading && !errorMsg && !isSuccess && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20">
                     <div className="w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mb-4"></div>
                     <p className="font-medium">Đang xử lý...</p>
@@ -213,7 +223,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             )}
             
             {/* Visual Guide Overlay */}
-            {!loading && !errorMsg && (
+            {!loading && !errorMsg && !isSuccess && (
                 <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
                     {/* Hướng dẫn căn chỉnh */}
                     <div className="w-[80%] aspect-square border-2 border-[#D4AF37]/70 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
@@ -229,43 +239,47 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             )}
             
             {/* Control Buttons (Bottom Right) */}
-            <div className="absolute bottom-28 right-6 z-40 flex flex-col gap-4">
-                {/* Switch Camera Button */}
-                {videoInputDevices.length > 1 && (
+            {!isSuccess && (
+                <div className="absolute bottom-28 right-6 z-40 flex flex-col gap-4">
+                    {/* Switch Camera Button */}
+                    {videoInputDevices.length > 1 && (
+                        <button 
+                            onClick={handleSwitchCamera}
+                            className="bg-white/20 backdrop-blur-md border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-white/40 active:scale-95 transition-all"
+                            title="Đổi Camera"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2l-.22-.34A2 2 0 0 0 13.12 4H10.88a2 2 0 0 0-1.66.66l-.22.34A2 2 0 0 1 7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M17 13h.01"/></svg>
+                        </button>
+                    )}
+                    
+                    {/* Upload Image Button */}
                     <button 
-                        onClick={handleSwitchCamera}
-                        className="bg-white/20 backdrop-blur-md border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-white/40 active:scale-95 transition-all"
-                        title="Đổi Camera"
+                        onClick={triggerFileUpload}
+                        className="bg-[#D4AF37] border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-[#b89b31] active:scale-95 transition-all"
+                        title="Chọn ảnh từ thư viện"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2l-.22-.34A2 2 0 0 0 13.12 4H10.88a2 2 0 0 0-1.66.66l-.22.34A2 2 0 0 1 7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M17 13h.01"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                     </button>
-                )}
-                
-                {/* Upload Image Button */}
-                <button 
-                    onClick={triggerFileUpload}
-                    className="bg-[#D4AF37] border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-[#b89b31] active:scale-95 transition-all"
-                    title="Chọn ảnh từ thư viện"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                </button>
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleFileUpload}
-                />
-            </div>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleFileUpload}
+                    />
+                </div>
+            )}
         </div>
 
         {/* Footer Status */}
-        <div className="p-4 bg-white text-center shrink-0 z-30">
-            <p className="font-bold text-[#00695C] animate-pulse mb-1">{scanStatus}</p>
-            <p className="text-xs text-gray-500 mb-2">
-                Nếu camera mờ, hãy bấm nút <strong>"Hình ảnh"</strong> màu vàng để chụp bằng Camera gốc của máy.
-            </p>
-        </div>
+        {!isSuccess && (
+            <div className="p-4 bg-white text-center shrink-0 z-30">
+                <p className="font-bold text-[#00695C] animate-pulse mb-1">{scanStatus}</p>
+                <p className="text-xs text-gray-500 mb-2">
+                    Nếu camera mờ, hãy bấm nút <strong>"Hình ảnh"</strong> màu vàng để chụp bằng Camera gốc của máy.
+                </p>
+            </div>
+        )}
 
         <style>{`
             @keyframes scan {
@@ -275,6 +289,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             }
             .animate-scan {
                 animation: scan 3s infinite linear;
+            }
+            @keyframes fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+            .animate-fade-in {
+                animation: fade-in 0.3s ease-out forwards;
             }
         `}</style>
       </div>
