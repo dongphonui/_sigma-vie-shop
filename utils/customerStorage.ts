@@ -42,7 +42,10 @@ export const registerCustomer = (data: {
     password: string; 
     email?: string; 
     phoneNumber?: string; 
-    address?: string 
+    address?: string;
+    cccdNumber?: string;
+    gender?: string;
+    dob?: string;
 }): { success: boolean; message: string; customer?: Customer } => {
   const customers = getCustomers();
   
@@ -56,6 +59,9 @@ export const registerCustomer = (data: {
   if (data.phoneNumber && customers.some(c => c.phoneNumber === data.phoneNumber)) {
     return { success: false, message: 'Số điện thoại này đã được đăng ký.' };
   }
+  if (data.cccdNumber && customers.some(c => c.cccdNumber === data.cccdNumber)) {
+    return { success: false, message: 'Số CCCD này đã được đăng ký.' };
+  }
 
   const newCustomer: Customer = {
     id: `CUST-${Date.now()}`,
@@ -64,6 +70,9 @@ export const registerCustomer = (data: {
     phoneNumber: data.phoneNumber || undefined,
     passwordHash: simpleHash(data.password),
     address: data.address,
+    cccdNumber: data.cccdNumber,
+    gender: data.gender,
+    dob: data.dob,
     createdAt: Date.now()
   };
 
@@ -106,7 +115,7 @@ export const loginCustomer = (identifier: string, password: string): { success: 
   const hash = simpleHash(password);
 
   const customer = customers.find(c => 
-    ((c.email === identifier) || (c.phoneNumber === identifier)) && 
+    ((c.email === identifier) || (c.phoneNumber === identifier) || (c.cccdNumber === identifier)) && 
     c.passwordHash === hash
   );
 

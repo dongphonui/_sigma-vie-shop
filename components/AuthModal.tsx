@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { loginCustomer, registerCustomer } from '../utils/customerStorage';
+import { parseCCCDQrCode } from '../utils/cccdHelper';
+import QRScanner from './QRScanner';
 import type { Customer } from '../types';
 
 interface AuthModalProps {
@@ -10,19 +12,26 @@ interface AuthModalProps {
   initialMode?: 'LOGIN' | 'REGISTER';
 }
 
+const ScanIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="10" x="7" y="7" rx="2"/><path d="M7 17v4"/><path d="M17 17v4"/><path d="M17 7V3"/><path d="M7 7V3"/></svg>
+);
+
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, initialMode = 'LOGIN' }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(initialMode);
   
   // Register specific state
   const [registerMethod, setRegisterMethod] = useState<'EMAIL' | 'PHONE'>('EMAIL');
+  const [showScanner, setShowScanner] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
-    identifier: '', // Used for Login (Email or Phone) or Register (Specific value based on method)
+    identifier: '', // Used for Login (Email or Phone or CCCD) or Register (Specific value based on method)
     password: '',
     confirmPassword: '',
-    extraInfo: '', // Used for address or alternate contact if needed (keeping simple for now)
-    address: ''
+    address: '',
+    cccdNumber: '',
+    gender: '',
+    dob: ''
   });
   
   const [error, setError] = useState('');
@@ -38,8 +47,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
         identifier: '',
         password: '',
         confirmPassword: '',
-        extraInfo: '',
-        address: ''
+        address: '',
+        cccdNumber: '',
+        gender: '',
+        dob: ''
     });
   }, [isOpen, initialMode]);
 
@@ -47,6 +58,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleScanSuccess = (decodedText: string) => {
+      const cccdData = parseCCCDQrCode(decodedText);
+      if (cccdData) {
+          setFormData(prev => ({
+              ...prev,
+              fullName: cccdData.fullName,
+              cccdNumber: cccdData.cccdNumber,
+              address: cccdData.address,
+              gender: cccdData.gender,
+              dob: cccdData.dob
+          }));
+          setShowScanner(false);
+          setSuccessMsg(`Đã quét CCCD thành công! Xin chào ${cccdData.fullName}`);
+          setTimeout(() => setSuccessMsg(''), 5000);
+      } else {
+          alert("Mã QR không đúng định dạng CCCD hoặc không đọc được. Vui lòng thử lại.");
+      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -66,7 +96,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             address: formData.address,
             // Dynamically assign email or phone based on method
             email: registerMethod === 'EMAIL' ? formData.identifier : undefined,
-            phoneNumber: registerMethod === 'PHONE' ? formData.identifier : undefined
+            phoneNumber: registerMethod === 'PHONE' ? formData.identifier : undefined,
+            cccdNumber: formData.cccdNumber || undefined,
+            gender: formData.gender || undefined,
+            dob: formData.dob || undefined
         };
 
         const result = registerCustomer(registrationData);
@@ -93,8 +126,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
   };
 
   return (
+    <>
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up max-h-[90vh] overflow-y-auto">
         {/* Header Tabs */}
         <div className="flex border-b">
             <button 
@@ -118,49 +152,70 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
 
             {/* Registration Method Toggles */}
             {mode === 'REGISTER' && (
-                <div className="flex justify-center mb-6 space-x-4">
-                    <label className="flex items-center cursor-pointer">
-                        <input 
-                            type="radio" 
-                            name="regMethod" 
-                            className="mr-2 text-[#00695C] focus:ring-[#00695C]"
-                            checked={registerMethod === 'EMAIL'}
-                            onChange={() => { setRegisterMethod('EMAIL'); setFormData({...formData, identifier: ''}); }}
-                        />
-                        <span className="text-sm font-medium text-gray-700">Dùng Email</span>
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                        <input 
-                            type="radio" 
-                            name="regMethod" 
-                            className="mr-2 text-[#00695C] focus:ring-[#00695C]"
-                            checked={registerMethod === 'PHONE'}
-                            onChange={() => { setRegisterMethod('PHONE'); setFormData({...formData, identifier: ''}); }}
-                        />
-                        <span className="text-sm font-medium text-gray-700">Dùng Số điện thoại</span>
-                    </label>
-                </div>
+                <>
+                    <button 
+                        type="button"
+                        onClick={() => setShowScanner(true)}
+                        className="w-full mb-6 bg-blue-600 text-white py-2 rounded-lg font-bold shadow hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors"
+                    >
+                        <ScanIcon className="w-5 h-5" />
+                        Quét QR Căn cước công dân
+                    </button>
+
+                    <div className="flex justify-center mb-6 space-x-4">
+                        <label className="flex items-center cursor-pointer">
+                            <input 
+                                type="radio" 
+                                name="regMethod" 
+                                className="mr-2 text-[#00695C] focus:ring-[#00695C]"
+                                checked={registerMethod === 'EMAIL'}
+                                onChange={() => { setRegisterMethod('EMAIL'); }}
+                            />
+                            <span className="text-sm font-medium text-gray-700">Dùng Email</span>
+                        </label>
+                        <label className="flex items-center cursor-pointer">
+                            <input 
+                                type="radio" 
+                                name="regMethod" 
+                                className="mr-2 text-[#00695C] focus:ring-[#00695C]"
+                                checked={registerMethod === 'PHONE'}
+                                onChange={() => { setRegisterMethod('PHONE'); }}
+                            />
+                            <span className="text-sm font-medium text-gray-700">Dùng Số ĐT</span>
+                        </label>
+                    </div>
+                </>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === 'REGISTER' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
-                        <input 
-                            type="text" 
-                            name="fullName"
-                            required
-                            value={formData.fullName}
-                            onChange={handleChange}
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
-                        />
-                    </div>
+                    <>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
+                            <input 
+                                type="text" 
+                                name="fullName"
+                                required
+                                value={formData.fullName}
+                                onChange={handleChange}
+                                placeholder="Nhập họ tên hoặc quét CCCD"
+                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
+                            />
+                        </div>
+                        {formData.cccdNumber && (
+                            <div className="bg-gray-50 p-3 rounded border text-xs text-gray-600 space-y-1">
+                                <p><strong>Số CCCD:</strong> {formData.cccdNumber}</p>
+                                <p><strong>Ngày sinh:</strong> {formData.dob}</p>
+                                <p><strong>Giới tính:</strong> {formData.gender}</p>
+                            </div>
+                        )}
+                    </>
                 )}
                 
                 <div>
                     <label className="block text-sm font-medium text-gray-700">
                         {mode === 'LOGIN' 
-                            ? 'Email hoặc Số điện thoại' 
+                            ? 'Email / SĐT / Số CCCD' 
                             : (registerMethod === 'EMAIL' ? 'Email' : 'Số điện thoại')
                         }
                     </label>
@@ -207,6 +262,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                 name="address"
                                 value={formData.address}
                                 onChange={handleChange}
+                                placeholder="Nhập địa chỉ hoặc quét CCCD"
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
                             />
                         </div>
@@ -233,6 +289,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
         </div>
       </div>
     </div>
+
+    {showScanner && (
+        <QRScanner 
+            onScanSuccess={handleScanSuccess} 
+            onClose={() => setShowScanner(false)} 
+        />
+    )}
+    </>
   );
 };
 

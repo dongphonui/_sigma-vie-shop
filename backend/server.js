@@ -83,17 +83,30 @@ const initDb = async () => {
     `);
 
     // 3. Customers Table
+    // Updated: Add CCCD columns
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id VARCHAR(100) PRIMARY KEY,
         full_name TEXT NOT NULL,
         email VARCHAR(255),
         phone_number VARCHAR(50),
+        cccd_number VARCHAR(50) UNIQUE,
+        gender VARCHAR(20),
+        dob VARCHAR(50),
         password_hash TEXT NOT NULL,
         address TEXT,
         created_at BIGINT
       );
     `);
+    
+    // Migration for existing customers table
+    try {
+        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number VARCHAR(50) UNIQUE`);
+        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender VARCHAR(20)`);
+        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob VARCHAR(50)`);
+    } catch (err) {
+        console.log("Error adding columns to customers:", err.message);
+    }
 
     // 4. Orders Table
     await client.query(`
@@ -171,18 +184,13 @@ const parsePrice = (priceStr) => {
 
 // --- NODEMAILER CONFIGURATION ---
 const transporter = nodemailer.createTransport({
-  host: 'smtp.googlemail.com', 
-  port: 465, 
-  secure: true, 
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER, 
     pass: process.env.EMAIL_PASS
   },
-  connectionTimeout: 60000, 
-  greetingTimeout: 30000, 
-  socketTimeout: 60000,
-  logger: true,
-  debug: true
+  logger: false,
+  debug: false
 });
 
 transporter.verify(function (error, success) {
@@ -335,6 +343,7 @@ app.get('/api/customers', async (req, res) => {
     const result = await pool.query('SELECT * FROM customers');
     const customers = result.rows.map(r => ({
         id: r.id, fullName: r.full_name, email: r.email, phoneNumber: r.phone_number,
+        cccdNumber: r.cccd_number, gender: r.gender, dob: r.dob,
         passwordHash: r.password_hash, address: r.address, createdAt: parseInt(r.created_at)
     }));
     res.json(customers);
@@ -345,22 +354,22 @@ app.post('/api/customers/sync', async (req, res) => {
   const c = req.body;
   try {
     await pool.query(
-      `INSERT INTO customers (id, full_name, email, phone_number, password_hash, address, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO customers (id, full_name, email, phone_number, cccd_number, gender, dob, password_hash, address, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (id) DO NOTHING`, 
-       [c.id, c.fullName, c.email, c.phoneNumber, c.passwordHash, c.address, c.createdAt]
+       [c.id, c.fullName, c.email, c.phoneNumber, c.cccdNumber, c.gender, c.dob, c.passwordHash, c.address, c.createdAt]
     );
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.put('/api/customers/:id', async (req, res) => {
     const id = req.params.id;
-    const { fullName, email, phoneNumber, address } = req.body;
+    const { fullName, email, phoneNumber, address, cccdNumber, gender, dob } = req.body;
     try {
         await pool.query(
-            `UPDATE customers SET full_name = $1, email = $2, phone_number = $3, address = $4 WHERE id = $5`,
-            [fullName, email, phoneNumber, address, id]
+            `UPDATE customers SET full_name = $1, email = $2, phone_number = $3, address = $4, cccd_number = $5, gender = $6, dob = $7 WHERE id = $8`,
+            [fullName, email, phoneNumber, address, cccdNumber, gender, dob, id]
         );
         res.json({ success: true });
     } catch (err) {

@@ -44,6 +44,9 @@ export interface Customer {
   fullName: string;
   email?: string;       // Optional: User might register with Phone
   phoneNumber?: string; // Optional: User might register with Email
+  cccdNumber?: string;  // NEW: Citizen ID Number
+  gender?: string;      // NEW: Gender from CCCD
+  dob?: string;         // NEW: Date of Birth from CCCD
   passwordHash: string;
   address?: string;
   createdAt: number;
