@@ -1,6 +1,5 @@
-
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -9,115 +8,102 @@ interface QRScannerProps {
 }
 
 const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onClose }) => {
-  const [errorMsg, setErrorMsg] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-  const [scanStatus, setScanStatus] = useState<string>('Đang khởi động...');
-  const [cameras, setCameras] = useState<Array<{id: string, label: string}>>([]);
-  const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
+  const [errorMsg, setErrorMsg] = useState<string>('');
+  const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [scanStatus, setScanStatus] = useState<string>('Đang khởi động Camera...');
   
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerId = "reader-container";
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const codeReader = useRef<BrowserMultiFormatReader>(new BrowserMultiFormatReader());
+  const isScanRunning = useRef<boolean>(false);
 
-  // 1. Lấy danh sách Camera khi Mount
   useEffect(() => {
-    const init = async () => {
+    const initCamera = async () => {
         try {
-            // Xin quyền trước để lấy được tên Camera
+            // Request permission first
             await navigator.mediaDevices.getUserMedia({ video: true });
             
-            const devices = await Html5Qrcode.getCameras();
-            if (devices && devices.length) {
-                setCameras(devices);
-                // Mặc định chọn camera cuối cùng (thường là camera sau chính trên Android/iOS)
-                // Hoặc tìm camera có từ khóa 'back', 'environment'
-                const backCamIndex = devices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('sau'));
-                setCurrentCameraIndex(backCamIndex !== -1 ? backCamIndex : devices.length - 1);
+            const devices = await codeReader.current.listVideoInputDevices();
+            setVideoInputDevices(devices);
+            
+            if (devices.length > 0) {
+                // Try to find the best back camera
+                // On mobile, usually the last one or one labeled 'back'/'environment'
+                const backCamera = devices.find(device => device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('sau'));
+                const initialDeviceId = backCamera ? backCamera.deviceId : devices[devices.length - 1].deviceId;
+                setSelectedDeviceId(initialDeviceId);
             } else {
-                setErrorMsg("Không tìm thấy camera nào trên thiết bị.");
+                setErrorMsg('Không tìm thấy camera trên thiết bị này.');
+                setLoading(false);
             }
         } catch (err) {
-            console.error(err);
-            setErrorMsg("Vui lòng cho phép truy cập Camera để quét mã.");
-        } finally {
+            console.error("Camera Permission Error:", err);
+            setErrorMsg('Vui lòng cấp quyền truy cập Camera để quét mã.');
             setLoading(false);
         }
     };
-    init();
+
+    initCamera();
 
     return () => {
-        handleStop();
+        isScanRunning.current = false;
+        codeReader.current.reset();
     };
   }, []);
 
-  // 2. Khởi động quét khi có Camera Index hoặc thay đổi Index
   useEffect(() => {
-      if (cameras.length > 0) {
-          startScan(cameras[currentCameraIndex].id);
+      if (selectedDeviceId && videoRef.current) {
+          startDecoding(selectedDeviceId);
       }
-  }, [cameras, currentCameraIndex]);
+  }, [selectedDeviceId]);
 
-  const startScan = async (cameraId: string) => {
-    await handleStop(); // Dừng camera cũ trước khi bật cái mới
-
-    const scanner = new Html5Qrcode(containerId, false);
-    scannerRef.current = scanner;
-
-    const config = {
-      fps: 10, // Giảm FPS xuống 10 để camera có thời gian lấy nét tốt hơn (quan trọng cho CCCD)
-      qrbox: { width: 300, height: 300 }, // Vùng quét vuông tập trung
-      aspectRatio: 1.0,
-      videoConstraints: {
-        deviceId: { exact: cameraId },
-        // Cố gắng yêu cầu độ phân giải cao (Full HD)
-        width: { min: 1024, ideal: 1920, max: 3840 },
-        height: { min: 720, ideal: 1080, max: 2160 },
-        focusMode: "continuous" // Yêu cầu lấy nét liên tục (nếu trình duyệt hỗ trợ)
-      },
-      formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
-      experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-      }
-    };
-
-    setScanStatus(`Đang dùng: Camera ${currentCameraIndex + 1}/${cameras.length}`);
-
-    try {
-        await scanner.start(
-            cameraId, 
-            config,
-            (decodedText) => {
-                // Success
-                setScanStatus("✅ Đã bắt được mã!");
-                handleStop().then(() => {
-                    onScanSuccess(decodedText);
-                });
-            },
-            (errorMessage) => {
-                // Scanning...
-            }
-        );
-    } catch (err) {
-        console.error("Error starting scanner", err);
-        setErrorMsg("Không thể khởi động camera này. Hãy thử đổi camera khác.");
-    }
-  };
-
-  const handleStop = async () => {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-          try {
-              await scannerRef.current.stop();
-              scannerRef.current.clear();
-          } catch (e) {
-              console.error("Error stopping scanner", e);
-          }
+  const startDecoding = async (deviceId: string) => {
+      codeReader.current.reset();
+      setLoading(true);
+      setScanStatus('Đang lấy nét...');
+      isScanRunning.current = true;
+      
+      try {
+          // ZXing controls the video element directly
+          await codeReader.current.decodeFromVideoDevice(
+              deviceId,
+              videoRef.current!,
+              (result, err) => {
+                  if (result && isScanRunning.current) {
+                      const text = result.getText();
+                      setScanStatus('✅ Đã bắt được mã!');
+                      isScanRunning.current = false;
+                      codeReader.current.reset();
+                      onScanSuccess(text);
+                  }
+                  if (err && !(err instanceof NotFoundException)) {
+                      // Ignore frequent scan errors
+                  }
+              }
+          );
+          setLoading(false);
+          setScanStatus('Đang quét... Giữ yên thẻ CCCD');
+      } catch (err) {
+          console.error("Decoding Error:", err);
+          setErrorMsg('Không thể khởi động camera này. Hãy thử đổi camera khác.');
+          setLoading(false);
       }
   };
 
   const handleSwitchCamera = () => {
-      if (cameras.length <= 1) return;
-      const nextIndex = (currentCameraIndex + 1) % cameras.length;
-      setCurrentCameraIndex(nextIndex);
+      if (videoInputDevices.length <= 1) return;
+      
+      const currentIndex = videoInputDevices.findIndex(d => d.deviceId === selectedDeviceId);
+      const nextIndex = (currentIndex + 1) % videoInputDevices.length;
+      setSelectedDeviceId(videoInputDevices[nextIndex].deviceId);
   };
+
+  const stopAndClose = () => {
+      isScanRunning.current = false;
+      codeReader.current.reset();
+      onClose();
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-95 z-[60] flex items-center justify-center p-0 sm:p-4">
@@ -127,9 +113,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent text-white flex justify-between items-center z-30">
             <div>
                 <h3 className="font-bold text-lg drop-shadow-md">Quét CCCD</h3>
-                <p className="text-xs text-gray-300">{cameras.length > 0 ? cameras[currentCameraIndex].label.substring(0, 25) + '...' : ''}</p>
+                <p className="text-xs text-gray-300">
+                    {videoInputDevices.length > 0 
+                        ? videoInputDevices.find(d => d.deviceId === selectedDeviceId)?.label.substring(0, 25) + '...' 
+                        : ''}
+                </p>
             </div>
-            <button onClick={() => { handleStop(); onClose(); }} className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 rounded-full p-2 transition-colors">
+            <button onClick={stopAndClose} className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 rounded-full p-2 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
@@ -158,7 +148,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
                     </button>
                 </div>
             ) : (
-                <div id={containerId} className="w-full h-full object-cover"></div>
+                <video 
+                    ref={videoRef} 
+                    className="w-full h-full object-cover"
+                    playsInline
+                    muted
+                />
             )}
             
             {/* Visual Guide Overlay */}
@@ -178,7 +173,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             )}
             
             {/* Switch Camera Button (Floating) */}
-            {cameras.length > 1 && (
+            {videoInputDevices.length > 1 && (
                 <button 
                     onClick={handleSwitchCamera}
                     className="absolute bottom-24 right-6 z-40 bg-white/20 backdrop-blur-md border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-white/40 active:scale-95 transition-all"
@@ -195,7 +190,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             <p className="text-xs text-gray-500 mb-2">
                 Di chuyển thẻ CCCD vào gần/xa từ từ để lấy nét.
             </p>
-            {cameras.length > 1 && (
+            {videoInputDevices.length > 1 && (
                  <p className="text-[10px] text-gray-400">
                     Nếu khó quét, hãy bấm nút máy ảnh để thử ống kính khác.
                 </p>

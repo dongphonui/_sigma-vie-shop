@@ -18,7 +18,7 @@
     "recharts": "^2.12.3",
     "otpauth": "^9.2.2",
     "nodemailer": "^6.9.7",
-    "html5-qrcode": "^2.3.8"
+    "@zxing/library": "^0.21.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",
