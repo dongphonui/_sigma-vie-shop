@@ -1,6 +1,5 @@
-
-import React, { useEffect, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import React, { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -9,64 +8,118 @@ interface QRScannerProps {
 }
 
 const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onClose }) => {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const containerId = "reader-container";
 
   useEffect(() => {
-    // Config
-    const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        showTorchButtonIfSupported: true
-    };
-    
-    // Create Scanner instance
-    scannerRef.current = new Html5QrcodeScanner(
-      "reader", 
-      config, 
-      /* verbose= */ false
-    );
+    // 1. Initialize Scanner
+    // Use verbose=false to reduce console logs
+    const scanner = new Html5Qrcode(containerId, false);
+    scannerRef.current = scanner;
 
-    // Success Callback
-    const successCallback = (decodedText: string) => {
-        // Stop scanning after success
-        if (scannerRef.current) {
-            scannerRef.current.clear().catch(err => console.error("Failed to clear scanner", err));
-        }
-        onScanSuccess(decodedText);
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+      formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
     };
 
-    // Error Callback
-    const errorCallback = (errorMessage: any) => {
+    // 2. Start Camera
+    scanner.start(
+      { facingMode: "environment" }, // Prefer back camera
+      config,
+      (decodedText) => {
+        // Success
+        handleStop().then(() => {
+            onScanSuccess(decodedText);
+        });
+      },
+      (errorMessage) => {
+        // Scan Error (Frequent, ignore mostly)
         if (onScanFailure) {
-            onScanFailure(errorMessage);
+            // console.warn(errorMessage);
         }
-    };
+      }
+    ).then(() => {
+        setLoading(false);
+    }).catch(err => {
+        console.error("Error starting scanner:", err);
+        setLoading(false);
+        if (typeof err === 'string') {
+            setErrorMsg(err);
+        } else if (err?.name === 'NotAllowedError') {
+            setErrorMsg("Bạn đã từ chối quyền truy cập Camera. Vui lòng cho phép trong cài đặt trình duyệt.");
+        } else if (err?.name === 'NotFoundError') {
+            setErrorMsg("Không tìm thấy Camera trên thiết bị này.");
+        } else if (err?.name === 'NotReadableError') {
+            setErrorMsg("Camera đang được sử dụng bởi ứng dụng khác.");
+        } else {
+            setErrorMsg("Không thể khởi động Camera. Vui lòng đảm bảo bạn đang truy cập qua HTTPS (ổ khóa an toàn) hoặc Localhost.");
+        }
+    });
 
-    // Start
-    scannerRef.current.render(successCallback, errorCallback);
-
-    // Cleanup
+    // Cleanup on unmount
     return () => {
-        if (scannerRef.current) {
-            scannerRef.current.clear().catch(() => {});
-        }
+        handleStop();
     };
-  }, [onScanSuccess, onScanFailure]);
+  }, []);
+
+  const handleStop = async () => {
+      if (scannerRef.current && scannerRef.current.isScanning) {
+          try {
+              await scannerRef.current.stop();
+              scannerRef.current.clear();
+          } catch (e) {
+              console.error("Error stopping scanner", e);
+          }
+      }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden relative">
-        <div className="p-4 bg-[#00695C] text-white flex justify-between items-center">
-            <h3 className="font-bold">Quét mã QR trên CCCD</h3>
-            <button onClick={onClose} className="text-white hover:bg-[#004d40] rounded-full p-1">
+    <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden relative flex flex-col">
+        
+        {/* Header */}
+        <div className="p-4 bg-[#00695C] text-white flex justify-between items-center z-10">
+            <h3 className="font-bold text-lg">Quét mã QR</h3>
+            <button onClick={() => { handleStop(); onClose(); }} className="text-white hover:bg-[#004d40] rounded-full p-1 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
-        <div className="p-4">
-            <div id="reader" className="w-full"></div>
-            <p className="text-sm text-center text-gray-500 mt-4">
-                Đưa mã QR trên thẻ CCCD vào khung hình để tự động điền thông tin.
+
+        {/* Camera Area */}
+        <div className="relative bg-black min-h-[300px] flex items-center justify-center">
+            {loading && !errorMsg && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20">
+                    <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <p>Đang khởi động Camera...</p>
+                </div>
+            )}
+
+            {errorMsg ? (
+                <div className="p-6 text-center text-red-400 z-20">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <p className="font-bold mb-2">Lỗi Camera</p>
+                    <p className="text-sm text-gray-300 mb-4">{errorMsg}</p>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="bg-white text-black px-4 py-2 rounded text-sm font-bold hover:bg-gray-200"
+                    >
+                        Tải lại trang
+                    </button>
+                </div>
+            ) : (
+                <div id={containerId} className="w-full h-full"></div>
+            )}
+        </div>
+
+        {/* Instructions */}
+        <div className="p-4 bg-gray-50 text-center">
+            <p className="text-sm text-gray-600">
+                Đưa mã QR vào khung hình.<br/>
+                Hệ thống sẽ tự động nhận diện.
             </p>
         </div>
       </div>
