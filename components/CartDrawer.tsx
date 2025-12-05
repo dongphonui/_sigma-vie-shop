@@ -46,15 +46,6 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
       
-      // We will generate a SINGLE Order ID for the whole cart for payment simplicity in this demo,
-      // but strictly speaking, our system creates 1 order per product. 
-      // To adapt to "1 QR code for many items", we can just use the ID of the first created order as the reference,
-      // or sum them up. For simplicity here:
-      // 1. Create all orders.
-      // 2. Sum up amount.
-      // 3. Show QR.
-      
-      // Let's create orders first
       const createdOrders = [];
 
       for (const item of items) {
@@ -70,11 +61,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       if (successfulOrders.length > 0) {
           // If Bank Transfer, show Modal
           if (paymentMethod === 'BANK_TRANSFER') {
-              // Use the first order ID as reference or a combined one if we had a "Cart Order" concept.
-              // Since we split orders, let's use the ID of the first order for the transaction reference.
               setLastOrderId(createdOrders[0].id);
               setShowQrModal(true);
-              // Don't close drawer yet, wait for user confirmation
           } else {
               // COD
               clearCart(); 
@@ -92,6 +80,15 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       clearCart();
       onClose();
       alert('Cảm ơn bạn! Đơn hàng đang được chờ xác nhận thanh toán.');
+  };
+
+  const checkAuth = (action: () => void) => {
+      if (!currentUser) {
+          onClose();
+          onOpenAuth();
+      } else {
+          action();
+      }
   };
 
   return (
@@ -139,14 +136,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                             <div className="flex justify-between items-center mt-2">
                                 <div className="flex items-center border border-gray-300 rounded">
                                     <button 
-                                        onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                                        onClick={() => checkAuth(() => updateCartQuantity(item.id, item.quantity - 1))}
                                         className="px-2 py-0.5 text-gray-600 hover:bg-gray-100"
                                     >
                                         -
                                     </button>
                                     <span className="px-2 text-sm font-medium">{item.quantity}</span>
                                     <button 
-                                        onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                                        onClick={() => checkAuth(() => updateCartQuantity(item.id, item.quantity + 1))}
                                         className="px-2 py-0.5 text-gray-600 hover:bg-gray-100"
                                         disabled={item.quantity >= item.stock}
                                     >
@@ -154,7 +151,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                                     </button>
                                 </div>
                                 <button 
-                                    onClick={() => removeFromCart(item.id)}
+                                    onClick={() => checkAuth(() => removeFromCart(item.id))}
                                     className="text-gray-400 hover:text-red-500 transition-colors"
                                     title="Xóa"
                                 >

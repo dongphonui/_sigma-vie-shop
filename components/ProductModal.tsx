@@ -88,6 +88,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   };
 
   const handleAddToCart = () => {
+      if (!isLoggedIn) {
+          onOpenAuth();
+          return;
+      }
       addToCart(product, quantity);
       setFeedbackMsg('Đã thêm vào giỏ hàng!');
       setTimeout(() => setFeedbackMsg(''), 2000);
