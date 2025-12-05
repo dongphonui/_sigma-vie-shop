@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
-import type { Product } from '../types';
+import type { Product, Order } from '../types';
 import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
 import { addToCart } from '../utils/cartStorage';
-// Removed sendEmail import
+import PaymentModal from './PaymentModal';
 
 interface ProductModalProps {
   product: Product;
@@ -34,6 +34,14 @@ const ShoppingCartIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
 );
 
+const DollarSignIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+);
+
+const CreditCardIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+);
+
 const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedIn, onOpenAuth }) => {
   const [managerEmail, setManagerEmail] = useState('');
   const isOutOfStock = product.stock <= 0;
@@ -49,6 +57,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   const [quantity, setQuantity] = useState(1);
   const [orderStatus, setOrderStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS'>('IDLE');
   const [feedbackMsg, setFeedbackMsg] = useState('');
+  
+  // Payment State
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BANK_TRANSFER'>('COD');
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -95,18 +108,28 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
           productForOrder.price = product.salePrice; 
       }
 
-      const result = createOrder(customer, productForOrder, quantity);
+      const result = createOrder(customer, productForOrder, quantity, paymentMethod);
 
       if (result.success && result.order) {
-          // Logic gửi email thông báo đơn hàng đã được tắt theo yêu cầu.
-          // Đơn hàng vẫn được lưu vào Database và Admin có thể xem trong trang quản trị.
-          setOrderStatus('SUCCESS');
+          setCreatedOrder(result.order);
+          if (paymentMethod === 'BANK_TRANSFER') {
+              // Nếu chọn chuyển khoản, mở QR Modal
+              setShowQrModal(true);
+              setOrderStatus('IDLE'); // Reset để UI không hiện success ngay
+          } else {
+              // Nếu chọn COD, hiện success ngay
+              setOrderStatus('SUCCESS');
+          }
       } else {
           setFeedbackMsg(result.message);
           setOrderStatus('IDLE');
       }
   };
 
+  const handleConfirmPayment = () => {
+      setShowQrModal(false);
+      setOrderStatus('SUCCESS');
+  };
 
   const renderOrderSection = () => {
       if (isOutOfStock) {
@@ -124,7 +147,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                 <CheckCircleIcon className="w-16 h-16 text-green-500 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-green-700 mb-2">Đặt hàng thành công!</h3>
                 <p className="text-gray-600 mb-6">
-                    Đơn hàng của bạn đã được ghi nhận vào hệ thống.
+                    {paymentMethod === 'BANK_TRANSFER' 
+                        ? 'Cảm ơn bạn đã thanh toán. Chúng tôi sẽ xử lý đơn hàng sớm nhất.' 
+                        : 'Đơn hàng của bạn đã được ghi nhận. Bạn sẽ thanh toán khi nhận hàng.'}
                 </p>
                 <button 
                     onClick={onClose}
@@ -160,7 +185,30 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                     +
                 </button>
             </div>
-            <p className="text-sm text-gray-500 mb-6">Còn lại {product.stock} sản phẩm trong kho</p>
+            <p className="text-sm text-gray-500 mb-4">Còn lại {product.stock} sản phẩm trong kho</p>
+
+            {/* Payment Method Selector */}
+            {isLoggedIn && (
+                <div className="mb-6">
+                    <p className="text-sm font-medium text-gray-700 mb-2 text-left">Phương thức thanh toán:</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button 
+                            onClick={() => setPaymentMethod('COD')}
+                            className={`flex flex-col items-center justify-center py-2 px-2 border rounded-lg transition-all ${paymentMethod === 'COD' ? 'bg-orange-50 border-[#D4AF37] text-[#D4AF37] ring-1 ring-[#D4AF37]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <DollarSignIcon className="w-5 h-5 mb-1" />
+                            <span className="text-xs font-bold">Tiền mặt (COD)</span>
+                        </button>
+                        <button 
+                            onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                            className={`flex flex-col items-center justify-center py-2 px-2 border rounded-lg transition-all ${paymentMethod === 'BANK_TRANSFER' ? 'bg-teal-50 border-[#00695C] text-[#00695C] ring-1 ring-[#00695C]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <CreditCardIcon className="w-5 h-5 mb-1" />
+                            <span className="text-xs font-bold">Chuyển khoản (QR)</span>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="flex flex-col gap-3">
                  <button 
@@ -186,7 +234,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         className={`w-full text-white font-bold py-3 px-8 rounded-full shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 ${isFlashSaleActive ? 'bg-red-600 hover:bg-red-700' : 'bg-[#00695C] hover:bg-[#004d40]'} disabled:opacity-70`}
                     >
                         {isFlashSaleActive && <LightningIcon className="w-5 h-5" />}
-                        <span>{orderStatus === 'PROCESSING' ? 'Đang xử lý...' : 'Mua ngay (Đặt nhanh)'}</span>
+                        <span>{orderStatus === 'PROCESSING' ? 'Đang xử lý...' : (paymentMethod === 'BANK_TRANSFER' ? 'Thanh toán & Mua ngay' : 'Mua ngay (Đặt nhanh)')}</span>
                     </button>
                 )}
             </div>
@@ -197,76 +245,86 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div 
-        className="relative bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row animate-fade-in-up"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-colors z-10"
-          aria-label="Đóng cửa sổ"
+    <>
+        <div 
+        className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4"
+        onClick={onClose}
         >
-          <XIcon className="w-8 h-8"/>
-        </button>
-        
-        <div className="w-full md:w-1/2 relative">
-          <img 
-            src={product.imageUrl} 
-            alt={product.name} 
-            className={`w-full h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none ${isOutOfStock ? 'grayscale opacity-75' : ''}`} 
-          />
-           {isOutOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <div className="bg-black/70 text-white px-8 py-4 font-bold text-2xl tracking-widest border-4 border-white transform -rotate-12 backdrop-blur-sm">
-                    HẾT HÀNG
+        <div 
+            className="relative bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-colors z-10"
+            aria-label="Đóng cửa sổ"
+            >
+            <XIcon className="w-8 h-8"/>
+            </button>
+            
+            <div className="w-full md:w-1/2 relative">
+            <img 
+                src={product.imageUrl} 
+                alt={product.name} 
+                className={`w-full h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-t-none ${isOutOfStock ? 'grayscale opacity-75' : ''}`} 
+            />
+            {isOutOfStock && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="bg-black/70 text-white px-8 py-4 font-bold text-2xl tracking-widest border-4 border-white transform -rotate-12 backdrop-blur-sm">
+                        HẾT HÀNG
+                    </div>
                 </div>
+            )}
+            {isFlashSaleActive && !isOutOfStock && (
+                <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-pulse flex items-center gap-1 z-10">
+                    <LightningIcon className="w-4 h-4" />
+                    FLASH SALE
+                </div>
+            )}
             </div>
-           )}
-           {isFlashSaleActive && !isOutOfStock && (
-               <div className="absolute top-4 left-4 bg-red-600 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-pulse flex items-center gap-1 z-10">
-                   <LightningIcon className="w-4 h-4" />
-                   FLASH SALE
-               </div>
-           )}
+
+            <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
+            <h2 className="text-3xl font-bold font-serif mb-4 text-gray-900">{product.name}</h2>
+            
+            <div className="flex items-end gap-3 mb-6">
+                {isFlashSaleActive ? (
+                    <>
+                        <p className="text-3xl font-bold text-red-600">{product.salePrice}</p>
+                        <p className="text-xl text-gray-400 line-through mb-1">{product.price}</p>
+                    </>
+                ) : (
+                    <p className="text-2xl text-gray-700">{product.price}</p>
+                )}
+                
+                {isOutOfStock && <span className="text-red-600 font-bold border border-red-600 px-2 py-0.5 text-sm rounded mb-1">Hết hàng</span>}
+            </div>
+            
+            <p className="text-gray-600 mb-8">{product.description}</p>
+
+            <div className={`p-6 rounded-lg text-center ${isOutOfStock ? 'bg-gray-100' : (isFlashSaleActive ? 'bg-red-50 border border-red-100' : 'bg-gray-50')}`}>
+                {renderOrderSection()}
+            </div>
+            </div>
+        </div>
+        <style>{`
+            @keyframes fade-in-up {
+                from { opacity: 0; transform: translateY(20px) scale(0.95); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .animate-fade-in-up {
+                animation: fade-in-up 0.3s ease-out forwards;
+            }
+        `}</style>
         </div>
 
-        <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
-          <h2 className="text-3xl font-bold font-serif mb-4 text-gray-900">{product.name}</h2>
-          
-          <div className="flex items-end gap-3 mb-6">
-             {isFlashSaleActive ? (
-                 <>
-                    <p className="text-3xl font-bold text-red-600">{product.salePrice}</p>
-                    <p className="text-xl text-gray-400 line-through mb-1">{product.price}</p>
-                 </>
-             ) : (
-                 <p className="text-2xl text-gray-700">{product.price}</p>
-             )}
-             
-             {isOutOfStock && <span className="text-red-600 font-bold border border-red-600 px-2 py-0.5 text-sm rounded mb-1">Hết hàng</span>}
-          </div>
-          
-          <p className="text-gray-600 mb-8">{product.description}</p>
-
-          <div className={`p-6 rounded-lg text-center ${isOutOfStock ? 'bg-gray-100' : (isFlashSaleActive ? 'bg-red-50 border border-red-100' : 'bg-gray-50')}`}>
-            {renderOrderSection()}
-          </div>
-        </div>
-      </div>
-      <style>{`
-        @keyframes fade-in-up {
-            from { opacity: 0; transform: translateY(20px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .animate-fade-in-up {
-            animation: fade-in-up 0.3s ease-out forwards;
-        }
-      `}</style>
-    </div>
+        <PaymentModal 
+            isOpen={showQrModal} 
+            onClose={() => setShowQrModal(false)}
+            orderId={createdOrder?.id || ''}
+            amount={createdOrder?.totalPrice || 0}
+            onConfirmPayment={handleConfirmPayment}
+        />
+    </>
   );
 };
 
