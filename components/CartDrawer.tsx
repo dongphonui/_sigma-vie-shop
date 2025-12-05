@@ -21,6 +21,10 @@ const TrashIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 );
 
+const LockIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+);
+
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, currentUser, onOpenAuth }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BANK_TRANSFER'>('COD');
@@ -82,14 +86,35 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       alert('Cảm ơn bạn! Đơn hàng đang được chờ xác nhận thanh toán.');
   };
 
-  const checkAuth = (action: () => void) => {
-      if (!currentUser) {
-          onClose();
-          onOpenAuth();
-      } else {
-          action();
-      }
-  };
+  // NẾU CHƯA ĐĂNG NHẬP: Hiển thị màn hình chặn
+  if (!currentUser) {
+      return (
+        <>
+            <div 
+                className={`fixed inset-0 bg-black transition-opacity duration-300 z-50 ${isOpen ? 'opacity-50 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                onClick={onClose}
+            />
+            <div 
+                className={`fixed inset-y-0 right-0 w-full sm:w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 flex flex-col items-center justify-center p-8 text-center ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+            >
+                <div className="bg-gray-100 p-4 rounded-full mb-4">
+                    <LockIcon className="w-10 h-10 text-gray-500" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Giỏ hàng đã khóa</h2>
+                <p className="text-gray-500 mb-6">Vui lòng đăng nhập để xem giỏ hàng và thực hiện thanh toán.</p>
+                <button 
+                    onClick={() => { onClose(); onOpenAuth(); }}
+                    className="bg-[#D4AF37] text-white px-6 py-2 rounded-full font-bold hover:bg-[#b89b31]"
+                >
+                    Đăng nhập ngay
+                </button>
+                <button onClick={onClose} className="mt-4 text-gray-400 hover:text-gray-600 text-sm">
+                    Đóng
+                </button>
+            </div>
+        </>
+      );
+  }
 
   return (
     <>
@@ -136,14 +161,14 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                             <div className="flex justify-between items-center mt-2">
                                 <div className="flex items-center border border-gray-300 rounded">
                                     <button 
-                                        onClick={() => checkAuth(() => updateCartQuantity(item.id, item.quantity - 1))}
+                                        onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
                                         className="px-2 py-0.5 text-gray-600 hover:bg-gray-100"
                                     >
                                         -
                                     </button>
                                     <span className="px-2 text-sm font-medium">{item.quantity}</span>
                                     <button 
-                                        onClick={() => checkAuth(() => updateCartQuantity(item.id, item.quantity + 1))}
+                                        onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
                                         className="px-2 py-0.5 text-gray-600 hover:bg-gray-100"
                                         disabled={item.quantity >= item.stock}
                                     >
@@ -151,7 +176,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                                     </button>
                                 </div>
                                 <button 
-                                    onClick={() => checkAuth(() => removeFromCart(item.id))}
+                                    onClick={() => removeFromCart(item.id)}
                                     className="text-gray-400 hover:text-red-500 transition-colors"
                                     title="Xóa"
                                 >

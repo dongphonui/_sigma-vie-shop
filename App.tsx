@@ -103,6 +103,15 @@ const App: React.FC = () => {
       setCurrentUser(customer);
   };
 
+  // Logic: Chỉ mở giỏ hàng nếu đã đăng nhập
+  const handleOpenCart = () => {
+      if (!currentUser) {
+          openAuthModal('LOGIN');
+      } else {
+          setIsCartOpen(true);
+      }
+  };
+
   const renderPage = () => {
     const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
 
@@ -128,11 +137,14 @@ const App: React.FC = () => {
     }
   };
 
+  // Logic: Ẩn số lượng giỏ hàng nếu chưa đăng nhập
+  const visibleCartCount = currentUser ? cartItems.reduce((acc, item) => acc + item.quantity, 0) : 0;
+
   return (
     <div className="bg-[#F7F5F2] min-h-screen text-gray-800 selection:bg-[#D4AF37] selection:text-white relative">
       {React.cloneElement(renderPage() as React.ReactElement<any>, { 
-          cartItemCount: cartItems.reduce((acc, item) => acc + item.quantity, 0),
-          onOpenCart: () => setIsCartOpen(true)
+          cartItemCount: visibleCartCount,
+          onOpenCart: handleOpenCart
       })}
       
       <ChatWidget />
