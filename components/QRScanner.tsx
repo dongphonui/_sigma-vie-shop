@@ -15,6 +15,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   const [scanStatus, setScanStatus] = useState<string>('Đang khởi động Camera...');
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const codeReader = useRef<BrowserMultiFormatReader>(new BrowserMultiFormatReader());
   const isScanRunning = useRef<boolean>(false);
 
@@ -22,16 +23,25 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
     const initCamera = async () => {
         try {
             // Request permission first
-            await navigator.mediaDevices.getUserMedia({ video: true });
+            await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             
             const devices = await codeReader.current.listVideoInputDevices();
             setVideoInputDevices(devices);
             
             if (devices.length > 0) {
-                // Try to find the best back camera
-                // On mobile, usually the last one or one labeled 'back'/'environment'
-                const backCamera = devices.find(device => device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('sau'));
-                const initialDeviceId = backCamera ? backCamera.deviceId : devices[devices.length - 1].deviceId;
+                // Try to find the best back camera (usually the last one on Android/iOS)
+                // Filtering for 'back' or 'environment' often helps select the main high-res camera
+                const backCameras = devices.filter(device => 
+                    device.label.toLowerCase().includes('back') || 
+                    device.label.toLowerCase().includes('sau') ||
+                    device.label.toLowerCase().includes('environment')
+                );
+                
+                // Ưu tiên camera sau cuối cùng (thường là cam chính hoặc tele trên máy nhiều cam)
+                const initialDeviceId = backCameras.length > 0 
+                    ? backCameras[backCameras.length - 1].deviceId 
+                    : devices[devices.length - 1].deviceId;
+
                 setSelectedDeviceId(initialDeviceId);
             } else {
                 setErrorMsg('Không tìm thấy camera trên thiết bị này.');
@@ -65,20 +75,23 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
       isScanRunning.current = true;
       
       try {
-          // ZXing controls the video element directly
-          await codeReader.current.decodeFromVideoDevice(
-              deviceId,
+          // Config video constraints for highest possible resolution/focus
+          const constraints = {
+              video: {
+                  deviceId: { exact: deviceId },
+                  width: { ideal: 1920 }, // Full HD
+                  height: { ideal: 1080 },
+                  focusMode: 'continuous', // Try to force auto-focus
+              }
+          };
+
+          await codeReader.current.decodeFromConstraints(
+              constraints,
               videoRef.current!,
               (result, err) => {
                   if (result && isScanRunning.current) {
                       const text = result.getText();
-                      setScanStatus('✅ Đã bắt được mã!');
-                      isScanRunning.current = false;
-                      codeReader.current.reset();
-                      onScanSuccess(text);
-                  }
-                  if (err && !(err instanceof NotFoundException)) {
-                      // Ignore frequent scan errors
+                      handleSuccess(text);
                   }
               }
           );
@@ -86,9 +99,21 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
           setScanStatus('Đang quét... Giữ yên thẻ CCCD');
       } catch (err) {
           console.error("Decoding Error:", err);
-          setErrorMsg('Không thể khởi động camera này. Hãy thử đổi camera khác.');
+          setErrorMsg('Không thể khởi động camera này. Hãy thử đổi camera khác hoặc dùng tính năng "Chọn ảnh".');
           setLoading(false);
       }
+  };
+
+  const handleSuccess = (text: string) => {
+      setScanStatus('✅ Đã bắt được mã!');
+      isScanRunning.current = false;
+      codeReader.current.reset();
+      
+      // Play beep sound
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.play().catch(() => {});
+      
+      onScanSuccess(text);
   };
 
   const handleSwitchCamera = () => {
@@ -97,6 +122,39 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
       const currentIndex = videoInputDevices.findIndex(d => d.deviceId === selectedDeviceId);
       const nextIndex = (currentIndex + 1) % videoInputDevices.length;
       setSelectedDeviceId(videoInputDevices[nextIndex].deviceId);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          setLoading(true);
+          setScanStatus('Đang xử lý ảnh...');
+          try {
+              const file = e.target.files[0];
+              const imageUrl = URL.createObjectURL(file);
+              
+              const imgElement = document.createElement('img');
+              imgElement.src = imageUrl;
+              
+              // Wait for image to load
+              await new Promise((resolve) => { imgElement.onload = resolve; });
+
+              const result = await codeReader.current.decodeFromImageElement(imgElement);
+              if (result) {
+                  handleSuccess(result.getText());
+              }
+          } catch (err) {
+              console.error("Image Decode Error", err);
+              alert("Không tìm thấy mã QR trong ảnh này. Vui lòng chụp rõ nét mã QR trên thẻ CCCD.");
+              setScanStatus('Thử lại...');
+              setLoading(false);
+              // Restart live camera
+              if (selectedDeviceId) startDecoding(selectedDeviceId);
+          }
+      }
+  };
+
+  const triggerFileUpload = () => {
+      fileInputRef.current?.click();
   };
 
   const stopAndClose = () => {
@@ -114,9 +172,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             <div>
                 <h3 className="font-bold text-lg drop-shadow-md">Quét CCCD</h3>
                 <p className="text-xs text-gray-300">
-                    {videoInputDevices.length > 0 
-                        ? videoInputDevices.find(d => d.deviceId === selectedDeviceId)?.label.substring(0, 25) + '...' 
-                        : ''}
+                   Đưa mã QR vào khung hoặc chọn ảnh
                 </p>
             </div>
             <button onClick={stopAndClose} className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 rounded-full p-2 transition-colors">
@@ -129,7 +185,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             {loading && !errorMsg && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20">
                     <div className="w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p className="font-medium">Đang khởi động Camera...</p>
+                    <p className="font-medium">Đang xử lý...</p>
                 </div>
             )}
 
@@ -172,29 +228,43 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
                 </div>
             )}
             
-            {/* Switch Camera Button (Floating) */}
-            {videoInputDevices.length > 1 && (
+            {/* Control Buttons (Bottom Right) */}
+            <div className="absolute bottom-28 right-6 z-40 flex flex-col gap-4">
+                {/* Switch Camera Button */}
+                {videoInputDevices.length > 1 && (
+                    <button 
+                        onClick={handleSwitchCamera}
+                        className="bg-white/20 backdrop-blur-md border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-white/40 active:scale-95 transition-all"
+                        title="Đổi Camera"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2l-.22-.34A2 2 0 0 0 13.12 4H10.88a2 2 0 0 0-1.66.66l-.22.34A2 2 0 0 1 7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M17 13h.01"/></svg>
+                    </button>
+                )}
+                
+                {/* Upload Image Button */}
                 <button 
-                    onClick={handleSwitchCamera}
-                    className="absolute bottom-24 right-6 z-40 bg-white/20 backdrop-blur-md border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-white/40 active:scale-95 transition-all"
-                    title="Đổi Camera"
+                    onClick={triggerFileUpload}
+                    className="bg-[#D4AF37] border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-[#b89b31] active:scale-95 transition-all"
+                    title="Chọn ảnh từ thư viện"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2l-.22-.34A2 2 0 0 0 13.12 4H10.88a2 2 0 0 0-1.66.66l-.22.34A2 2 0 0 1 7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M17 13h.01"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 </button>
-            )}
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFileUpload}
+                />
+            </div>
         </div>
 
         {/* Footer Status */}
         <div className="p-4 bg-white text-center shrink-0 z-30">
             <p className="font-bold text-[#00695C] animate-pulse mb-1">{scanStatus}</p>
             <p className="text-xs text-gray-500 mb-2">
-                Di chuyển thẻ CCCD vào gần/xa từ từ để lấy nét.
+                Nếu camera mờ, hãy bấm nút <strong>"Hình ảnh"</strong> màu vàng để chụp bằng Camera gốc của máy.
             </p>
-            {videoInputDevices.length > 1 && (
-                 <p className="text-[10px] text-gray-400">
-                    Nếu khó quét, hãy bấm nút máy ảnh để thử ống kính khác.
-                </p>
-            )}
         </div>
 
         <style>{`
