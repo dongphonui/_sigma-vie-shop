@@ -14,9 +14,15 @@ export const parseCCCDQrCode = (qrString: string): CCCDData | null => {
   // ID|Old_ID|Name|DoB|Gender|Address|IssueDate
   // Example: 054096009510|221419681|Nguyễn Hồ N|11081999|Nam|Thôn Phú Vang, Bình Kiến, Tuy Hòa, Phú Yên|19022022
   
-  if (!qrString || !qrString.includes('|')) return null;
+  if (!qrString) return null;
 
-  const parts = qrString.split('|');
+  // 1. Clean string (remove invisible chars like BOM if scanned incorrectly)
+  // eslint-disable-next-line no-control-regex
+  const cleanStr = qrString.replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
+
+  if (!cleanStr.includes('|')) return null;
+
+  const parts = cleanStr.split('|');
   
   if (parts.length < 6) return null; // Basic validation
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
@@ -21,8 +22,12 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
 
     const config = {
       fps: 10,
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0,
+      // qrbox removed to allow full screen scanning which is better for detailed QRs like CCCD
+      videoConstraints: {
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 },
+        facingMode: "environment"
+      },
       formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
     };
 
@@ -32,6 +37,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
       config,
       (decodedText) => {
         // Success
+        console.log("QR Scanned raw:", decodedText);
         handleStop().then(() => {
             onScanSuccess(decodedText);
         });
@@ -79,18 +85,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden relative flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden relative flex flex-col h-[80vh]">
         
         {/* Header */}
-        <div className="p-4 bg-[#00695C] text-white flex justify-between items-center z-10">
-            <h3 className="font-bold text-lg">Quét mã QR</h3>
+        <div className="p-4 bg-[#00695C] text-white flex justify-between items-center z-10 shrink-0">
+            <h3 className="font-bold text-lg">Quét mã QR CCCD</h3>
             <button onClick={() => { handleStop(); onClose(); }} className="text-white hover:bg-[#004d40] rounded-full p-1 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
 
         {/* Camera Area */}
-        <div className="relative bg-black min-h-[300px] flex items-center justify-center">
+        <div className="relative bg-black flex-1 flex items-center justify-center overflow-hidden">
             {loading && !errorMsg && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white z-20">
                     <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mb-2"></div>
@@ -111,15 +117,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
                     </button>
                 </div>
             ) : (
-                <div id={containerId} className="w-full h-full"></div>
+                <div id={containerId} className="w-full h-full object-cover"></div>
             )}
         </div>
 
         {/* Instructions */}
-        <div className="p-4 bg-gray-50 text-center">
+        <div className="p-4 bg-gray-50 text-center shrink-0">
             <p className="text-sm text-gray-600">
-                Đưa mã QR vào khung hình.<br/>
-                Hệ thống sẽ tự động nhận diện.
+                Đưa mã QR vào khung hình. Giữ yên tay để lấy nét.<br/>
+                Hệ thống sẽ tự động điền thông tin.
             </p>
         </div>
       </div>
