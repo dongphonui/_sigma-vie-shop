@@ -211,41 +211,41 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ và tên</label>
-                                <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="name" />
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
-                                <input type="text" name="cccdNumber" required value={formData.cccdNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <input type="text" name="cccdNumber" required value={formData.cccdNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
-                                <input type="text" name="dob" required value={formData.dob} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <input type="text" name="dob" required value={formData.dob} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="bday" />
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
-                                <input type="text" name="gender" required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <input type="text" name="gender" required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="sex" />
                             </div>
                         </div>
                          <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
-                                <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="email" />
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số điện thoại</label>
-                                <input type="tel" name="phoneNumber" required value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <input type="tel" name="phoneNumber" required value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="tel" />
                                 <p className="text-[10px] text-[#D4AF37] mt-1 italic">SĐT này sẽ là tên đăng nhập chính thức của bạn.</p>
                             </div>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày cấp CCCD</label>
-                            <input type="text" name="issueDate" required value={formData.issueDate} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" />
+                            <input type="text" name="issueDate" required value={formData.issueDate} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
                         </div>
                          <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nơi thường trú</label>
-                            <input type="text" name="address" required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                            <input type="text" name="address" required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="street-address" />
                         </div>
                     </>
                 )}
@@ -275,6 +275,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             value={formData.password}
                             onChange={handleChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" 
+                            autoComplete="new-password"
                         />
                     </div>
                     {mode === 'REGISTER' && (
@@ -287,6 +288,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" 
+                                autoComplete="new-password"
                             />
                         </div>
                     )}
