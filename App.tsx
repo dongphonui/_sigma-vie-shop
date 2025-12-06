@@ -26,29 +26,35 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
+  // Khởi tạo và lắng nghe thay đổi route / user
   useEffect(() => {
     const handleHashChange = () => {
       setRoute(window.location.hash);
     };
     
-    // Check for logged in customer
+    // Check for logged in customer on init
     setCurrentUser(getCurrentCustomer());
     
-    // Initial Cart Load
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
+
+  // Lắng nghe thay đổi giỏ hàng VÀ thay đổi người dùng
+  useEffect(() => {
+    // Khi currentUser thay đổi, getCart() sẽ tự động lấy đúng key của user đó (nhờ update ở cartStorage)
     setCartItems(getCart());
 
     const handleCartUpdate = () => {
         setCartItems(getCart());
     };
 
-    window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('sigma_vie_cart_update', handleCartUpdate);
-
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('sigma_vie_cart_update', handleCartUpdate);
     };
-  }, []);
+  }, [currentUser]); // QUAN TRỌNG: Chạy lại khi currentUser thay đổi
 
   useEffect(() => {
     const targetSequence = ['x', 'y', 'z'];
@@ -101,6 +107,7 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (customer: Customer) => {
       setCurrentUser(customer);
+      // Khi login thành công, useEffect ở trên sẽ chạy lại và load giỏ hàng của user này
   };
 
   // Logic: Chỉ mở giỏ hàng nếu đã đăng nhập
