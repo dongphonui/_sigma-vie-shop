@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { loginCustomer, registerCustomer } from '../utils/customerStorage';
 import { parseCCCDQrCode } from '../utils/cccdHelper';
 import QRScanner from './QRScanner';
@@ -24,9 +23,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(initialMode);
   const [showScanner, setShowScanner] = useState(false);
 
+  // Generate random field names ONCE when component mounts or mode changes
+  // to completely baffle browser autofill heuristics on mobile
+  const randomNames = useMemo(() => ({
+      cccd: `f_${Math.random().toString(36).substring(7)}`,
+      dob: `f_${Math.random().toString(36).substring(7)}`,
+      issueDate: `f_${Math.random().toString(36).substring(7)}`,
+      address: `f_${Math.random().toString(36).substring(7)}`,
+      gender: `f_${Math.random().toString(36).substring(7)}`
+  }), [isOpen]); // Re-generate on open
+
   const [formData, setFormData] = useState({
     fullName: '',
-    identifier: '', // Used for Login
+    identifier: '',
     email: '',
     phoneNumber: '',
     password: '',
@@ -63,7 +72,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
   if (!isOpen) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Map random names back to real state keys
+    if (name === randomNames.cccd) {
+        setFormData(prev => ({ ...prev, cccdNumber: value }));
+    } else if (name === randomNames.dob) {
+        setFormData(prev => ({ ...prev, dob: value }));
+    } else if (name === randomNames.issueDate) {
+        setFormData(prev => ({ ...prev, issueDate: value }));
+    } else if (name === randomNames.address) {
+        setFormData(prev => ({ ...prev, address: value }));
+    } else if (name === randomNames.gender) {
+        setFormData(prev => ({ ...prev, gender: value }));
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleScanSuccess = (decodedText: string) => {
@@ -163,10 +187,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             {/* Registration: CCCD Display & Scan Button */}
             {mode === 'REGISTER' && (
                 <>
-                    {/* Dummy Inputs (Hidden Trap) to catch browser autofill */}
-                    <div style={{ width: 0, height: 0, overflow: 'hidden', position: 'absolute' }}>
-                        <input type="text" name="fake_email_trap" tabIndex={-1} />
-                        <input type="password" name="fake_password_trap" tabIndex={-1} />
+                    {/* Dummy Inputs to break Autofill Chain */}
+                    <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
+                         <input type="text" name="dummy_username_trap" />
+                         <input type="password" name="dummy_password_trap" />
                     </div>
 
                     {/* Digital ID Card Display */}
@@ -212,45 +236,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                     <>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ và tên</label>
-                                <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="name" />
-                            </div>
-                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
-                                {/* FIX: Changed type to 'tel' to match Phone behavior (blocks email autofill) */}
-                                <input 
-                                    type="tel" 
-                                    name="cccdNumber" 
-                                    required 
-                                    value={formData.cccdNumber} 
-                                    onChange={handleChange} 
-                                    className="w-full px-3 py-2 border rounded-md text-sm" 
-                                    autoComplete="off"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
-                                {/* FIX: Changed type to 'search' (browser never autofills credentials in search) */}
-                                <input 
-                                    type="search" 
-                                    name="dob" 
-                                    required 
-                                    value={formData.dob} 
-                                    onChange={handleChange} 
-                                    placeholder="DD/MM/YYYY" 
-                                    className="w-full px-3 py-2 border rounded-md text-sm" 
-                                    autoComplete="off"
-                                />
-                            </div>
-                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
-                                <input type="text" name="gender" required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
-                            </div>
-                        </div>
-                         <div className="grid grid-cols-2 gap-4">
-                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
                                 <input 
                                     type="email" 
@@ -276,13 +261,57 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                 <p className="text-[10px] text-[#D4AF37] mt-1 italic">SĐT này sẽ là tên đăng nhập chính thức của bạn.</p>
                             </div>
                         </div>
+
+                        {/* DUMMY FIELD SEPARATOR: Blocks flow between Email and CCCD */}
+                        <input type="text" className="hidden" autoComplete="off" />
+
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ và tên</label>
+                                <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="name" />
+                            </div>
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
+                                {/* RANDOM NAME + NUMBER TYPE: prevents username autofill */}
+                                <input 
+                                    type="number" 
+                                    name={randomNames.cccd} 
+                                    required 
+                                    value={formData.cccdNumber} 
+                                    onChange={handleChange} 
+                                    className="w-full px-3 py-2 border rounded-md text-sm" 
+                                    autoComplete="off"
+                                    placeholder="12 số"
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
+                                {/* RANDOM NAME + SEARCH TYPE: prevents autofill */}
+                                <input 
+                                    type="search" 
+                                    name={randomNames.dob} 
+                                    required 
+                                    value={formData.dob} 
+                                    onChange={handleChange} 
+                                    placeholder="DD/MM/YYYY" 
+                                    className="w-full px-3 py-2 border rounded-md text-sm" 
+                                    autoComplete="off"
+                                />
+                            </div>
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
+                                <input type="text" name={randomNames.gender} required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
+                            </div>
+                        </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày cấp CCCD</label>
-                            <input type="text" name="issueDate" required value={formData.issueDate} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
+                            <input type="text" name={randomNames.issueDate} required value={formData.issueDate} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
                         </div>
                          <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nơi thường trú</label>
-                            <input type="text" name="address" required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="street-address" />
+                            <input type="text" name={randomNames.address} required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
                         </div>
                     </>
                 )}
