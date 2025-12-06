@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Content } from "@google/genai";
 import { getProducts } from '../utils/productStorage';
@@ -64,7 +63,22 @@ const ChatWidget: React.FC = () => {
       const products = getProducts();
       const productContext = products.map(p => `${p.name} (ID: ${p.id}) - Giá: ${p.price}. Mô tả: ${p.description}`).join('\n');
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      
+      if (!apiKey) {
+        console.error("API_KEY is missing. Please set it in your .env file.");
+        const errorMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'model',
+            text: "Hệ thống Chatbot chưa được cấu hình đúng (Thiếu API Key). Vui lòng liên hệ quản trị viên.",
+            timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        setIsLoading(false);
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       // Convert internal message format to Gemini history format
       // Limit history to last 20 messages to avoid context limit issues
@@ -97,7 +111,7 @@ const ChatWidget: React.FC = () => {
       const modelMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: responseText,
+        text: responseText || "Xin lỗi, tôi không có câu trả lời cho vấn đề này.",
         timestamp: Date.now(),
       };
 
