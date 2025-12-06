@@ -47,6 +47,7 @@ export interface Customer {
   cccdNumber?: string;  // NEW: Citizen ID Number
   gender?: string;      // NEW: Gender from CCCD
   dob?: string;         // NEW: Date of Birth from CCCD
+  issueDate?: string;   // NEW: Date of Issue from CCCD
   passwordHash: string;
   address?: string;
   createdAt: number;

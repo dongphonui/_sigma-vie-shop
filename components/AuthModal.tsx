@@ -13,7 +13,7 @@ interface AuthModalProps {
 }
 
 const ScanIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="10" x="7" y="7" rx="2"/><path d="M7 17v4"/><path d="M17 17v4"/><path d="M17 7V3"/><path d="M7 7V3"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2-2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="10" x="7" y="7" rx="2"/><path d="M7 17v4"/><path d="M17 17v4"/><path d="M17 7V3"/><path d="M7 7V3"/></svg>
 );
 
 const UserCircleIcon: React.FC<{className?: string}> = ({className}) => (
@@ -22,20 +22,20 @@ const UserCircleIcon: React.FC<{className?: string}> = ({className}) => (
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, initialMode = 'LOGIN' }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(initialMode);
-  
-  // Register specific state
-  const [registerMethod, setRegisterMethod] = useState<'EMAIL' | 'PHONE'>('EMAIL');
   const [showScanner, setShowScanner] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
-    identifier: '', // Used for Login (Email or Phone or CCCD) or Register (Specific value based on method)
+    identifier: '', // Used for Login
+    email: '',
+    phoneNumber: '',
     password: '',
     confirmPassword: '',
     address: '',
     cccdNumber: '',
     gender: '',
-    dob: ''
+    dob: '',
+    issueDate: ''
   });
   
   const [error, setError] = useState('');
@@ -45,16 +45,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
     setMode(initialMode);
     setError('');
     setSuccessMsg('');
-    setRegisterMethod('EMAIL');
     setFormData({
         fullName: '',
         identifier: '',
+        email: '',
+        phoneNumber: '',
         password: '',
         confirmPassword: '',
         address: '',
         cccdNumber: '',
         gender: '',
-        dob: ''
+        dob: '',
+        issueDate: ''
     });
   }, [isOpen, initialMode]);
 
@@ -73,11 +75,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
               cccdNumber: cccdData.cccdNumber,
               address: cccdData.address,
               gender: cccdData.gender,
-              dob: cccdData.dob
+              dob: cccdData.dob,
+              issueDate: cccdData.issueDate
           }));
           setShowScanner(false);
-          setSuccessMsg(`Đã xác thực CCCD thành công!`);
-          setTimeout(() => setSuccessMsg(''), 3000);
+          setSuccessMsg(`Đã xác thực CCCD thành công! Vui lòng điền thêm Email & SĐT.`);
+          setTimeout(() => setSuccessMsg(''), 4000);
       } else {
           alert("Mã QR không đúng định dạng CCCD hoặc không đọc được. Vui lòng thử lại.");
       }
@@ -93,20 +96,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             setError('Mật khẩu xác nhận không khớp.');
             return;
         }
+        
+        // Validate required fields manually before sending
+        if (!formData.email || !formData.phoneNumber || !formData.cccdNumber || !formData.issueDate) {
+             setError('Vui lòng nhập đầy đủ thông tin (Quét CCCD để tự động điền).');
+             return;
+        }
 
-        const registrationData = {
+        const result = registerCustomer({
             fullName: formData.fullName,
             password: formData.password,
+            email: formData.email,
+            phoneNumber: formData.phoneNumber,
             address: formData.address,
-            // Dynamically assign email or phone based on method
-            email: registerMethod === 'EMAIL' ? formData.identifier : undefined,
-            phoneNumber: registerMethod === 'PHONE' ? formData.identifier : undefined,
-            cccdNumber: formData.cccdNumber || undefined,
-            gender: formData.gender || undefined,
-            dob: formData.dob || undefined
-        };
-
-        const result = registerCustomer(registrationData);
+            cccdNumber: formData.cccdNumber,
+            gender: formData.gender,
+            dob: formData.dob,
+            issueDate: formData.issueDate
+        });
 
         if (result.success && result.customer) {
             setSuccessMsg('Đăng ký thành công! Đang đăng nhập...');
@@ -149,12 +156,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             </button>
         </div>
 
-        <div className="p-8">
+        <div className="p-6">
             <h2 className="text-2xl font-serif font-bold text-center mb-6 text-gray-800">
                 {mode === 'LOGIN' ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}
             </h2>
 
-            {/* Registration Method Toggles */}
+            {/* Registration: CCCD Display & Scan Button */}
             {mode === 'REGISTER' && (
                 <>
                     {/* Digital ID Card Display */}
@@ -174,6 +181,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                         <p className="text-xs"><span className="text-gray-500 text-[10px] uppercase mr-1">Sinh:</span> <span className="font-medium">{formData.dob}</span></p>
                                         <p className="text-xs"><span className="text-gray-500 text-[10px] uppercase mr-1">Giới tính:</span> <span className="font-medium">{formData.gender}</span></p>
                                     </div>
+                                    <p className="text-xs"><span className="text-gray-500 text-[10px] uppercase mr-1">Ngày cấp:</span> <span className="font-medium">{formData.issueDate}</span></p>
                                     <p className="text-xs text-gray-600 line-clamp-1 mt-0.5"><span className="text-gray-500 text-[10px] uppercase mr-1">Đ/C:</span> {formData.address}</p>
                                 </div>
                             </div>
@@ -192,106 +200,96 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                         className="w-full mb-6 bg-[#00695C] text-white py-2.5 rounded-lg font-bold shadow hover:bg-[#004d40] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
                     >
                         <ScanIcon className="w-5 h-5" />
-                        {formData.cccdNumber ? 'Quét lại CCCD' : 'Quét QR Căn cước công dân'}
+                        {formData.cccdNumber ? 'Quét lại CCCD' : 'Quét CCCD để điền tự động'}
                     </button>
-
-                    <div className="flex justify-center mb-6 space-x-4">
-                        <label className="flex items-center cursor-pointer group">
-                            <input 
-                                type="radio" 
-                                name="regMethod" 
-                                className="mr-2 text-[#00695C] focus:ring-[#00695C]"
-                                checked={registerMethod === 'EMAIL'}
-                                onChange={() => { setRegisterMethod('EMAIL'); }}
-                            />
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-[#00695C]">Dùng Email</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer group">
-                            <input 
-                                type="radio" 
-                                name="regMethod" 
-                                className="mr-2 text-[#00695C] focus:ring-[#00695C]"
-                                checked={registerMethod === 'PHONE'}
-                                onChange={() => { setRegisterMethod('PHONE'); }}
-                            />
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-[#00695C]">Dùng Số ĐT</span>
-                        </label>
-                    </div>
                 </>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === 'REGISTER' && (
+                    <>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ và tên</label>
+                                <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                            </div>
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
+                                <input type="text" name="cccdNumber" required value={formData.cccdNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
+                                <input type="text" name="dob" required value={formData.dob} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" />
+                            </div>
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
+                                <input type="text" name="gender" required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                            </div>
+                        </div>
+                         <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
+                                <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                            </div>
+                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số điện thoại</label>
+                                <input type="tel" name="phoneNumber" required value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày cấp CCCD</label>
+                            <input type="text" name="issueDate" required value={formData.issueDate} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" />
+                        </div>
+                         <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nơi thường trú</label>
+                            <input type="text" name="address" required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                        </div>
+                    </>
+                )}
+                
+                {mode === 'LOGIN' && (
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
+                        <label className="block text-sm font-medium text-gray-700">Email / SĐT / Số CCCD</label>
                         <input 
                             type="text" 
-                            name="fullName"
+                            name="identifier"
                             required
-                            value={formData.fullName}
+                            value={formData.identifier}
                             onChange={handleChange}
-                            placeholder="Nhập họ tên hoặc quét CCCD"
+                            placeholder="Nhập 1 trong 3 thông tin để đăng nhập"
                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
                         />
                     </div>
                 )}
-                
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                        {mode === 'LOGIN' 
-                            ? 'Email / SĐT / Số CCCD' 
-                            : (registerMethod === 'EMAIL' ? 'Email' : 'Số điện thoại')
-                        }
-                    </label>
-                    <input 
-                        type={registerMethod === 'EMAIL' || mode === 'LOGIN' ? 'text' : 'tel'} 
-                        name="identifier"
-                        required
-                        value={formData.identifier}
-                        onChange={handleChange}
-                        placeholder={mode === 'LOGIN' ? 'nhap@email.com hoặc 09...' : (registerMethod === 'EMAIL' ? 'vidu@email.com' : '0912345678')}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
-                    />
-                </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Mật khẩu</label>
-                    <input 
-                        type="password" 
-                        name="password"
-                        required
-                        value={formData.password}
-                        onChange={handleChange}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
-                    />
-                </div>
-
-                {mode === 'REGISTER' && (
-                    <>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Mật khẩu</label>
+                        <input 
+                            type="password" 
+                            name="password"
+                            required
+                            value={formData.password}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" 
+                        />
+                    </div>
+                    {mode === 'REGISTER' && (
                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Nhập lại mật khẩu</label>
+                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nhập lại MK</label>
                             <input 
                                 type="password" 
                                 name="confirmPassword"
                                 required
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" 
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Địa chỉ (Tùy chọn)</label>
-                            <input 
-                                type="text" 
-                                name="address"
-                                value={formData.address}
-                                onChange={handleChange}
-                                placeholder="Nhập địa chỉ hoặc quét CCCD"
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
-                            />
-                        </div>
-                    </>
-                )}
+                    )}
+                </div>
 
                 {error && <p className="text-sm text-red-600 text-center bg-red-50 p-2 rounded">{error}</p>}
                 {successMsg && <p className="text-sm text-green-600 text-center bg-green-50 p-2 rounded">{successMsg}</p>}
@@ -300,7 +298,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                     type="submit" 
                     className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors font-bold uppercase"
                 >
-                    {mode === 'LOGIN' ? 'Đăng Nhập' : 'Đăng Ký'}
+                    {mode === 'LOGIN' ? 'Đăng Nhập' : 'Hoàn tất Đăng Ký'}
                 </button>
             </form>
 

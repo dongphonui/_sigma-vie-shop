@@ -83,7 +83,7 @@ const initDb = async () => {
     `);
 
     // 3. Customers Table
-    // Updated: Add CCCD columns
+    // Updated: Add CCCD columns and issue_date
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id VARCHAR(100) PRIMARY KEY,
@@ -93,6 +93,7 @@ const initDb = async () => {
         cccd_number VARCHAR(50) UNIQUE,
         gender VARCHAR(20),
         dob VARCHAR(50),
+        issue_date VARCHAR(50),
         password_hash TEXT NOT NULL,
         address TEXT,
         created_at BIGINT
@@ -104,6 +105,7 @@ const initDb = async () => {
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number VARCHAR(50) UNIQUE`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender VARCHAR(20)`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob VARCHAR(50)`);
+        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS issue_date VARCHAR(50)`);
     } catch (err) {
         console.log("Error adding columns to customers:", err.message);
     }
@@ -343,7 +345,7 @@ app.get('/api/customers', async (req, res) => {
     const result = await pool.query('SELECT * FROM customers');
     const customers = result.rows.map(r => ({
         id: r.id, fullName: r.full_name, email: r.email, phoneNumber: r.phone_number,
-        cccdNumber: r.cccd_number, gender: r.gender, dob: r.dob,
+        cccdNumber: r.cccd_number, gender: r.gender, dob: r.dob, issueDate: r.issue_date,
         passwordHash: r.password_hash, address: r.address, createdAt: parseInt(r.created_at)
     }));
     res.json(customers);
@@ -354,10 +356,10 @@ app.post('/api/customers/sync', async (req, res) => {
   const c = req.body;
   try {
     await pool.query(
-      `INSERT INTO customers (id, full_name, email, phone_number, cccd_number, gender, dob, password_hash, address, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO customers (id, full_name, email, phone_number, cccd_number, gender, dob, issue_date, password_hash, address, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (id) DO NOTHING`, 
-       [c.id, c.fullName, c.email, c.phoneNumber, c.cccdNumber, c.gender, c.dob, c.passwordHash, c.address, c.createdAt]
+       [c.id, c.fullName, c.email, c.phoneNumber, c.cccdNumber, c.gender, c.dob, c.issueDate, c.passwordHash, c.address, c.createdAt]
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
@@ -365,11 +367,11 @@ app.post('/api/customers/sync', async (req, res) => {
 
 app.put('/api/customers/:id', async (req, res) => {
     const id = req.params.id;
-    const { fullName, email, phoneNumber, address, cccdNumber, gender, dob } = req.body;
+    const { fullName, email, phoneNumber, address, cccdNumber, gender, dob, issueDate } = req.body;
     try {
         await pool.query(
-            `UPDATE customers SET full_name = $1, email = $2, phone_number = $3, address = $4, cccd_number = $5, gender = $6, dob = $7 WHERE id = $8`,
-            [fullName, email, phoneNumber, address, cccdNumber, gender, dob, id]
+            `UPDATE customers SET full_name = $1, email = $2, phone_number = $3, address = $4, cccd_number = $5, gender = $6, dob = $7, issue_date = $8 WHERE id = $9`,
+            [fullName, email, phoneNumber, address, cccdNumber, gender, dob, issueDate, id]
         );
         res.json({ success: true });
     } catch (err) {

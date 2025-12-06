@@ -40,39 +40,44 @@ export const getCustomers = (): Customer[] => {
 export const registerCustomer = (data: { 
     fullName: string; 
     password: string; 
-    email?: string; 
-    phoneNumber?: string; 
-    address?: string;
-    cccdNumber?: string;
-    gender?: string;
-    dob?: string;
+    email: string; 
+    phoneNumber: string; 
+    address: string;
+    cccdNumber: string;
+    gender: string;
+    dob: string;
+    issueDate: string;
 }): { success: boolean; message: string; customer?: Customer } => {
   const customers = getCustomers();
   
-  if (!data.email && !data.phoneNumber) {
-      return { success: false, message: 'Vui lòng cung cấp Email hoặc Số điện thoại.' };
+  // 1. Validate Required Fields
+  if (!data.fullName || !data.password || !data.email || !data.phoneNumber || !data.cccdNumber || !data.address || !data.dob || !data.issueDate || !data.gender) {
+      return { success: false, message: 'Vui lòng điền đầy đủ thông tin (bao gồm cả CCCD).' };
   }
 
-  if (data.email && customers.some(c => c.email === data.email)) {
+  // 2. Check Duplicates
+  if (customers.some(c => c.email === data.email)) {
     return { success: false, message: 'Email này đã được đăng ký.' };
   }
-  if (data.phoneNumber && customers.some(c => c.phoneNumber === data.phoneNumber)) {
+  if (customers.some(c => c.phoneNumber === data.phoneNumber)) {
     return { success: false, message: 'Số điện thoại này đã được đăng ký.' };
   }
-  if (data.cccdNumber && customers.some(c => c.cccdNumber === data.cccdNumber)) {
+  if (customers.some(c => c.cccdNumber === data.cccdNumber)) {
     return { success: false, message: 'Số CCCD này đã được đăng ký.' };
   }
 
+  // 3. Create Customer Object
   const newCustomer: Customer = {
     id: `CUST-${Date.now()}`,
     fullName: data.fullName,
-    email: data.email || undefined,
-    phoneNumber: data.phoneNumber || undefined,
-    passwordHash: simpleHash(data.password),
-    address: data.address,
+    email: data.email,
+    phoneNumber: data.phoneNumber,
     cccdNumber: data.cccdNumber,
     gender: data.gender,
     dob: data.dob,
+    issueDate: data.issueDate, // Save Issue Date
+    passwordHash: simpleHash(data.password),
+    address: data.address,
     createdAt: Date.now()
   };
 
@@ -114,6 +119,7 @@ export const loginCustomer = (identifier: string, password: string): { success: 
   const customers = getCustomers();
   const hash = simpleHash(password);
 
+  // Allow login via Email OR Phone OR CCCD
   const customer = customers.find(c => 
     ((c.email === identifier) || (c.phoneNumber === identifier) || (c.cccdNumber === identifier)) && 
     c.passwordHash === hash
