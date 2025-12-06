@@ -63,7 +63,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
   if (!isOpen) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Handle the obfuscated name for CCCD to prevent auto-fill
+    const name = e.target.name === 'x-cccd-input' ? 'cccdNumber' : e.target.name;
+    setFormData({ ...formData, [name]: e.target.value });
   };
 
   const handleScanSuccess = (decodedText: string) => {
@@ -215,27 +217,52 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
-                                <input type="text" name="cccdNumber" required value={formData.cccdNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
+                                {/* CHANGE: Use obscure name to prevent browser auto-fill from hijacking this field */}
+                                <input 
+                                    type="text" 
+                                    name="x-cccd-input" 
+                                    required 
+                                    value={formData.cccdNumber} 
+                                    onChange={handleChange} 
+                                    className="w-full px-3 py-2 border rounded-md text-sm" 
+                                    autoComplete="off" 
+                                />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
-                                <input type="text" name="dob" required value={formData.dob} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="bday" />
+                                <input type="text" name="dob" required value={formData.dob} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
-                                <input type="text" name="gender" required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="sex" />
+                                <input type="text" name="gender" required value={formData.gender} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
                             </div>
                         </div>
                          <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
-                                <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="email" />
+                                <input 
+                                    type="email" 
+                                    name="email" 
+                                    required 
+                                    value={formData.email} 
+                                    onChange={handleChange} 
+                                    className="w-full px-3 py-2 border rounded-md text-sm" 
+                                    autoComplete="email" 
+                                />
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số điện thoại</label>
-                                <input type="tel" name="phoneNumber" required value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="tel" />
+                                <input 
+                                    type="tel" 
+                                    name="phoneNumber" 
+                                    required 
+                                    value={formData.phoneNumber} 
+                                    onChange={handleChange} 
+                                    className="w-full px-3 py-2 border rounded-md text-sm" 
+                                    autoComplete="tel" 
+                                />
                                 <p className="text-[10px] text-[#D4AF37] mt-1 italic">SĐT này sẽ là tên đăng nhập chính thức của bạn.</p>
                             </div>
                         </div>
