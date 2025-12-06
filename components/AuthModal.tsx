@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { loginCustomer, registerCustomer } from '../utils/customerStorage';
 import { parseCCCDQrCode } from '../utils/cccdHelper';
@@ -64,7 +63,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Handle the obfuscated name for CCCD to prevent auto-fill
-    const name = e.target.name === 'x-cccd-input' ? 'cccdNumber' : e.target.name;
+    const name = e.target.name === 'x-cccd-input-secure' ? 'cccdNumber' : e.target.name;
     setFormData({ ...formData, [name]: e.target.value });
   };
 
@@ -136,6 +135,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             setError(result.message);
         }
     }
+  };
+
+  // Helper function to remove readonly on focus (prevents autofill)
+  const enableInput = (e: React.FocusEvent<HTMLInputElement>) => {
+      e.target.removeAttribute('readonly');
   };
 
   return (
@@ -217,22 +221,35 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
-                                {/* CHANGE: Use obscure name to prevent browser auto-fill from hijacking this field */}
+                                {/* AUTOFILL FIX: Use obscure name and readOnly hack */}
                                 <input 
                                     type="text" 
-                                    name="x-cccd-input" 
+                                    name="x-cccd-input-secure" 
                                     required 
                                     value={formData.cccdNumber} 
                                     onChange={handleChange} 
                                     className="w-full px-3 py-2 border rounded-md text-sm" 
                                     autoComplete="off" 
+                                    readOnly={!formData.cccdNumber} // Start readOnly to block autofill, enable on interaction
+                                    onFocus={enableInput}
                                 />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
-                                <input type="text" name="dob" required value={formData.dob} onChange={handleChange} placeholder="DD/MM/YYYY" className="w-full px-3 py-2 border rounded-md text-sm" autoComplete="off" />
+                                <input 
+                                    type="text" 
+                                    name="dob" 
+                                    required 
+                                    value={formData.dob} 
+                                    onChange={handleChange} 
+                                    placeholder="DD/MM/YYYY" 
+                                    className="w-full px-3 py-2 border rounded-md text-sm" 
+                                    autoComplete="off"
+                                    readOnly={!formData.dob} // Autofill protection
+                                    onFocus={enableInput}
+                                />
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
@@ -288,6 +305,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             onChange={handleChange}
                             placeholder="Nhập số điện thoại"
                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
+                            autoComplete="tel"
                         />
                     </div>
                 )}
