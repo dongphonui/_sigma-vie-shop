@@ -116,11 +116,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
         });
 
         if (result.success && result.customer) {
-            setSuccessMsg('Đăng ký thành công! Đang đăng nhập...');
+            setSuccessMsg('Đăng ký thành công! Hãy dùng Số điện thoại để đăng nhập.');
             setTimeout(() => {
                 onLoginSuccess(result.customer!);
                 onClose();
-            }, 1000);
+            }, 2000);
         } else {
             setError(result.message);
         }
@@ -236,6 +236,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số điện thoại</label>
                                 <input type="tel" name="phoneNumber" required value={formData.phoneNumber} onChange={handleChange} className="w-full px-3 py-2 border rounded-md text-sm" />
+                                <p className="text-[10px] text-[#D4AF37] mt-1 italic">SĐT này sẽ là tên đăng nhập chính thức của bạn.</p>
                             </div>
                         </div>
                         <div>
@@ -251,14 +252,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                 
                 {mode === 'LOGIN' && (
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Email / SĐT / Số CCCD</label>
+                        <label className="block text-sm font-medium text-gray-700">Tài khoản đăng nhập</label>
                         <input 
                             type="text" 
                             name="identifier"
                             required
                             value={formData.identifier}
                             onChange={handleChange}
-                            placeholder="Nhập 1 trong 3 thông tin để đăng nhập"
+                            placeholder="Nhập số điện thoại"
                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
                         />
                     </div>
