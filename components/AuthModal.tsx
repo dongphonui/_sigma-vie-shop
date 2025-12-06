@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { loginCustomer, registerCustomer } from '../utils/customerStorage';
 import { parseCCCDQrCode } from '../utils/cccdHelper';
@@ -62,9 +63,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
   if (!isOpen) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Handle the obfuscated name for CCCD to prevent auto-fill
-    const name = e.target.name === 'x-cccd-input-secure' ? 'cccdNumber' : e.target.name;
-    setFormData({ ...formData, [name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleScanSuccess = (decodedText: string) => {
@@ -98,7 +97,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             return;
         }
         
-        // Validate required fields manually before sending
         if (!formData.email || !formData.phoneNumber || !formData.cccdNumber || !formData.issueDate) {
              setError('Vui lòng nhập đầy đủ thông tin (Quét CCCD để tự động điền).');
              return;
@@ -137,11 +135,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
     }
   };
 
-  // Helper function to remove readonly on focus (prevents autofill)
-  const enableInput = (e: React.FocusEvent<HTMLInputElement>) => {
-      e.target.removeAttribute('readonly');
-  };
-
   return (
     <>
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
@@ -170,11 +163,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             {/* Registration: CCCD Display & Scan Button */}
             {mode === 'REGISTER' && (
                 <>
+                    {/* Dummy Inputs (Hidden Trap) to catch browser autofill */}
+                    <div style={{ width: 0, height: 0, overflow: 'hidden', position: 'absolute' }}>
+                        <input type="text" name="fake_email_trap" tabIndex={-1} />
+                        <input type="password" name="fake_password_trap" tabIndex={-1} />
+                    </div>
+
                     {/* Digital ID Card Display */}
                     {formData.cccdNumber && (
                         <div className="mb-6 relative overflow-hidden rounded-xl shadow-lg border border-gray-200 bg-gradient-to-br from-blue-50 to-white p-4">
                             <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-100 rounded-full opacity-50"></div>
-                            
                             <div className="relative z-10 flex gap-4 items-start">
                                 <div className="w-16 h-20 bg-gray-100 rounded-lg border border-gray-300 shadow-sm flex items-center justify-center overflow-hidden shrink-0">
                                     <UserCircleIcon className="w-10 h-10 text-gray-400" />
@@ -191,8 +189,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                     <p className="text-xs text-gray-600 line-clamp-1 mt-0.5"><span className="text-gray-500 text-[10px] uppercase mr-1">Đ/C:</span> {formData.address}</p>
                                 </div>
                             </div>
-                            
-                            {/* Smart Fill Badge */}
                             <div className="absolute bottom-2 right-2 bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                 Đã xác thực Chip
@@ -211,7 +207,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                 </>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
                 {mode === 'REGISTER' && (
                     <>
                         <div className="grid grid-cols-2 gap-4">
@@ -221,25 +217,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             </div>
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
-                                {/* AUTOFILL FIX: Use obscure name and readOnly hack */}
+                                {/* FIX: Changed type to 'tel' to match Phone behavior (blocks email autofill) */}
                                 <input 
-                                    type="text" 
-                                    name="x-cccd-input-secure" 
+                                    type="tel" 
+                                    name="cccdNumber" 
                                     required 
                                     value={formData.cccdNumber} 
                                     onChange={handleChange} 
                                     className="w-full px-3 py-2 border rounded-md text-sm" 
-                                    autoComplete="off" 
-                                    readOnly={!formData.cccdNumber} // Start readOnly to block autofill, enable on interaction
-                                    onFocus={enableInput}
+                                    autoComplete="off"
                                 />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
+                                {/* FIX: Changed type to 'search' (browser never autofills credentials in search) */}
                                 <input 
-                                    type="text" 
+                                    type="search" 
                                     name="dob" 
                                     required 
                                     value={formData.dob} 
@@ -247,8 +242,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                                     placeholder="DD/MM/YYYY" 
                                     className="w-full px-3 py-2 border rounded-md text-sm" 
                                     autoComplete="off"
-                                    readOnly={!formData.dob} // Autofill protection
-                                    onFocus={enableInput}
                                 />
                             </div>
                              <div>
