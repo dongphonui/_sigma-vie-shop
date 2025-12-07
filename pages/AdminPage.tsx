@@ -1272,8 +1272,9 @@ const AdminPage: React.FC = () => {
                 <div className="bg-white p-6 rounded-lg max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
                     <h3 className="text-lg font-bold mb-4">{qrProduct.name}</h3>
                     <div className="flex justify-center mb-4 p-4 border rounded bg-white">
+                        {/* Ensure URL is clean with query param BEFORE any hash if possible, but standard is absolute path */}
                         <QRCodeSVG 
-                            value={`${window.location.origin}/?product=${qrProduct.id}`}
+                            value={`${window.location.origin}?product=${qrProduct.id}`}
                             size={200}
                             fgColor="#111827"
                         />

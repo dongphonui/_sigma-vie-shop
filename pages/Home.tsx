@@ -94,34 +94,38 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
 
   useEffect(() => {
+    // Initial Load
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
     setSettings(getHomePageSettings());
 
-    // Lắng nghe sự kiện cập nhật sản phẩm từ DB (quan trọng cho Zalo/thiết bị mới)
+    // Deep Link Check on Initial Load
+    if (initialProductId && allProducts.length > 0) {
+        const found = allProducts.find(p => String(p.id) === String(initialProductId));
+        if (found) setSelectedProduct(found);
+    }
+
+    // Listener for async updates (DB fetch)
     const handleProductUpdate = () => {
         const updated = getProducts();
         setProducts(updated);
+        
         // Cập nhật lại filteredProducts nếu đang không tìm kiếm
         if (!searchQuery) {
             setFilteredProducts(updated);
+        }
+
+        // Retry Deep Link after update
+        if (initialProductId) {
+            const found = updated.find(p => String(p.id) === String(initialProductId));
+            if (found) setSelectedProduct(found);
         }
     };
     
     window.addEventListener('sigma_vie_products_update', handleProductUpdate);
     return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
-  }, []); // Run once on mount
-
-  // Deep Link Logic (Tách riêng để chạy lại khi products thay đổi)
-  useEffect(() => {
-    if (initialProductId && products.length > 0) {
-        const found = products.find(p => String(p.id) === String(initialProductId));
-        if (found) {
-            setSelectedProduct(found);
-        }
-    }
-  }, [initialProductId, products]);
+  }, [initialProductId]); // Re-run if ID changes
 
   // Flash Sale Logic
   useEffect(() => {

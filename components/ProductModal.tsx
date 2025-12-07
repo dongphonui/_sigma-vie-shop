@@ -263,7 +263,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   // Generate Direct Link for QR
   // IMPORTANT: Move query param ?product=ID BEFORE the hash (#)
   // This ensures Zalo and other in-app scanners parse the query parameter correctly.
-  const productUrl = `${window.location.origin}/?product=${product.id}`;
+  // Use simple string concat to ensure no trailing slash issues if origin has one
+  const origin = window.location.origin.replace(/\/$/, '');
+  const productUrl = `${origin}?product=${product.id}`;
 
   return (
     <>

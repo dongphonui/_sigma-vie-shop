@@ -33,6 +33,9 @@ export const getProducts = (): Product[] => {
             
             // QUAN TRỌNG: Phát tín hiệu để UI cập nhật lại
             window.dispatchEvent(new Event('sigma_vie_products_update'));
+          } else {
+             // Even if empty or failed, dispatch event to signal loading attempt finished
+             window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
         });
       }, 500);
