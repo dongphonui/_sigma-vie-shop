@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Home from './pages/Home';
 import AdminPage from './pages/AdminPage';
@@ -33,7 +34,10 @@ const App: React.FC = () => {
     const handleHashChange = () => {
       // Check for query params in hash (e.g., #/?product=123)
       const hash = window.location.hash;
-      setRoute(hash.split('?')[0]); // Base route
+      
+      // Clean query params from route for switching pages
+      // but keep them in memory for deep linking logic
+      setRoute(hash.split('?')[0]); 
       
       if (hash.includes('?')) {
           const queryString = hash.split('?')[1];
@@ -41,7 +45,7 @@ const App: React.FC = () => {
           const pid = urlParams.get('product');
           if (pid) {
               setInitialProductId(pid);
-              // Clean URL after capturing ID to avoid reopening on refresh (optional)
+              // Optional: Clear URL after extracting ID to prevent reopening on reload
               // window.history.replaceState(null, '', window.location.pathname + '#/');
           }
       }
@@ -151,7 +155,7 @@ const App: React.FC = () => {
       case '#/my-orders':
         return <MyOrdersPage currentUser={currentUser} isAdminLinkVisible={isAdminLinkVisible} />;
       default:
-        // Pass initialProductId to Home
+        // Pass initialProductId to Home for Deep Linking
         return (
             <Home 
                 isAdminLinkVisible={isAdminLinkVisible} 

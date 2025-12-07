@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Product, HomePageSettings, Customer } from '../types';
 import Header from '../components/Header';
@@ -13,7 +14,7 @@ interface HomeProps {
   currentUser: Customer | null;
   cartItemCount?: number;
   onOpenCart?: () => void;
-  initialProductId?: string | null; // NEW Prop
+  initialProductId?: string | null; // NEW Prop for Deep Linking
 }
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
@@ -97,7 +98,8 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     setProducts(allProducts);
     setFilteredProducts(allProducts);
     
-    // Logic để mở sản phẩm từ Deep Link (QR Code)
+    // Logic: Deep Link Handling
+    // If initialProductId is present in URL, find product and open modal
     if (initialProductId) {
         const found = allProducts.find(p => String(p.id) === String(initialProductId));
         if (found) {
@@ -127,7 +129,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     }
     
     setSettings(getHomePageSettings());
-  }, [initialProductId]); // Re-run if initialProductId changes
+  }, [initialProductId]); // Dependency on initialProductId ensures effect runs when it changes
 
   useEffect(() => {
       if (!settings || !settings.promoImageUrls || settings.promoImageUrls.length <= 1) return;
