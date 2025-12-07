@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Home from './pages/Home';
 import AdminPage from './pages/AdminPage';
@@ -32,23 +31,35 @@ const App: React.FC = () => {
   // Khởi tạo và lắng nghe thay đổi route / user
   useEffect(() => {
     const handleHashChange = () => {
-      // Check for query params in hash (e.g., #/?product=123)
+      const fullUrl = window.location.href;
       const hash = window.location.hash;
       
-      // Clean query params from route for switching pages
-      // but keep them in memory for deep linking logic
-      setRoute(hash.split('?')[0]); 
-      
-      if (hash.includes('?')) {
-          const queryString = hash.split('?')[1];
-          const urlParams = new URLSearchParams(queryString);
-          const pid = urlParams.get('product');
-          if (pid) {
-              setInitialProductId(pid);
-              // Optional: Clear URL after extracting ID to prevent reopening on reload
-              // window.history.replaceState(null, '', window.location.pathname + '#/');
+      // Robust URL Parsing for Deep Linking
+      let pid = null;
+
+      if (fullUrl.includes('product=')) {
+          // Case 1: Query param in full URL (e.g. /?product=123#/)
+          const urlObj = new URL(fullUrl);
+          pid = urlObj.searchParams.get('product');
+          
+          // Case 2: Query param in hash (e.g. /#/?product=123)
+          if (!pid && hash.includes('?')) {
+               const hashQuery = hash.split('?')[1];
+               const hashParams = new URLSearchParams(hashQuery);
+               pid = hashParams.get('product');
           }
       }
+
+      if (pid) {
+          setInitialProductId(pid);
+          // Optional: Clean URL
+          // history.replaceState(null, '', window.location.pathname + '#/');
+      }
+
+      // Base route logic
+      // Remove query params from route state to ensure routing works
+      const cleanHash = hash.split('?')[0] || '#/';
+      setRoute(cleanHash);
     };
     
     handleHashChange(); // Run on mount

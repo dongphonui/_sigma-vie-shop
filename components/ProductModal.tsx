@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import type { Product, Order } from '../types';
 import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
@@ -262,7 +261,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   // Generate Direct Link for QR
   // Sử dụng window.location.origin để tạo link tuyệt đối.
-  // Thêm /#/?product=ID để App.tsx có thể parse được.
+  // Cấu trúc #/?product=ID là định dạng chuẩn để App.tsx parse
   const productUrl = `${window.location.origin}/#/?product=${product.id}`;
 
   return (
