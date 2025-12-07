@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import type { Product, Order } from '../types';
 import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
@@ -260,9 +261,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   };
 
   // Generate Direct Link for QR
-  // Sử dụng window.location.origin để tạo link tuyệt đối.
-  // Cấu trúc #/?product=ID là định dạng chuẩn để App.tsx parse
-  const productUrl = `${window.location.origin}/#/?product=${product.id}`;
+  // IMPORTANT: Move query param ?product=ID BEFORE the hash (#)
+  // This ensures Zalo and other in-app scanners parse the query parameter correctly.
+  const productUrl = `${window.location.origin}/?product=${product.id}`;
 
   return (
     <>

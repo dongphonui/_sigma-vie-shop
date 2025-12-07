@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -1272,13 +1273,9 @@ const AdminPage: React.FC = () => {
                     <h3 className="text-lg font-bold mb-4">{qrProduct.name}</h3>
                     <div className="flex justify-center mb-4 p-4 border rounded bg-white">
                         <QRCodeSVG 
-                            value={JSON.stringify({ 
-                                id: qrProduct.id, 
-                                name: qrProduct.name, 
-                                price: qrProduct.price,
-                                sku: qrProduct.sku 
-                            })} 
-                            size={200} 
+                            value={`${window.location.origin}/?product=${qrProduct.id}`}
+                            size={200}
+                            fgColor="#111827"
                         />
                     </div>
                     <p className="text-sm text-gray-500 mb-4">SKU: {qrProduct.sku}</p>
@@ -1704,7 +1701,7 @@ const AdminPage: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Font tiêu đề</label>
                             <select value={aboutSettings.headingFont} onChange={(e) => handleAboutSettingsChange('headingFont', e.target.value)} className="w-full border rounded px-3 py-2">
                                 <option value="Playfair Display">Playfair Display (Serif)</option>
-                                <option value="Poppins">Poppins</option>
+                                <option value="Poppins">Poppins (Sans-serif)</option>
                             </select>
                         </div>
                          <div>
