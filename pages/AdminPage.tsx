@@ -22,7 +22,7 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsStorage';
+import { getStoreSettings } from '../utils/storeSettingsStorage';
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 
@@ -496,8 +496,15 @@ const AdminPage: React.FC = () => {
       const storePhone = storeSettings?.phoneNumber || '0912.345.678';
       const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
 
+      // Fix: Lookup specific customer to get correct Phone Number
+      // (order.customerContact might store Email based on creation logic)
+      const linkedCustomer = customers.find(c => c.id === order.customerId);
+      const displayPhone = linkedCustomer?.phoneNumber || order.customerContact;
+
       // Generate Product URL for QR (Compatible with Zalo/Mobile)
+      // Query param placed BEFORE hash to ensure Zalo browser reads it correctly
       const productUrl = `${window.location.origin}?product=${order.productId}`;
+      
       // Use public QR Generator API for embedding in print view
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
 
@@ -545,7 +552,7 @@ const AdminPage: React.FC = () => {
                 <div class="box">
                     <h3>NGƯỜI NHẬN</h3>
                     <p><strong>${order.customerName}</strong></p>
-                    <p>SĐT: <strong>${order.customerContact}</strong></p>
+                    <p>SĐT: <strong>${displayPhone}</strong></p>
                     <p>Đ/C: ${order.customerAddress}</p>
                 </div>
             </div>
@@ -804,23 +811,6 @@ const AdminPage: React.FC = () => {
           alert('Mã xác thực không đúng! Vui lòng thử lại.');
       }
   };
-
-  // Store Settings Handler
-  const handleStoreSettingsChange = (field: keyof StoreSettings, value: string) => {
-      if (storeSettings) {
-          setStoreSettings({ ...storeSettings, [field]: value });
-      }
-  };
-
-  const handleStoreSettingsSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (storeSettings) {
-          updateStoreSettings(storeSettings);
-          setSettingsFeedback('Đã cập nhật thông tin cửa hàng!');
-          setTimeout(() => setSettingsFeedback(''), 3000);
-      }
-  };
-
 
   // Social Settings Handler
   const handleSocialSettingsChange = (field: keyof SocialSettings, value: string) => {
@@ -2079,60 +2069,6 @@ const AdminPage: React.FC = () => {
                       </form>
                   )}
               </div>
-
-              {/* Store Info Section */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <LayersIcon className="w-5 h-5 text-gray-600" />
-                      Thông tin Cửa hàng (In hóa đơn)
-                  </h4>
-                  {storeSettings && (
-                      <form onSubmit={handleStoreSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                           <div>
-                                <label className="block text-sm font-medium text-gray-700">Tên Cửa hàng</label>
-                                <input 
-                                    type="text" 
-                                    value={storeSettings.name} 
-                                    onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
-                                    className="mt-1 w-full border rounded px-3 py-2"
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                                    <input 
-                                        type="text" 
-                                        value={storeSettings.phoneNumber} 
-                                        onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
-                                        className="mt-1 w-full border rounded px-3 py-2"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Email liên hệ</label>
-                                    <input 
-                                        type="email" 
-                                        value={storeSettings.email} 
-                                        onChange={(e) => handleStoreSettingsChange('email', e.target.value)} 
-                                        className="mt-1 w-full border rounded px-3 py-2"
-                                    />
-                                </div>
-                            </div>
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                                <input 
-                                    type="text" 
-                                    value={storeSettings.address} 
-                                    onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
-                                    className="mt-1 w-full border rounded px-3 py-2"
-                                />
-                            </div>
-                           <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
-                              Lưu thông tin Cửa hàng
-                          </button>
-                      </form>
-                  )}
-              </div>
-
 
               {/* Social Media Links */}
               <div className="border-t pt-6">
