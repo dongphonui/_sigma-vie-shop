@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Home from './pages/Home';
 import AdminPage from './pages/AdminPage';
@@ -33,20 +34,31 @@ const App: React.FC = () => {
     const handleHashChange = () => {
       const fullUrl = window.location.href;
       const hash = window.location.hash;
+      const search = window.location.search;
       
       // Robust URL Parsing for Deep Linking
       let pid = null;
 
-      if (fullUrl.includes('product=')) {
-          // Case 1: Query param in full URL (e.g. /?product=123#/)
-          const urlObj = new URL(fullUrl);
-          pid = urlObj.searchParams.get('product');
+      // Priority 1: Direct Query Parameter (e.g. ?product=123)
+      const urlParams = new URLSearchParams(search);
+      pid = urlParams.get('product');
+
+      if (!pid && fullUrl.includes('product=')) {
+          // Case 2: Query param might be stuck inside hash or malformed
+          try {
+              const urlObj = new URL(fullUrl);
+              pid = urlObj.searchParams.get('product');
+          } catch (e) {
+              // Ignore invalid URL
+          }
           
-          // Case 2: Query param in hash (e.g. /#/?product=123)
+          // Case 3: Query param in hash manually (e.g. /#/?product=123)
           if (!pid && hash.includes('?')) {
-               const hashQuery = hash.split('?')[1];
-               const hashParams = new URLSearchParams(hashQuery);
-               pid = hashParams.get('product');
+               const hashParts = hash.split('?');
+               if (hashParts.length > 1) {
+                   const hashParams = new URLSearchParams(hashParts[1]);
+                   pid = hashParams.get('product');
+               }
           }
       }
 

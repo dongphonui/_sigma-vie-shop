@@ -97,19 +97,36 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
+    setSettings(getHomePageSettings());
+
+    // Lắng nghe sự kiện cập nhật sản phẩm từ DB (quan trọng cho Zalo/thiết bị mới)
+    const handleProductUpdate = () => {
+        const updated = getProducts();
+        setProducts(updated);
+        // Cập nhật lại filteredProducts nếu đang không tìm kiếm
+        if (!searchQuery) {
+            setFilteredProducts(updated);
+        }
+    };
     
-    // Logic: Deep Link Handling
-    // If initialProductId is present in URL, find product and open modal
-    if (initialProductId) {
-        const found = allProducts.find(p => String(p.id) === String(initialProductId));
+    window.addEventListener('sigma_vie_products_update', handleProductUpdate);
+    return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
+  }, []); // Run once on mount
+
+  // Deep Link Logic (Tách riêng để chạy lại khi products thay đổi)
+  useEffect(() => {
+    if (initialProductId && products.length > 0) {
+        const found = products.find(p => String(p.id) === String(initialProductId));
         if (found) {
             setSelectedProduct(found);
         }
     }
-    
+  }, [initialProductId, products]);
+
+  // Flash Sale Logic
+  useEffect(() => {
     const now = Date.now();
-    // Filter active Flash Sale products
-    const activeFlashSales = allProducts.filter(p => {
+    const activeFlashSales = products.filter(p => {
         const isValidTime = (!p.flashSaleStartTime || now >= p.flashSaleStartTime) &&
                             (!p.flashSaleEndTime || now <= p.flashSaleEndTime);
         return p.isFlashSale === true && p.status === 'active' && isValidTime;
@@ -127,9 +144,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
             setFlashSaleEndTime(sortedEndTimes[0]);
         }
     }
-    
-    setSettings(getHomePageSettings());
-  }, [initialProductId]); // Dependency on initialProductId ensures effect runs when it changes
+  }, [products]);
 
   useEffect(() => {
       if (!settings || !settings.promoImageUrls || settings.promoImageUrls.length <= 1) return;

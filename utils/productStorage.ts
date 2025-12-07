@@ -30,7 +30,9 @@ export const getProducts = (): Product[] => {
             console.log('Đã tải dữ liệu từ Postgres thành công!');
             // Ghi đè LocalStorage bằng dữ liệu thật từ DB
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
-            hasLoadedFromDB = true;
+            
+            // QUAN TRỌNG: Phát tín hiệu để UI cập nhật lại
+            window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
         });
       }, 500);
