@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Home from './pages/Home';
 import AdminPage from './pages/AdminPage';
@@ -26,11 +25,29 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
+  // Deep Link State
+  const [initialProductId, setInitialProductId] = useState<string | null>(null);
+
   // Khởi tạo và lắng nghe thay đổi route / user
   useEffect(() => {
     const handleHashChange = () => {
-      setRoute(window.location.hash);
+      // Check for query params in hash (e.g., #/?product=123)
+      const hash = window.location.hash;
+      setRoute(hash.split('?')[0]); // Base route
+      
+      if (hash.includes('?')) {
+          const queryString = hash.split('?')[1];
+          const urlParams = new URLSearchParams(queryString);
+          const pid = urlParams.get('product');
+          if (pid) {
+              setInitialProductId(pid);
+              // Clean URL after capturing ID to avoid reopening on refresh (optional)
+              // window.history.replaceState(null, '', window.location.pathname + '#/');
+          }
+      }
     };
+    
+    handleHashChange(); // Run on mount
     
     // Check for logged in customer on init
     setCurrentUser(getCurrentCustomer());
@@ -43,7 +60,6 @@ const App: React.FC = () => {
 
   // Lắng nghe thay đổi giỏ hàng VÀ thay đổi người dùng
   useEffect(() => {
-    // Khi currentUser thay đổi, getCart() sẽ tự động lấy đúng key của user đó (nhờ update ở cartStorage)
     setCartItems(getCart());
 
     const handleCartUpdate = () => {
@@ -54,7 +70,7 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('sigma_vie_cart_update', handleCartUpdate);
     };
-  }, [currentUser]); // QUAN TRỌNG: Chạy lại khi currentUser thay đổi
+  }, [currentUser]); 
 
   useEffect(() => {
     const targetSequence = ['x', 'y', 'z'];
@@ -107,10 +123,8 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (customer: Customer) => {
       setCurrentUser(customer);
-      // Khi login thành công, useEffect ở trên sẽ chạy lại và load giỏ hàng của user này
   };
 
-  // Logic: Chỉ mở giỏ hàng nếu đã đăng nhập
   const handleOpenCart = () => {
       if (!currentUser) {
           openAuthModal('LOGIN');
@@ -121,8 +135,11 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
+    
+    // Normalize route to handle potential trailing slashes or query params if not stripped
+    const currentPath = route.split('?')[0];
 
-    switch (route) {
+    switch (currentPath) {
       case '#/admin':
         return isAuthenticated ? <AdminPage /> : <LoginPage />;
       case '#/login':
@@ -134,17 +151,18 @@ const App: React.FC = () => {
       case '#/my-orders':
         return <MyOrdersPage currentUser={currentUser} isAdminLinkVisible={isAdminLinkVisible} />;
       default:
+        // Pass initialProductId to Home
         return (
             <Home 
                 isAdminLinkVisible={isAdminLinkVisible} 
                 onOpenAuth={openAuthModal}
                 currentUser={currentUser}
+                initialProductId={initialProductId}
             />
         );
     }
   };
 
-  // Logic: Ẩn số lượng giỏ hàng nếu chưa đăng nhập
   const visibleCartCount = currentUser ? cartItems.reduce((acc, item) => acc + item.quantity, 0) : 0;
 
   return (

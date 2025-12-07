@@ -259,6 +259,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       );
   };
 
+  // Generate Direct Link for QR
+  const productUrl = `${window.location.origin}/#/?product=${product.id}`;
+
   return (
     <>
         <div 
@@ -358,12 +361,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                     
                     <div className="flex justify-center mb-6 p-4 border-2 border-[#D4AF37] rounded-lg bg-white inline-block">
                          <QRCodeSVG 
-                            value={JSON.stringify({
-                                id: product.id,
-                                name: product.name,
-                                price: product.price,
-                                sku: product.sku
-                            })}
+                            value={productUrl}
                             size={200}
                             fgColor="#111827"
                          />
@@ -372,6 +370,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                     <p className="text-sm font-medium text-gray-700">
                         Quét mã để xem thông tin hoặc mua nhanh
                     </p>
+                    <p className="text-xs text-gray-400 mt-2 break-all">{productUrl}</p>
                 </div>
             </div>
         )}

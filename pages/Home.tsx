@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Product, HomePageSettings, Customer } from '../types';
 import Header from '../components/Header';
@@ -12,9 +11,9 @@ interface HomeProps {
   isAdminLinkVisible: boolean;
   onOpenAuth: (mode?: 'LOGIN' | 'REGISTER') => void;
   currentUser: Customer | null;
-  // New Props passed from App
   cartItemCount?: number;
   onOpenCart?: () => void;
+  initialProductId?: string | null; // NEW Prop
 }
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
@@ -81,7 +80,7 @@ const FlashSaleTimer: React.FC<{textColor: string, targetDate?: number}> = ({ te
 };
 
 
-const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser, cartItemCount, onOpenCart }) => {
+const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser, cartItemCount, onOpenCart, initialProductId }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,6 +96,14 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
+    
+    // Logic để mở sản phẩm từ Deep Link (QR Code)
+    if (initialProductId) {
+        const found = allProducts.find(p => String(p.id) === String(initialProductId));
+        if (found) {
+            setSelectedProduct(found);
+        }
+    }
     
     const now = Date.now();
     // Filter active Flash Sale products
@@ -120,7 +127,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     }
     
     setSettings(getHomePageSettings());
-  }, []);
+  }, [initialProductId]); // Re-run if initialProductId changes
 
   useEffect(() => {
       if (!settings || !settings.promoImageUrls || settings.promoImageUrls.length <= 1) return;
