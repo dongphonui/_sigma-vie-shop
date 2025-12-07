@@ -41,7 +41,8 @@ export const createOrder = (
     customer: Customer,
     product: Product,
     quantity: number,
-    paymentMethod: 'COD' | 'BANK_TRANSFER' = 'COD' // Added Parameter
+    paymentMethod: 'COD' | 'BANK_TRANSFER' = 'COD',
+    shippingFee: number = 0 // NEW Parameter
 ): { success: boolean; message: string; order?: Order } => {
     
     if (product.stock < quantity) {
@@ -49,6 +50,9 @@ export const createOrder = (
     }
 
     const pricePerUnit = parsePrice(product.price);
+    const subtotal = pricePerUnit * quantity;
+    const finalTotal = subtotal + shippingFee; // Total includes shipping
+
     const newOrder: Order = {
         id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         customerId: customer.id,
@@ -58,10 +62,11 @@ export const createOrder = (
         productId: product.id,
         productName: product.name,
         quantity: quantity,
-        totalPrice: pricePerUnit * quantity,
+        totalPrice: finalTotal, // Save Final Total
+        shippingFee: shippingFee, // Save Fee info
         status: 'PENDING',
         timestamp: Date.now(),
-        paymentMethod: paymentMethod // NEW
+        paymentMethod: paymentMethod
     };
 
     const stockUpdated = updateProductStock(product.id, -quantity);

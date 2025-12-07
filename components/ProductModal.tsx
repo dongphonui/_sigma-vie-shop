@@ -5,6 +5,7 @@ import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
 import { addToCart } from '../utils/cartStorage';
+import { calculateShippingFee } from '../utils/shippingSettingsStorage';
 import PaymentModal from './PaymentModal';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -109,6 +110,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       setTimeout(() => setFeedbackMsg(''), 2000);
   };
 
+  const parsePrice = (priceStr: string): number => {
+      return parseInt(priceStr.replace(/[^0-9]/g, ''), 10) || 0;
+  };
+
   const handlePlaceOrder = async () => {
       const customer = getCurrentCustomer();
       if (!customer) {
@@ -124,7 +129,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
           productForOrder.price = product.salePrice; 
       }
 
-      const result = createOrder(customer, productForOrder, quantity, paymentMethod);
+      const pricePerUnit = parsePrice(productForOrder.price);
+      const subtotal = pricePerUnit * quantity;
+      const shippingFee = calculateShippingFee(subtotal);
+
+      const result = createOrder(customer, productForOrder, quantity, paymentMethod, shippingFee);
 
       if (result.success && result.order) {
           setCreatedOrder(result.order);
@@ -177,12 +186,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
           );
       }
 
+      // Calculate estimate for preview
+      const currentPrice = isFlashSaleActive && product.salePrice ? parsePrice(product.salePrice) : parsePrice(product.price);
+      const estimateSubtotal = currentPrice * quantity;
+      const estimateShipping = calculateShippingFee(estimateSubtotal);
+      const estimateTotal = estimateSubtotal + estimateShipping;
+
       return (
         <div className="py-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Mua Sản Phẩm</h3>
             
             {/* Quantity Selector */}
-            <div className="flex items-center justify-center gap-4 mb-6">
+            <div className="flex items-center justify-center gap-4 mb-2">
                 <button 
                     onClick={() => handleQuantityChange(-1)}
                     disabled={quantity <= 1 || orderStatus === 'PROCESSING'}
@@ -202,6 +217,22 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                 </button>
             </div>
             <p className="text-sm text-gray-500 mb-4">Còn lại {product.stock} sản phẩm trong kho</p>
+
+            {/* Price Preview */}
+            <div className="bg-gray-50 p-3 rounded-lg mb-4 text-sm text-gray-600 space-y-1">
+                <div className="flex justify-between">
+                    <span>Tạm tính:</span>
+                    <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(estimateSubtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>Phí vận chuyển:</span>
+                    {estimateShipping === 0 ? <span className="text-green-600 font-bold">Miễn phí</span> : <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(estimateShipping)}</span>}
+                </div>
+                <div className="flex justify-between border-t pt-1 mt-1 font-bold text-gray-800">
+                    <span>Tổng cộng:</span>
+                    <span className="text-[#00695C]">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(estimateTotal)}</span>
+                </div>
+            </div>
 
             {/* Payment Method Selector */}
             {isLoggedIn && (
@@ -262,8 +293,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   // Generate Direct Link for QR
   // IMPORTANT: Move query param ?product=ID BEFORE the hash (#)
-  // This ensures Zalo and other in-app scanners parse the query parameter correctly.
-  // Use simple string concat to ensure no trailing slash issues if origin has one
   const origin = window.location.origin.replace(/\/$/, '');
   const productUrl = `${origin}?product=${product.id}`;
 

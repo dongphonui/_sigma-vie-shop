@@ -62,7 +62,8 @@ export interface Order {
   productId: number;
   productName: string;
   quantity: number;
-  totalPrice: number;
+  totalPrice: number; // Tổng tiền (đã bao gồm ship)
+  shippingFee?: number; // NEW: Phí vận chuyển
   status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
   timestamp: number;
   paymentMethod?: 'COD' | 'BANK_TRANSFER'; // NEW
@@ -208,4 +209,10 @@ export interface StoreSettings {
   phoneNumber: string;
   address: string;
   email?: string;
+}
+
+export interface ShippingSettings {
+  baseFee: number; // Phí cơ bản (VD: 30k)
+  freeShipThreshold: number; // Mức miễn phí ship (VD: 500k)
+  enabled: boolean;
 }

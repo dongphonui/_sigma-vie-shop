@@ -1,11 +1,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, StoreSettings } from '../types';
+import type { 
+    Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, 
+    InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, 
+    BankSettings, ShippingSettings, StoreSettings 
+} from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -22,6 +26,7 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
+import { getShippingSettings, updateShippingSettings } from '../utils/shippingSettingsStorage';
 import { getStoreSettings } from '../utils/storeSettingsStorage';
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
@@ -189,7 +194,9 @@ const AdminPage: React.FC = () => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+
   
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
@@ -250,6 +257,7 @@ const AdminPage: React.FC = () => {
     setSocialSettings(getSocialSettings());
     setTotpEnabled(isTotpEnabled());
     setBankSettings(getBankSettings());
+    setShippingSettings(getShippingSettings());
     setStoreSettings(getStoreSettings());
     
     // Fetch Logs
@@ -487,7 +495,17 @@ const AdminPage: React.FC = () => {
       refreshInventory(); // Refresh inventory history
   };
 
-  // Printer Handler (NEW)
+  // Shipping Handler
+  const handleShippingSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (shippingSettings) {
+        updateShippingSettings(shippingSettings);
+        setSettingsFeedback('Đã cập nhật phí vận chuyển!');
+        setTimeout(() => setSettingsFeedback(''), 3000);
+    }
+  };
+
+  // Printer Handler
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
@@ -495,18 +513,16 @@ const AdminPage: React.FC = () => {
       const storeName = storeSettings?.name || 'Sigma Vie Store';
       const storePhone = storeSettings?.phoneNumber || '0912.345.678';
       const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
-
-      // Fix: Lookup specific customer to get correct Phone Number
-      // (order.customerContact might store Email based on creation logic)
+      
       const linkedCustomer = customers.find(c => c.id === order.customerId);
       const displayPhone = linkedCustomer?.phoneNumber || order.customerContact;
 
-      // Generate Product URL for QR (Compatible with Zalo/Mobile)
-      // Query param placed BEFORE hash to ensure Zalo browser reads it correctly
       const productUrl = `${window.location.origin}?product=${order.productId}`;
-      
-      // Use public QR Generator API for embedding in print view
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
+
+      // Calculate Subtotal (Total - Ship)
+      const shippingFee = order.shippingFee || 0;
+      const subtotal = order.totalPrice - shippingFee;
 
       const html = `
         <!DOCTYPE html>
@@ -524,7 +540,8 @@ const AdminPage: React.FC = () => {
                 .box h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
                 .order-details { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
                 .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
-                .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
+                .total-section { text-align: right; margin-top: 20px; font-size: 14px; }
+                .final-total { font-size: 18px; font-weight: bold; margin-top: 5px; }
                 .footer { text-align: center; margin-top: 30px; font-size: 12px; font-style: italic; }
                 .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
                 
@@ -570,14 +587,16 @@ const AdminPage: React.FC = () => {
                     <tr>
                         <td>${order.productName}</td>
                         <td>${order.quantity}</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice / order.quantity)}đ</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="total-section">
-                <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
+                <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
+                <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
+                <p class="final-total">Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
                 ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
 
@@ -1839,8 +1858,56 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* Email Management */}
+              {/* Shipping Settings (NEW) */}
               <div>
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <TruckIcon className="w-5 h-5 text-gray-600" />
+                      Cấu hình Phí vận chuyển
+                  </h4>
+                  {shippingSettings && (
+                      <form onSubmit={handleShippingSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                            <div className="flex items-center gap-2 mb-2">
+                                <input 
+                                    type="checkbox" 
+                                    checked={shippingSettings.enabled}
+                                    onChange={(e) => setShippingSettings({...shippingSettings, enabled: e.target.checked})}
+                                    className="w-4 h-4 text-[#D4AF37] rounded"
+                                />
+                                <label className="text-sm font-bold text-gray-800">Bật tính phí vận chuyển</label>
+                            </div>
+                            {shippingSettings.enabled && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Phí ship cơ bản</label>
+                                        <input 
+                                            type="number" 
+                                            value={shippingSettings.baseFee} 
+                                            onChange={(e) => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})}
+                                            className="mt-1 w-full border rounded px-3 py-2"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Áp dụng cho mọi đơn hàng chưa đạt mức miễn phí.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Mức miễn phí Ship (Freeship)</label>
+                                        <input 
+                                            type="number" 
+                                            value={shippingSettings.freeShipThreshold} 
+                                            onChange={(e) => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})}
+                                            className="mt-1 w-full border rounded px-3 py-2"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Đơn hàng có giá trị lớn hơn mức này sẽ được Free Ship.</p>
+                                    </div>
+                                </div>
+                            )}
+                            <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                                Lưu cấu hình Ship
+                            </button>
+                      </form>
+                  )}
+              </div>
+
+              {/* Email Management */}
+              <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
                   <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
                   

@@ -1,8 +1,9 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { CartItem, Customer } from '../types';
 import { updateCartQuantity, removeFromCart, clearCart } from '../utils/cartStorage';
 import { createOrder } from '../utils/orderStorage';
+import { calculateShippingFee, getShippingSettings } from '../utils/shippingSettingsStorage';
 import PaymentModal from './PaymentModal';
 
 interface CartDrawerProps {
@@ -30,10 +31,20 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'BANK_TRANSFER'>('COD');
   const [showQrModal, setShowQrModal] = useState(false);
   const [lastOrderId, setLastOrderId] = useState('');
+  const [shippingSettings, setShippingSettings] = useState(getShippingSettings());
 
-  const totalPrice = useMemo(() => {
+  useEffect(() => {
+      if (isOpen) {
+          setShippingSettings(getShippingSettings());
+      }
+  }, [isOpen]);
+
+  const subtotal = useMemo(() => {
     return items.reduce((sum, item) => sum + (item.selectedPrice * item.quantity), 0);
   }, [items]);
+
+  const shippingFee = calculateShippingFee(subtotal);
+  const totalPrice = subtotal + shippingFee;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
@@ -49,29 +60,38 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       setIsProcessing(true);
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
-      
       const createdOrders = [];
 
+      // Logic Split Order: Since current backend structure stores 1 item per Order record
+      // We need to decide how to apply shipping fee.
+      // Solution: Apply FULL shipping fee to the FIRST item, and 0 for others in this batch.
+      
+      let isFirstItem = true;
+
       for (const item of items) {
-          const result = createOrder(currentUser, item, item.quantity, paymentMethod);
+          const feeForItem = isFirstItem ? shippingFee : 0;
+          const result = createOrder(currentUser, item, item.quantity, paymentMethod, feeForItem);
+          
           if (result.success && result.order) {
               successfulOrders.push(`${item.name} (x${item.quantity})`);
               createdOrders.push(result.order);
+              isFirstItem = false; // Only charge once
           } else {
               failedItems.push(item.name);
           }
       }
 
       if (successfulOrders.length > 0) {
-          // If Bank Transfer, show Modal
+          // If Bank Transfer, show Modal for the total amount
           if (paymentMethod === 'BANK_TRANSFER') {
-              setLastOrderId(createdOrders[0].id);
+              // Show QR with info of first order ID but TOTAL Amount
+              setLastOrderId(createdOrders[0].id + (createdOrders.length > 1 ? '...' : ''));
               setShowQrModal(true);
           } else {
               // COD
               clearCart(); 
               onClose();
-              alert('Đơn hàng đã được đặt thành công (Thanh toán khi nhận hàng)!');
+              alert(`Đơn hàng đã được đặt thành công! Tổng thanh toán: ${formatPrice(totalPrice)}`);
           }
       } else {
           alert(`Không thể đặt hàng. Có thể sản phẩm đã hết hàng. Lỗi: ${failedItems.join(', ')}`);
@@ -209,10 +229,30 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center mb-4">
-                    <span className="text-gray-600">Tổng cộng:</span>
-                    <span className="text-2xl font-bold text-[#D4AF37]">{formatPrice(totalPrice)}</span>
+                <div className="space-y-2 mb-4 border-t pt-4">
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Tạm tính:</span>
+                        <span className="font-medium">{formatPrice(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">Phí vận chuyển:</span>
+                        {shippingFee === 0 ? (
+                            <span className="font-bold text-green-600">Miễn phí</span>
+                        ) : (
+                            <span className="font-medium">{formatPrice(shippingFee)}</span>
+                        )}
+                    </div>
+                    {shippingFee > 0 && shippingSettings.enabled && (
+                        <div className="text-xs text-gray-400 text-right">
+                            (Mua thêm {formatPrice(shippingSettings.freeShipThreshold - subtotal)} để được Freeship)
+                        </div>
+                    )}
+                    <div className="flex justify-between items-center pt-2 border-t mt-2">
+                        <span className="text-gray-800 font-bold">Tổng cộng:</span>
+                        <span className="text-2xl font-bold text-[#D4AF37]">{formatPrice(totalPrice)}</span>
+                    </div>
                 </div>
+
                 <button 
                     onClick={handleCheckout}
                     disabled={isProcessing}
@@ -228,7 +268,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
         isOpen={showQrModal} 
         onClose={() => setShowQrModal(false)}
         orderId={lastOrderId}
-        amount={totalPrice}
+        amount={totalPrice} // Use Total Price
         onConfirmPayment={handleConfirmPayment}
       />
     </>
