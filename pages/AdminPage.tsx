@@ -117,14 +117,6 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
 
-const StoreIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
-);
-
-const QrCodeIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
-);
-
 
 const AdminPage: React.FC = () => {
   // General State
@@ -149,7 +141,6 @@ const AdminPage: React.FC = () => {
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState<string | null>(null);
   const [productFeedback, setProductFeedback] = useState('');
-  const [qrProduct, setQrProduct] = useState<Product | null>(null); // State for QR Modal
   
   // Flash Sale State
   const [newProductIsFlashSale, setNewProductIsFlashSale] = useState(false);
@@ -496,7 +487,7 @@ const AdminPage: React.FC = () => {
       refreshInventory(); // Refresh inventory history
   };
 
-  // Printer Handler
+  // Printer Handler (NEW)
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
@@ -504,6 +495,11 @@ const AdminPage: React.FC = () => {
       const storeName = storeSettings?.name || 'Sigma Vie Store';
       const storePhone = storeSettings?.phoneNumber || '0912.345.678';
       const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
+
+      // Generate Product URL for QR (Compatible with Zalo/Mobile)
+      const productUrl = `${window.location.origin}?product=${order.productId}`;
+      // Use public QR Generator API for embedding in print view
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
 
       const html = `
         <!DOCTYPE html>
@@ -522,7 +518,8 @@ const AdminPage: React.FC = () => {
                 .order-details { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
                 .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
                 .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
-                .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
+                .footer { text-align: center; margin-top: 30px; font-size: 12px; font-style: italic; }
+                .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
                 
                 @media print {
                     @page { margin: 0.5cm; }
@@ -577,6 +574,11 @@ const AdminPage: React.FC = () => {
                 ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
 
+            <div class="qr-section">
+                <p>Quét mã để mua thêm sản phẩm này:</p>
+                <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
+            </div>
+
             <div class="footer">
                 <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
                 <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
@@ -586,7 +588,9 @@ const AdminPage: React.FC = () => {
       `;
       printWindow.document.write(html);
       printWindow.document.close();
-      printWindow.print();
+      setTimeout(() => {
+          printWindow.print();
+      }, 500);
   };
 
   // Customer Handlers
@@ -801,7 +805,7 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // Store Settings Handlers (NEW)
+  // Store Settings Handler
   const handleStoreSettingsChange = (field: keyof StoreSettings, value: string) => {
       if (storeSettings) {
           setStoreSettings({ ...storeSettings, [field]: value });
@@ -812,10 +816,11 @@ const AdminPage: React.FC = () => {
       e.preventDefault();
       if (storeSettings) {
           updateStoreSettings(storeSettings);
-          setSettingsFeedback('Đã cập nhật thông tin cửa hàng thành công!');
+          setSettingsFeedback('Đã cập nhật thông tin cửa hàng!');
           setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
+
 
   // Social Settings Handler
   const handleSocialSettingsChange = (field: keyof SocialSettings, value: string) => {
@@ -1242,13 +1247,6 @@ const AdminPage: React.FC = () => {
                                             {product.isFlashSale && <span className="ml-1 text-xs text-red-500 font-bold">⚡</span>}
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                             <button 
-                                                onClick={() => setQrProduct(product)} 
-                                                className="text-gray-600 hover:text-gray-900 mr-2" 
-                                                title="Mã QR"
-                                            >
-                                                <QrCodeIcon className="w-4 h-4 inline" />
-                                            </button>
                                             <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
                                             <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
                                         </td>
@@ -1264,30 +1262,6 @@ const AdminPage: React.FC = () => {
              <div className={`mt-4 p-3 rounded text-center font-medium animate-pulse ${productFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                  {productFeedback}
              </div>
-        )}
-
-        {/* QR Code Modal */}
-        {qrProduct && (
-            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setQrProduct(null)}>
-                <div className="bg-white p-6 rounded-lg max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
-                    <h3 className="text-lg font-bold mb-4">{qrProduct.name}</h3>
-                    <div className="flex justify-center mb-4 p-4 border rounded bg-white">
-                        {/* Ensure URL is clean with query param BEFORE any hash if possible, but standard is absolute path */}
-                        <QRCodeSVG 
-                            value={`${window.location.origin}?product=${qrProduct.id}`}
-                            size={200}
-                            fgColor="#111827"
-                        />
-                    </div>
-                    <p className="text-sm text-gray-500 mb-4">SKU: {qrProduct.sku}</p>
-                    <button 
-                        onClick={() => setQrProduct(null)}
-                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium"
-                    >
-                        Đóng
-                    </button>
-                </div>
-            </div>
         )}
     </div>
   );
@@ -2055,7 +2029,7 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* Bank Settings Section */}
+              {/* Bank Settings Section (NEW with Security) */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <CreditCardIcon className="w-5 h-5 text-gray-600" />
@@ -2106,52 +2080,59 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* Store Information Settings (NEW) */}
+              {/* Store Info Section */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <StoreIcon className="w-5 h-5 text-gray-600" />
-                      Thông tin Cửa hàng (Hóa đơn)
+                      <LayersIcon className="w-5 h-5 text-gray-600" />
+                      Thông tin Cửa hàng (In hóa đơn)
                   </h4>
                   {storeSettings && (
                       <form onSubmit={handleStoreSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Tên cửa hàng</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.name} 
-                                      onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required
-                                  />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.phoneNumber} 
-                                      onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required
-                                  />
-                              </div>
-                              <div className="md:col-span-2">
-                                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.address} 
-                                      onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required
-                                  />
-                              </div>
-                          </div>
-                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                           <div>
+                                <label className="block text-sm font-medium text-gray-700">Tên Cửa hàng</label>
+                                <input 
+                                    type="text" 
+                                    value={storeSettings.name} 
+                                    onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
+                                    className="mt-1 w-full border rounded px-3 py-2"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                                    <input 
+                                        type="text" 
+                                        value={storeSettings.phoneNumber} 
+                                        onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
+                                        className="mt-1 w-full border rounded px-3 py-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Email liên hệ</label>
+                                    <input 
+                                        type="email" 
+                                        value={storeSettings.email} 
+                                        onChange={(e) => handleStoreSettingsChange('email', e.target.value)} 
+                                        className="mt-1 w-full border rounded px-3 py-2"
+                                    />
+                                </div>
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                                <input 
+                                    type="text" 
+                                    value={storeSettings.address} 
+                                    onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
+                                    className="mt-1 w-full border rounded px-3 py-2"
+                                />
+                            </div>
+                           <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
                               Lưu thông tin Cửa hàng
                           </button>
                       </form>
                   )}
               </div>
+
 
               {/* Social Media Links */}
               <div className="border-t pt-6">
