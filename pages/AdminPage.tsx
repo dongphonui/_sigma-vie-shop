@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -10,7 +9,7 @@ import { getProducts, addProduct, deleteProduct, updateProductStock, updateProdu
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
-    isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTotpToken, verifyTempTotpToken
+    isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTempTotpToken, verifyTotpToken
 } from '../utils/adminSettingsStorage';
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
@@ -26,7 +25,7 @@ import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsSto
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 
-// --- ICONS ---
+
 const ImagePlus: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12H3"/><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
 );
@@ -121,6 +120,10 @@ const StoreIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
 );
 
+const QrCodeIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
@@ -145,6 +148,7 @@ const AdminPage: React.FC = () => {
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState<string | null>(null);
   const [productFeedback, setProductFeedback] = useState('');
+  const [qrProduct, setQrProduct] = useState<Product | null>(null); // State for QR Modal
   
   // Flash Sale State
   const [newProductIsFlashSale, setNewProductIsFlashSale] = useState(false);
@@ -1237,6 +1241,13 @@ const AdminPage: React.FC = () => {
                                             {product.isFlashSale && <span className="ml-1 text-xs text-red-500 font-bold">⚡</span>}
                                         </td>
                                         <td className="px-4 py-3 text-right">
+                                             <button 
+                                                onClick={() => setQrProduct(product)} 
+                                                className="text-gray-600 hover:text-gray-900 mr-2" 
+                                                title="Mã QR"
+                                            >
+                                                <QrCodeIcon className="w-4 h-4 inline" />
+                                            </button>
                                             <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
                                             <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
                                         </td>
@@ -1252,6 +1263,33 @@ const AdminPage: React.FC = () => {
              <div className={`mt-4 p-3 rounded text-center font-medium animate-pulse ${productFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                  {productFeedback}
              </div>
+        )}
+
+        {/* QR Code Modal */}
+        {qrProduct && (
+            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" onClick={() => setQrProduct(null)}>
+                <div className="bg-white p-6 rounded-lg max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
+                    <h3 className="text-lg font-bold mb-4">{qrProduct.name}</h3>
+                    <div className="flex justify-center mb-4 p-4 border rounded bg-white">
+                        <QRCodeSVG 
+                            value={JSON.stringify({ 
+                                id: qrProduct.id, 
+                                name: qrProduct.name, 
+                                price: qrProduct.price,
+                                sku: qrProduct.sku 
+                            })} 
+                            size={200} 
+                        />
+                    </div>
+                    <p className="text-sm text-gray-500 mb-4">SKU: {qrProduct.sku}</p>
+                    <button 
+                        onClick={() => setQrProduct(null)}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium"
+                    >
+                        Đóng
+                    </button>
+                </div>
+            </div>
         )}
     </div>
   );
@@ -2019,54 +2057,7 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* Store Info Settings (NEW) */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <StoreIcon className="w-5 h-5 text-gray-600" />
-                      Thông tin Cửa hàng (Hóa đơn)
-                  </h4>
-                  {storeSettings && (
-                      <form onSubmit={handleStoreSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Tên Cửa hàng</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.name} 
-                                      onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required 
-                                  />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.phoneNumber} 
-                                      onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required 
-                                  />
-                              </div>
-                              <div className="md:col-span-2">
-                                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.address} 
-                                      onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required 
-                                  />
-                              </div>
-                          </div>
-                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
-                              Lưu thông tin Cửa hàng
-                          </button>
-                      </form>
-                  )}
-              </div>
-
-              {/* Bank Settings Section (NEW with Security) */}
+              {/* Bank Settings Section */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <CreditCardIcon className="w-5 h-5 text-gray-600" />
@@ -2112,6 +2103,53 @@ const AdminPage: React.FC = () => {
                           </div>
                           <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
                               Lưu thông tin Ngân hàng
+                          </button>
+                      </form>
+                  )}
+              </div>
+
+              {/* Store Information Settings (NEW) */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <StoreIcon className="w-5 h-5 text-gray-600" />
+                      Thông tin Cửa hàng (Hóa đơn)
+                  </h4>
+                  {storeSettings && (
+                      <form onSubmit={handleStoreSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Tên cửa hàng</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.name} 
+                                      onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.phoneNumber} 
+                                      onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.address} 
+                                      onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required
+                                  />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                              Lưu thông tin Cửa hàng
                           </button>
                       </form>
                   )}
