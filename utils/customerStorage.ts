@@ -1,4 +1,3 @@
-
 import type { Customer } from '../types';
 import { fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, deleteCustomerFromDB } from './apiClient';
 
@@ -75,7 +74,7 @@ export const registerCustomer = (data: {
     cccdNumber: data.cccdNumber,
     gender: data.gender,
     dob: data.dob,
-    issueDate: data.issueDate, // Save Issue Date
+    issueDate: data.issueDate, 
     passwordHash: simpleHash(data.password),
     address: data.address,
     createdAt: Date.now()
@@ -100,7 +99,6 @@ export const updateCustomer = (updatedCustomer: Customer): void => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
         updateCustomerInDB(updatedCustomer);
         
-        // If updating current logged in user, update session as well
         const currentUser = getCurrentCustomer();
         if (currentUser && currentUser.id === updatedCustomer.id) {
              sessionStorage.setItem(SESSION_KEY, JSON.stringify(updatedCustomer));
@@ -119,9 +117,9 @@ export const loginCustomer = (identifier: string, password: string): { success: 
   const customers = getCustomers();
   const hash = simpleHash(password);
 
-  // Allow login via Email OR Phone OR CCCD
+  // STRICT LOGIN: Only check phoneNumber
   const customer = customers.find(c => 
-    ((c.email === identifier) || (c.phoneNumber === identifier) || (c.cccdNumber === identifier)) && 
+    c.phoneNumber === identifier && 
     c.passwordHash === hash
   );
 
@@ -130,7 +128,7 @@ export const loginCustomer = (identifier: string, password: string): { success: 
     return { success: true, message: 'Đăng nhập thành công!', customer };
   }
 
-  return { success: false, message: 'Tài khoản hoặc mật khẩu không đúng.' };
+  return { success: false, message: 'Số điện thoại hoặc mật khẩu không đúng.' };
 };
 
 export const logoutCustomer = (): void => {

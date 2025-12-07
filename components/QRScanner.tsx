@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
@@ -14,7 +13,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   const [videoInputDevices, setVideoInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [scanStatus, setScanStatus] = useState<string>('Đang khởi động Camera...');
-  const [isSuccess, setIsSuccess] = useState(false); // New State for Success Animation
+  const [isSuccess, setIsSuccess] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,14 +23,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   useEffect(() => {
     const initCamera = async () => {
         try {
-            // Request permission first
+            // Xin quyền camera trước
             await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             
             const devices = await codeReader.current.listVideoInputDevices();
             setVideoInputDevices(devices);
             
             if (devices.length > 0) {
-                // Try to find the best back camera
+                // Ưu tiên camera sau (back/environment)
                 const backCameras = devices.filter(device => 
                     device.label.toLowerCase().includes('back') || 
                     device.label.toLowerCase().includes('sau') ||
@@ -104,17 +103,15 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
   };
 
   const handleSuccess = (text: string) => {
-      if (isSuccess) return; // Prevent multiple triggers
+      if (isSuccess) return;
       
-      setIsSuccess(true); // Trigger animation
+      setIsSuccess(true);
       isScanRunning.current = false;
       codeReader.current.reset();
       
-      // Play beep sound
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
       audio.play().catch(() => {});
       
-      // Delay callback to show animation
       setTimeout(() => {
           onScanSuccess(text);
       }, 1500);
@@ -166,7 +163,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
     <div className="fixed inset-0 bg-black bg-opacity-95 z-[60] flex items-center justify-center p-0 sm:p-4">
       <div className="bg-black sm:bg-white sm:rounded-lg shadow-xl w-full h-full sm:h-auto sm:max-w-md overflow-hidden relative flex flex-col">
         
-        {/* Header */}
         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent text-white flex justify-between items-center z-30">
             <div>
                 <h3 className="font-bold text-lg drop-shadow-md">Quét CCCD</h3>
@@ -179,9 +175,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             </button>
         </div>
 
-        {/* Camera Area */}
         <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
-            {/* Success Overlay */}
             {isSuccess && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center shadow-lg mb-4 animate-bounce">
@@ -222,26 +216,20 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
                 />
             )}
             
-            {/* Visual Guide Overlay */}
             {!loading && !errorMsg && !isSuccess && (
                 <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center">
-                    {/* Hướng dẫn căn chỉnh */}
                     <div className="w-[80%] aspect-square border-2 border-[#D4AF37]/70 rounded-lg relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
                         <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#D4AF37] -mt-1 -ml-1"></div>
                         <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#D4AF37] -mt-1 -mr-1"></div>
                         <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#D4AF37] -mb-1 -ml-1"></div>
                         <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#D4AF37] -mb-1 -mr-1"></div>
-                        
-                        {/* Scanning Laser Effect */}
                         <div className="absolute left-2 right-2 h-0.5 bg-red-500/80 shadow-[0_0_10px_rgba(220,38,38,0.8)] animate-scan"></div>
                     </div>
                 </div>
             )}
             
-            {/* Control Buttons (Bottom Right) */}
             {!isSuccess && (
                 <div className="absolute bottom-28 right-6 z-40 flex flex-col gap-4">
-                    {/* Switch Camera Button */}
                     {videoInputDevices.length > 1 && (
                         <button 
                             onClick={handleSwitchCamera}
@@ -252,7 +240,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
                         </button>
                     )}
                     
-                    {/* Upload Image Button */}
                     <button 
                         onClick={triggerFileUpload}
                         className="bg-[#D4AF37] border border-white/30 p-3 rounded-full shadow-lg text-white hover:bg-[#b89b31] active:scale-95 transition-all"
@@ -271,7 +258,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ onScanSuccess, onScanFailure, onC
             )}
         </div>
 
-        {/* Footer Status */}
         {!isSuccess && (
             <div className="p-4 bg-white text-center shrink-0 z-30">
                 <p className="font-bold text-[#00695C] animate-pulse mb-1">{scanStatus}</p>
