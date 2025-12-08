@@ -15,26 +15,36 @@ export const getProducts = (): Product[] => {
     let localData = [];
     
     if (storedProducts) {
-      localData = JSON.parse(storedProducts);
+      try {
+        localData = JSON.parse(storedProducts);
+      } catch (e) {
+        console.error("Dữ liệu sản phẩm trong LocalStorage bị lỗi, đang reset...", e);
+        localStorage.removeItem(STORAGE_KEY);
+        localData = PRODUCTS;
+      }
     } else {
       localData = PRODUCTS;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
     }
 
-    // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API ngầm
+    // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API NGAY LẬP TỨC (Không delay)
     if (!hasLoadedFromDB) {
-      setTimeout(() => {
-        fetchProductsFromDB().then(dbProducts => {
+      hasLoadedFromDB = true; 
+      
+      // Gọi bất đồng bộ
+      fetchProductsFromDB().then(dbProducts => {
           if (dbProducts && dbProducts.length > 0) {
-            console.log('Đã tải dữ liệu từ Postgres thành công!');
+            console.log('Đã đồng bộ dữ liệu sản phẩm từ Server.');
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
+            // Phát sự kiện cập nhật
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           } else {
              window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
-        });
-      }, 500);
-      hasLoadedFromDB = true; 
+      }).catch(err => {
+          console.error("Lỗi đồng bộ sản phẩm:", err);
+          window.dispatchEvent(new Event('sigma_vie_products_update'));
+      });
     }
 
     return localData.map((p: any) => ({
@@ -49,13 +59,13 @@ export const getProducts = (): Product[] => {
         salePrice: p.salePrice || undefined,
         flashSaleStartTime: p.flashSaleStartTime || undefined,
         flashSaleEndTime: p.flashSaleEndTime || undefined,
-        sizes: p.sizes || [], 
-        colors: p.colors || [],
-        variants: p.variants || [] // Load variants
+        sizes: Array.isArray(p.sizes) ? p.sizes : [], 
+        colors: Array.isArray(p.colors) ? p.colors : [],
+        variants: Array.isArray(p.variants) ? p.variants : [] 
     }));
 
   } catch (error) {
-    console.error("Lỗi storage", error);
+    console.error("Lỗi nghiêm trọng trong productStorage", error);
     return PRODUCTS;
   }
 };
@@ -151,7 +161,7 @@ export const updateProductStock = (id: number, quantityChange: number, size?: st
     // 2. Cập nhật Atomic lên Server (Send variant info)
     updateProductStockInDB(id, quantityChange, size, color).then(response => {
         if (response && response.success) {
-            console.log(`Đã cập nhật kho an toàn trên server. Tồn kho mới: ${response.newStock}`);
+            console.log(`Đã cập nhật kho an toàn trên server.`);
         }
     });
 

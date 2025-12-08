@@ -93,6 +93,9 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
   // Slider State
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
 
+  // Deep Link Loading State
+  const [isLookingForProduct, setIsLookingForProduct] = useState(false);
+
   useEffect(() => {
     // Initial Load
     const allProducts = getProducts();
@@ -101,9 +104,14 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     setSettings(getHomePageSettings());
 
     // Deep Link Check on Initial Load
-    if (initialProductId && allProducts.length > 0) {
+    if (initialProductId) {
         const found = allProducts.find(p => String(p.id) === String(initialProductId));
-        if (found) setSelectedProduct(found);
+        if (found) {
+            setSelectedProduct(found);
+        } else {
+            // Not found in local yet, waiting for DB update...
+            setIsLookingForProduct(true);
+        }
     }
 
     // Listener for async updates (DB fetch)
@@ -119,7 +127,13 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         // Retry Deep Link after update
         if (initialProductId) {
             const found = updated.find(p => String(p.id) === String(initialProductId));
-            if (found) setSelectedProduct(found);
+            if (found) {
+                setSelectedProduct(found);
+                setIsLookingForProduct(false); // Found it!
+            } else {
+                // If still not found after DB load, stop looking
+                setIsLookingForProduct(false);
+            }
         }
     };
     
@@ -180,6 +194,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
 
   const handleCloseModal = () => {
     setSelectedProduct(null);
+    setIsLookingForProduct(false);
   };
 
   const scrollToProducts = () => {
@@ -197,7 +212,21 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         cartItemCount={cartItemCount}
         onOpenCart={onOpenCart}
       />
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 relative">
+        
+        {/* Loading Indicator for Deep Link */}
+        {isLookingForProduct && !selectedProduct && (
+            <div className="fixed inset-0 bg-black/30 z-[60] flex items-center justify-center backdrop-blur-sm">
+                <div className="bg-white p-6 rounded-lg shadow-xl flex items-center gap-4 animate-fade-in-up">
+                    <div className="w-6 h-6 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin"></div>
+                    <div>
+                        <p className="font-bold text-gray-800">Đang tìm sản phẩm...</p>
+                        <p className="text-xs text-gray-500">Đang đồng bộ dữ liệu mới nhất</p>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="text-center mb-12">
           {settings ? (
             <>

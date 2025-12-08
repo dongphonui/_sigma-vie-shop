@@ -36,24 +36,33 @@ const App: React.FC = () => {
       const hash = window.location.hash;
       const search = window.location.search;
       
-      // Robust URL Parsing for Deep Linking
+      // Robust URL Parsing for Deep Linking (Compatible with Zalo/FB/Direct)
       let pid = null;
 
-      // Priority 1: Direct Query Parameter (e.g. ?product=123)
+      // Method 1: Standard Search Query (?product=123)
       const urlParams = new URLSearchParams(search);
       pid = urlParams.get('product');
 
-      if (!pid && fullUrl.includes('product=')) {
-          // Case 2: Query param might be stuck inside hash or malformed
+      // Method 2: Embedded in Hash (/#/?product=123)
+      if (!pid && hash.includes('product=')) {
           try {
-              // Try to find product=ID in the whole string manually if URLSearchParams fails
+             // Split by ? to check query string after hash
+             const hashParts = hash.split('?');
+             if (hashParts.length > 1) {
+                 const hashParams = new URLSearchParams(hashParts[1]);
+                 pid = hashParams.get('product');
+             }
+          } catch(e) {}
+      }
+
+      // Method 3: Fallback Regex for messy URLs
+      if (!pid && fullUrl.includes('product=')) {
+          try {
               const match = fullUrl.match(/[?&]product=([^&]+)/);
               if (match) {
                   pid = match[1];
               }
-          } catch (e) {
-              // Ignore invalid URL
-          }
+          } catch (e) {}
       }
 
       if (pid) {

@@ -87,15 +87,22 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                   (v.size === selectedSize || (!needsSize)) &&
                   (v.color === selectedColor || (!needsColor))
               );
+              // Show variant stock ONLY if we have selected required options
+              // OR allow showing general stock if user hasn't selected yet.
+              // Here, we show specific if selected, otherwise fallback to general stock for UX context.
               if ((!needsSize || selectedSize) && (!needsColor || selectedColor)) {
                   setCurrentStock(variant ? variant.stock : 0);
               } else {
+                  // If not fully selected, show general stock? Or keep 0?
+                  // Showing general stock is usually better to indicate "it's available"
                   setCurrentStock(product.stock); 
               }
           } else {
+              // No variants data but has sizes/colors defined (legacy data?)
               setCurrentStock(product.stock);
           }
       } else {
+          // Simple product
           setCurrentStock(product.stock);
       }
   }, [selectedSize, selectedColor, product]);
@@ -389,6 +396,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   };
 
   // Generate Direct Link for QR (Query Param Only - Best Compatibility)
+  // Example: https://domain.com/?product=123
   const productUrl = `${window.location.origin}/?product=${product.id}`;
 
   return (
