@@ -72,6 +72,7 @@ export const addToCart = (product: Product, quantity: number, size?: string, col
     } else {
         // Cap at stock
         cart[existingItemIndex].quantity = stockLimit;
+        alert(`Xin lỗi, bạn chỉ có thể thêm tối đa ${stockLimit} sản phẩm cho phân loại này.`);
     }
   } else {
     const stockLimit = getVariantStock(product, size, color);
@@ -83,6 +84,8 @@ export const addToCart = (product: Product, quantity: number, size?: string, col
             selectedSize: size, // Store size
             selectedColor: color // Store color
         });
+    } else {
+        alert(`Xin lỗi, sản phẩm này chỉ còn ${stockLimit} món.`);
     }
   }
 

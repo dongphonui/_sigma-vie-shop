@@ -146,7 +146,10 @@ const AdminPage: React.FC = () => {
   const [newProductSalePrice, setNewProductSalePrice] = useState('');
   const [newProductFlashSaleStartTime, setNewProductFlashSaleStartTime] = useState('');
   const [newProductFlashSaleEndTime, setNewProductFlashSaleEndTime] = useState('');
-
+  
+  // New States for Sizes and Colors
+  const [newProductSizes, setNewProductSizes] = useState(''); 
+  const [newProductColors, setNewProductColors] = useState('');
 
   // Product Filter State
   const [productSearch, setProductSearch] = useState('');
@@ -217,6 +220,9 @@ const AdminPage: React.FC = () => {
   const [inventoryFeedback, setInventoryFeedback] = useState('');
   const [inventoryView, setInventoryView] = useState<'stock' | 'history'>('stock');
   const [inventorySearch, setInventorySearch] = useState('');
+  // New Inventory State
+  const [inventorySize, setInventorySize] = useState(''); 
+  const [inventoryColor, setInventoryColor] = useState(''); 
 
   // Dashboard State
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -335,6 +341,8 @@ const AdminPage: React.FC = () => {
       setNewProductImage(product.imageUrl);
       setNewProductIsFlashSale(product.isFlashSale || false);
       setNewProductSalePrice(product.salePrice || '');
+      setNewProductSizes(product.sizes ? product.sizes.join(', ') : ''); // Load sizes
+      setNewProductColors(product.colors ? product.colors.join(', ') : ''); // Load colors
       
       setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
       setNewProductFlashSaleEndTime(product.flashSaleEndTime ? toLocalISOString(new Date(product.flashSaleEndTime)) : '');
@@ -356,6 +364,8 @@ const AdminPage: React.FC = () => {
       setNewProductSalePrice('');
       setNewProductFlashSaleStartTime('');
       setNewProductFlashSaleEndTime('');
+      setNewProductSizes(''); 
+      setNewProductColors('');
   };
 
   const handleCancelProductEdit = () => {
@@ -390,6 +400,8 @@ const AdminPage: React.FC = () => {
       salePrice: newProductSalePrice,
       flashSaleStartTime: newProductFlashSaleStartTime ? new Date(newProductFlashSaleStartTime).getTime() : undefined,
       flashSaleEndTime: newProductFlashSaleEndTime ? new Date(newProductFlashSaleEndTime).getTime() : undefined,
+      sizes: newProductSizes ? newProductSizes.split(',').map(s => s.trim()).filter(s => s) : [],
+      colors: newProductColors ? newProductColors.split(',').map(s => s.trim()).filter(s => s) : []
     };
 
     if (editingProduct) {
@@ -489,6 +501,17 @@ const AdminPage: React.FC = () => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
 
+      const storeName = 'Sigma Vie Store'; 
+      const storePhone = '0912.345.678';
+      const storeAddress = 'Hà Nội, Việt Nam';
+
+      const productUrl = `${window.location.origin}/?product=${order.productId}`;
+      
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
+
+      const shippingFee = order.shippingFee || 0;
+      const subtotal = order.totalPrice - shippingFee;
+
       const html = `
         <!DOCTYPE html>
         <html lang="vi">
@@ -507,6 +530,7 @@ const AdminPage: React.FC = () => {
                 .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
                 .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
                 .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
+                .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
                 
                 @media print {
                     @page { margin: 0.5cm; }
@@ -517,7 +541,7 @@ const AdminPage: React.FC = () => {
         </head>
         <body>
             <div class="header">
-                <h1>SIGMA VIE STORE</h1>
+                <h1>${storeName.toUpperCase()}</h1>
                 <p>Phiếu Giao Hàng / Hóa Đơn</p>
                 <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
             </div>
@@ -525,9 +549,9 @@ const AdminPage: React.FC = () => {
             <div class="info-section">
                 <div class="box">
                     <h3>NGƯỜI GỬI</h3>
-                    <p><strong>Sigma Vie Store</strong></p>
-                    <p>SĐT: 0912.345.678</p>
-                    <p>Đ/C: Hà Nội, Việt Nam</p>
+                    <p><strong>${storeName}</strong></p>
+                    <p>SĐT: ${storePhone}</p>
+                    <p>Đ/C: ${storeAddress}</p>
                 </div>
                 <div class="box">
                     <h3>NGƯỜI NHẬN</h3>
@@ -541,6 +565,7 @@ const AdminPage: React.FC = () => {
                 <thead>
                     <tr>
                         <th>Sản phẩm</th>
+                        <th>Phân loại</th>
                         <th>SL</th>
                         <th>Đơn giá</th>
                         <th>Thành tiền</th>
@@ -549,20 +574,32 @@ const AdminPage: React.FC = () => {
                 <tbody>
                     <tr>
                         <td>${order.productName}</td>
+                        <td>
+                            ${order.productSize ? `Size: ${order.productSize}` : ''} 
+                            ${order.productColor ? ` | Màu: ${order.productColor}` : ''}
+                            ${!order.productSize && !order.productColor ? '-' : ''}
+                        </td>
                         <td>${order.quantity}</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice / order.quantity)}đ</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="total-section">
+                <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
+                <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
                 <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
                 ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
 
+            <div class="qr-section">
+                <p>Quét mã để mua thêm sản phẩm này:</p>
+                <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
+            </div>
+
             <div class="footer">
-                <p>Cảm ơn quý khách đã mua hàng tại Sigma Vie!</p>
+                <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
                 <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
             </div>
         </body>
@@ -570,7 +607,9 @@ const AdminPage: React.FC = () => {
       `;
       printWindow.document.write(html);
       printWindow.document.close();
-      printWindow.print();
+      setTimeout(() => {
+          printWindow.print();
+      }, 500);
   };
 
   // Customer Handlers
@@ -626,24 +665,51 @@ const AdminPage: React.FC = () => {
         setInventoryFeedback('Số lượng phải lớn hơn 0.');
         return;
     }
+    
+    // Check if product requires size/color
+    if (product.sizes && product.sizes.length > 0 && !inventorySize) {
+        setInventoryFeedback('Vui lòng chọn Size cho sản phẩm này.');
+        return;
+    }
+    if (product.colors && product.colors.length > 0 && !inventoryColor) {
+        setInventoryFeedback('Vui lòng chọn Màu cho sản phẩm này.');
+        return;
+    }
 
     const change = inventoryType === 'IMPORT' ? qty : -qty;
     
-    // Check for stock availability on export
-    if (inventoryType === 'EXPORT' && product.stock < qty) {
-         setInventoryFeedback(`Lỗi: Tồn kho hiện tại (${product.stock}) không đủ để xuất ${qty}.`);
+    // Check for stock availability on export (Variant Aware)
+    let currentStock = product.stock;
+    if (inventorySize || inventoryColor) {
+        const variant = product.variants?.find(v => 
+            (v.size === inventorySize || (!v.size && !inventorySize)) && 
+            (v.color === inventoryColor || (!v.color && !inventoryColor))
+        );
+        currentStock = variant ? variant.stock : 0;
+    }
+
+    if (inventoryType === 'EXPORT' && currentStock < qty) {
+         setInventoryFeedback(`Lỗi: Tồn kho hiện tại (${currentStock}) không đủ để xuất ${qty}.`);
          return;
     }
 
-    const success = updateProductStock(productId, change);
+    // Update with size/color
+    const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
+        // Construct Note
+        let noteDetails = inventoryNote;
+        if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
+        if(inventoryColor) noteDetails += ` [Màu: ${inventoryColor}]`;
+
         addTransaction({
             productId,
             productName: product.name,
             type: inventoryType,
             quantity: qty,
-            note: inventoryNote
+            note: noteDetails,
+            selectedSize: inventorySize,
+            selectedColor: inventoryColor
         });
         
         refreshProducts();
@@ -1093,6 +1159,28 @@ const AdminPage: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu</label>
                                     <input type="text" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} className="w-full border rounded px-3 py-2" />
                                 </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước (Size)</label>
+                                        <input 
+                                            type="text" 
+                                            value={newProductSizes} 
+                                            onChange={(e) => setNewProductSizes(e.target.value)} 
+                                            className="w-full border rounded px-3 py-2" 
+                                            placeholder="S, M, L (cách nhau bởi dấu phẩy)" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc (Color)</label>
+                                        <input 
+                                            type="text" 
+                                            value={newProductColors} 
+                                            onChange={(e) => setNewProductColors(e.target.value)} 
+                                            className="w-full border rounded px-3 py-2" 
+                                            placeholder="Đen, Trắng, Đỏ (cách nhau bởi dấu phẩy)" 
+                                        />
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
                                     <select value={newProductStatus} onChange={(e) => setNewProductStatus(e.target.value as any)} className="w-full border rounded px-3 py-2">
@@ -1196,9 +1284,20 @@ const AdminPage: React.FC = () => {
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                {product.stock}
-                                            </span>
+                                            {product.sizes?.length || product.colors?.length ? (
+                                                <div className="text-xs">
+                                                    <span className="font-bold text-[#00695C]">Tổng: {product.stock}</span>
+                                                    <div className="text-gray-500 mt-1">
+                                                        {product.sizes?.length > 0 && <span>{product.sizes.length} Size</span>}
+                                                        {product.sizes?.length > 0 && product.colors?.length > 0 && <span>, </span>}
+                                                        {product.colors?.length > 0 && <span>{product.colors.length} Màu</span>}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                                    {product.stock}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">{product.category}</td>
                                         <td className="px-4 py-3">
@@ -1285,7 +1384,11 @@ const AdminPage: React.FC = () => {
                               </td>
                               <td className="px-4 py-3">
                                   <div>{order.productName}</div>
-                                  <div className="text-xs text-gray-400">x{order.quantity}</div>
+                                  <div className="text-xs text-gray-400">
+                                    x{order.quantity}
+                                    {order.productSize && ` | Size: ${order.productSize}`}
+                                    {order.productColor && ` | Màu: ${order.productColor}`}
+                                  </div>
                               </td>
                               <td className="px-4 py-3 font-bold text-gray-800">
                                   {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice)}
@@ -1397,7 +1500,11 @@ const AdminPage: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Chọn sản phẩm</label>
                             <select 
                                 value={selectedProductForInventory} 
-                                onChange={(e) => setSelectedProductForInventory(e.target.value)}
+                                onChange={(e) => {
+                                    setSelectedProductForInventory(e.target.value);
+                                    setInventorySize('');
+                                    setInventoryColor('');
+                                }}
                                 className="w-full border rounded px-3 py-2"
                                 required
                             >
@@ -1407,6 +1514,45 @@ const AdminPage: React.FC = () => {
                                 ))}
                             </select>
                         </div>
+
+                        {/* Dynamic Size/Color Selectors */}
+                        {selectedProductForInventory && (() => {
+                            const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
+                            if (!p) return null;
+                            return (
+                                <div className="grid grid-cols-2 gap-4">
+                                    {p.sizes && p.sizes.length > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước</label>
+                                            <select 
+                                                value={inventorySize} 
+                                                onChange={(e) => setInventorySize(e.target.value)} 
+                                                className="w-full border rounded px-3 py-2"
+                                                required
+                                            >
+                                                <option value="">-- Chọn Size --</option>
+                                                {p.sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {p.colors && p.colors.length > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc</label>
+                                            <select 
+                                                value={inventoryColor} 
+                                                onChange={(e) => setInventoryColor(e.target.value)} 
+                                                className="w-full border rounded px-3 py-2"
+                                                required
+                                            >
+                                                <option value="">-- Chọn Màu --</option>
+                                                {p.colors.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Loại giao dịch</label>
@@ -1440,6 +1586,31 @@ const AdminPage: React.FC = () => {
                                 rows={2}
                             />
                         </div>
+                        
+                        {/* Stock Display Helper */}
+                        {selectedProductForInventory && (
+                             <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                                 {(() => {
+                                     const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
+                                     if (!p) return null;
+                                     
+                                     let stockDisplay = p.stock;
+                                     let label = 'Tổng tồn kho';
+                                     
+                                     if (inventorySize || inventoryColor) {
+                                         const v = p.variants?.find(v => 
+                                            (v.size === inventorySize || (!v.size && !inventorySize)) && 
+                                            (v.color === inventoryColor || (!v.color && !inventoryColor))
+                                         );
+                                         stockDisplay = v ? v.stock : 0;
+                                         label = `Tồn kho chi tiết`;
+                                     }
+                                     
+                                     return <span><strong>{label}:</strong> {stockDisplay}</span>;
+                                 })()}
+                             </div>
+                        )}
+
                         <button type="submit" className="w-full bg-[#00695C] text-white py-2 rounded font-bold hover:bg-[#004d40]">
                             Thực hiện
                         </button>
@@ -1466,6 +1637,7 @@ const AdminPage: React.FC = () => {
                             <tr>
                                 <th className="px-4 py-3">Thời gian</th>
                                 <th className="px-4 py-3">Sản phẩm</th>
+                                <th className="px-4 py-3">Phân loại</th>
                                 <th className="px-4 py-3">Loại</th>
                                 <th className="px-4 py-3">Số lượng</th>
                                 <th className="px-4 py-3">Ghi chú</th>
@@ -1478,6 +1650,11 @@ const AdminPage: React.FC = () => {
                                 <tr key={t.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
                                     <td className="px-4 py-3 font-medium text-gray-900">{t.productName}</td>
+                                    <td className="px-4 py-3">
+                                        {t.selectedSize && <span className="mr-2 text-xs bg-gray-100 px-1 rounded">Size: {t.selectedSize}</span>}
+                                        {t.selectedColor && <span className="text-xs bg-gray-100 px-1 rounded">Màu: {t.selectedColor}</span>}
+                                        {!t.selectedSize && !t.selectedColor && '-'}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'IMPORT' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
                                             {t.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}

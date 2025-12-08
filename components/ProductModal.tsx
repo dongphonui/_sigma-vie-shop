@@ -59,8 +59,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   
   // Order Logic State
   const [quantity, setQuantity] = useState(1);
-  const [selectedSize, setSelectedSize] = useState<string>(''); // NEW STATE
-  const [selectedColor, setSelectedColor] = useState<string>(''); // NEW STATE
+  const [selectedSize, setSelectedSize] = useState<string>(''); 
+  const [selectedColor, setSelectedColor] = useState<string>('');
   const [orderStatus, setOrderStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS'>('IDLE');
   const [feedbackMsg, setFeedbackMsg] = useState('');
   
@@ -87,14 +87,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                   (v.size === selectedSize || (!needsSize)) &&
                   (v.color === selectedColor || (!needsColor))
               );
-              // Show variant stock if selection is complete, else show total or fallback
               if ((!needsSize || selectedSize) && (!needsColor || selectedColor)) {
                   setCurrentStock(variant ? variant.stock : 0);
               } else {
                   setCurrentStock(product.stock); 
               }
           } else {
-              // Should not happen if variants synced, but fallback
               setCurrentStock(product.stock);
           }
       } else {
@@ -181,7 +179,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
       setOrderStatus('PROCESSING');
 
-      // Use the sale price if available and active
       const productForOrder = { ...product };
       if (isFlashSaleActive && product.salePrice) {
           productForOrder.price = product.salePrice; 
@@ -197,11 +194,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       if (result.success && result.order) {
           setCreatedOrder(result.order);
           if (paymentMethod === 'BANK_TRANSFER') {
-              // Nếu chọn chuyển khoản, mở QR Modal
               setShowQrModal(true);
-              setOrderStatus('IDLE'); // Reset để UI không hiện success ngay
+              setOrderStatus('IDLE');
           } else {
-              // Nếu chọn COD, hiện success ngay
               setOrderStatus('SUCCESS');
           }
       } else {
@@ -247,7 +242,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
           );
       }
 
-      // Calculate estimate for preview
+      // Calculate estimate
       const currentPrice = isFlashSaleActive && product.salePrice ? parsePrice(product.salePrice) : parsePrice(product.price);
       const estimateSubtotal = currentPrice * quantity;
       const estimateShipping = calculateShippingFee(estimateSubtotal);
@@ -313,7 +308,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                     +
                 </button>
             </div>
-            <p className="text-sm text-gray-500 mb-4">Còn lại {currentStock} sản phẩm</p>
+            <p className="text-sm text-gray-500 mb-4">
+                {product.sizes?.length || product.colors?.length 
+                    ? `Còn lại ${currentStock} sản phẩm` 
+                    : `Kho: ${currentStock}`
+                }
+            </p>
 
             {/* Price Preview */}
             <div className="bg-gray-50 p-3 rounded-lg mb-4 text-sm text-gray-600 space-y-1">
@@ -388,10 +388,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       );
   };
 
-  // Generate Direct Link for QR
-  // IMPORTANT: Move query param ?product=ID BEFORE the hash (#)
-  const origin = window.location.origin.replace(/\/$/, '');
-  const productUrl = `${origin}?product=${product.id}`;
+  // Generate Direct Link for QR (Query Param Only - Best Compatibility)
+  const productUrl = `${window.location.origin}/?product=${product.id}`;
 
   return (
     <>
@@ -443,7 +441,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
             </div>
 
             <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
-            <h2 className="text-3xl font-bold font-serif mb-4 text-gray-900 pr-10">{product.name}</h2>
+            {/* PRODUCT TITLE - FIXED VISIBILITY */}
+            <h2 className="text-3xl font-bold font-serif mb-2 text-gray-900 pr-10 leading-tight">{product.name}</h2>
+            <p className="text-sm text-gray-500 mb-6">SKU: {product.sku}</p>
             
             <div className="flex items-end gap-3 mb-6">
                 {isFlashSaleActive ? (

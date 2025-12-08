@@ -46,26 +46,21 @@ const App: React.FC = () => {
       if (!pid && fullUrl.includes('product=')) {
           // Case 2: Query param might be stuck inside hash or malformed
           try {
-              const urlObj = new URL(fullUrl);
-              pid = urlObj.searchParams.get('product');
+              // Try to find product=ID in the whole string manually if URLSearchParams fails
+              const match = fullUrl.match(/[?&]product=([^&]+)/);
+              if (match) {
+                  pid = match[1];
+              }
           } catch (e) {
               // Ignore invalid URL
-          }
-          
-          // Case 3: Query param in hash manually (e.g. /#/?product=123)
-          if (!pid && hash.includes('?')) {
-               const hashParts = hash.split('?');
-               if (hashParts.length > 1) {
-                   const hashParams = new URLSearchParams(hashParts[1]);
-                   pid = hashParams.get('product');
-               }
           }
       }
 
       if (pid) {
+          console.log("Deep link detected for product:", pid);
           setInitialProductId(pid);
-          // Optional: Clean URL
-          // history.replaceState(null, '', window.location.pathname + '#/');
+          // Optional: Clean URL to remove param so refresh doesn't re-trigger?
+          // window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       }
 
       // Base route logic

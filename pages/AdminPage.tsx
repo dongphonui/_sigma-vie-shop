@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -24,7 +23,6 @@ import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerS
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
-
 
 const ImagePlus: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12H3"/><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
@@ -496,10 +494,21 @@ const AdminPage: React.FC = () => {
       refreshInventory(); // Refresh inventory history
   };
 
-  // Printer Handler
+  // Printer Handler (NEW)
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
+
+      const storeName = 'Sigma Vie Store'; 
+      const storePhone = '0912.345.678';
+      const storeAddress = 'Hà Nội, Việt Nam';
+
+      const productUrl = `${window.location.origin}/?product=${order.productId}`;
+      
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
+
+      const shippingFee = order.shippingFee || 0;
+      const subtotal = order.totalPrice - shippingFee;
 
       const html = `
         <!DOCTYPE html>
@@ -519,6 +528,7 @@ const AdminPage: React.FC = () => {
                 .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
                 .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
                 .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
+                .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
                 
                 @media print {
                     @page { margin: 0.5cm; }
@@ -529,7 +539,7 @@ const AdminPage: React.FC = () => {
         </head>
         <body>
             <div class="header">
-                <h1>SIGMA VIE STORE</h1>
+                <h1>${storeName.toUpperCase()}</h1>
                 <p>Phiếu Giao Hàng / Hóa Đơn</p>
                 <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
             </div>
@@ -537,9 +547,9 @@ const AdminPage: React.FC = () => {
             <div class="info-section">
                 <div class="box">
                     <h3>NGƯỜI GỬI</h3>
-                    <p><strong>Sigma Vie Store</strong></p>
-                    <p>SĐT: 0912.345.678</p>
-                    <p>Đ/C: Hà Nội, Việt Nam</p>
+                    <p><strong>${storeName}</strong></p>
+                    <p>SĐT: ${storePhone}</p>
+                    <p>Đ/C: ${storeAddress}</p>
                 </div>
                 <div class="box">
                     <h3>NGƯỜI NHẬN</h3>
@@ -568,19 +578,26 @@ const AdminPage: React.FC = () => {
                             ${!order.productSize && !order.productColor ? '-' : ''}
                         </td>
                         <td>${order.quantity}</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice / order.quantity)}đ</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="total-section">
+                <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
+                <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
                 <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
                 ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
 
+            <div class="qr-section">
+                <p>Quét mã để mua thêm sản phẩm này:</p>
+                <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
+            </div>
+
             <div class="footer">
-                <p>Cảm ơn quý khách đã mua hàng tại Sigma Vie!</p>
+                <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
                 <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
             </div>
         </body>
@@ -588,7 +605,9 @@ const AdminPage: React.FC = () => {
       `;
       printWindow.document.write(html);
       printWindow.document.close();
-      printWindow.print();
+      setTimeout(() => {
+          printWindow.print();
+      }, 500);
   };
 
   // Customer Handlers
@@ -676,6 +695,7 @@ const AdminPage: React.FC = () => {
     const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
+        // Construct Note
         let noteDetails = inventoryNote;
         if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
         if(inventoryColor) noteDetails += ` [Màu: ${inventoryColor}]`;
@@ -1262,9 +1282,20 @@ const AdminPage: React.FC = () => {
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                {product.stock}
-                                            </span>
+                                            {product.sizes?.length || product.colors?.length ? (
+                                                <div className="text-xs">
+                                                    <span className="font-bold text-[#00695C]">Tổng: {product.stock}</span>
+                                                    <div className="text-gray-500 mt-1">
+                                                        {product.sizes?.length > 0 && <span>{product.sizes.length} Size</span>}
+                                                        {product.sizes?.length > 0 && product.colors?.length > 0 && <span>, </span>}
+                                                        {product.colors?.length > 0 && <span>{product.colors.length} Màu</span>}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                                    {product.stock}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">{product.category}</td>
                                         <td className="px-4 py-3">
