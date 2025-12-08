@@ -1,28 +1,35 @@
 
+export interface ProductVariant {
+  size: string;
+  color: string;
+  stock: number;
+}
+
 export interface Product {
   id: number;
   name: string;
   price: string; // Giá bán (Giá gốc)
-  salePrice?: string; // Giá khuyến mãi (NEW)
-  isFlashSale?: boolean; // Có đang chạy Flash Sale không (NEW)
-  flashSaleStartTime?: number; // Thời gian bắt đầu (Timestamp)
-  flashSaleEndTime?: number; // Thời gian kết thúc (Timestamp)
+  salePrice?: string; // Giá khuyến mãi
+  isFlashSale?: boolean; // Có đang chạy Flash Sale không
+  flashSaleStartTime?: number; // Thời gian bắt đầu
+  flashSaleEndTime?: number; // Thời gian kết thúc
   importPrice: string; // Giá nhập
   description: string;
   imageUrl: string;
-  stock: number; // Số lượng tồn kho
+  stock: number; // Tổng tồn kho
   // New "Amazon-like" fields
   sku: string; // Stock Keeping Unit
   category: string;
   brand: string;
   status: 'active' | 'draft' | 'archived';
-  sizes?: string[]; // NEW: Danh sách size (VD: ['S', 'M', 'L'])
-  colors?: string[]; // NEW: Danh sách màu (VD: ['Đen', 'Trắng'])
+  sizes?: string[]; // Danh sách size (VD: ['S', 'M', 'L'])
+  colors?: string[]; // Danh sách màu (VD: ['Đen', 'Trắng'])
+  variants?: ProductVariant[]; // NEW: Quản lý tồn kho chi tiết
 }
 
 export interface CartItem extends Product {
   quantity: number;
-  selectedPrice: number; // The price at the time of adding (sale or regular)
+  selectedPrice: number;
   selectedSize?: string; // NEW: Size khách chọn
   selectedColor?: string; // NEW: Màu khách chọn
 }
@@ -37,21 +44,23 @@ export interface InventoryTransaction {
   id: string;
   productId: number;
   productName: string;
-  type: 'IMPORT' | 'EXPORT'; // Nhập hoặc Xuất
+  type: 'IMPORT' | 'EXPORT';
   quantity: number;
   timestamp: number;
   note?: string;
+  selectedSize?: string; // NEW: Size cụ thể
+  selectedColor?: string; // NEW: Màu cụ thể
 }
 
 export interface Customer {
   id: string;
   fullName: string;
-  email?: string;       // Optional: User might register with Phone
-  phoneNumber?: string; // Optional: User might register with Email
-  cccdNumber?: string;  // NEW: Citizen ID Number
-  gender?: string;      // NEW: Gender from CCCD
-  dob?: string;         // NEW: Date of Birth from CCCD
-  issueDate?: string;   // NEW: Date of Issue from CCCD
+  email?: string;       
+  phoneNumber?: string; 
+  cccdNumber?: string;  
+  gender?: string;      
+  dob?: string;         
+  issueDate?: string;   
   passwordHash: string;
   address?: string;
   createdAt: number;
@@ -61,18 +70,18 @@ export interface Order {
   id: string;
   customerId: string;
   customerName: string;
-  customerContact: string; // Email or Phone
+  customerContact: string; 
   customerAddress: string;
   productId: number;
   productName: string;
   productSize?: string; // NEW: Size khách chọn
   productColor?: string; // NEW: Màu khách chọn
   quantity: number;
-  totalPrice: number; // Tổng tiền (đã bao gồm ship)
-  shippingFee?: number; // NEW: Phí vận chuyển
+  totalPrice: number; 
+  shippingFee?: number; 
   status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
   timestamp: number;
-  paymentMethod?: 'COD' | 'BANK_TRANSFER'; // NEW
+  paymentMethod?: 'COD' | 'BANK_TRANSFER'; 
 }
 
 export interface AdminLoginLog {
@@ -109,15 +118,15 @@ export interface HomePageSettings {
   subtitleFont: string;
   
   // Promotion Section
-  promoImageUrl: string; // Keep for legacy/fallback
-  promoImageUrls: string[]; // NEW: Array for slider
+  promoImageUrl: string;
+  promoImageUrls: string[]; 
   promoBackgroundColor: string;
-  promoAccentColor: string; // Used for button and highlight text
-  promoTag: string; // "Độc Quyền"
-  promoSubTag: string; // "Chỉ có tại Sigma Vie"
-  promoTitle1: string; // "Khơi Nguồn"
-  promoTitleHighlight: string; // "Cảm Hứng"
-  promoTitle2: string; // "Mới"
+  promoAccentColor: string; 
+  promoTag: string; 
+  promoSubTag: string; 
+  promoTitle1: string; 
+  promoTitleHighlight: string; 
+  promoTitle2: string; 
   promoTitleFont: string; 
   promoTitleColor: string;
   promoTitleSize: string;
@@ -138,8 +147,8 @@ export interface HomePageSettings {
   regDescriptionColor: string;
   regDescriptionFont: string;
   regDescriptionSize: string;
-  regBgColorStart: string; // Gradient Start
-  regBgColorEnd: string;   // Gradient End
+  regBgColorStart: string; 
+  regBgColorEnd: string;   
   regButtonText: string;
   regButtonBgColor: string;
   regButtonTextColor: string;
@@ -151,7 +160,7 @@ export interface HomePageSettings {
   // Flash Sale Section Settings
   flashSaleBgColorStart: string;
   flashSaleBgColorEnd: string;
-  flashSaleTitleText: string; // NEW: Content text
+  flashSaleTitleText: string; 
   flashSaleTitleColor: string;
   flashSaleTitleFont: string;
   flashSaleTitleSize: string;
@@ -170,25 +179,22 @@ export interface AboutPageSettings {
 export interface HeaderSettings {
   brandName: string;
   brandColor: string;
-  brandFontSize: string; // e.g. "30px"
-  brandFont: string; // "Playfair Display" or "Poppins"
-  brandBackgroundColor: string; // Header background color
-  logoUrl?: string; // Logo image URL
+  brandFontSize: string; 
+  brandFont: string; 
+  brandBackgroundColor: string; 
+  logoUrl?: string; 
   
-  // Border / Frame Settings
   borderColor: string;
-  borderWidth: string; // e.g. "1px"
-  borderStyle: string; // e.g. "solid", "dashed"
+  borderWidth: string; 
+  borderStyle: string; 
 
-  // Navigation Settings
-  navStoreText: string; // "Cửa Hàng"
-  navAboutText: string; // "Về Chúng Tôi"
+  navStoreText: string; 
+  navAboutText: string; 
   navColor: string;
   navHoverColor: string;
   navFont: string;
   navFontSize: string;
 
-  // Login Button Settings
   loginBtnText: string;
   loginBtnFont: string;
   loginBtnFontSize: string;
@@ -204,10 +210,10 @@ export interface SocialSettings {
 }
 
 export interface BankSettings {
-  bankId: string; // e.g., 'VCB', 'MB'
+  bankId: string; 
   accountNumber: string;
   accountName: string;
-  template: string; // 'qr_only', 'compact', 'compact2', 'print'
+  template: string; 
 }
 
 export interface StoreSettings {
@@ -218,7 +224,7 @@ export interface StoreSettings {
 }
 
 export interface ShippingSettings {
-  baseFee: number; // Phí cơ bản (VD: 30k)
-  freeShipThreshold: number; // Mức miễn phí ship (VD: 500k)
+  baseFee: number; 
+  freeShipThreshold: number; 
   enabled: boolean;
 }

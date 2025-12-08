@@ -50,12 +50,10 @@ const QrCodeIcon: React.FC<{className?: string}> = ({className}) => (
 
 const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedIn, onOpenAuth }) => {
   const [managerEmail, setManagerEmail] = useState('');
-  const isOutOfStock = product.stock <= 0;
   
   const now = Date.now();
   const isFlashSaleActive = product.isFlashSale && 
                             product.salePrice && 
-                            !isOutOfStock &&
                             (!product.flashSaleStartTime || now >= product.flashSaleStartTime) &&
                             (!product.flashSaleEndTime || now <= product.flashSaleEndTime);
   
@@ -73,6 +71,38 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   // Product QR Code State
   const [showProductQr, setShowProductQr] = useState(false);
+
+  // NEW: Current Stock state for variants
+  const [currentStock, setCurrentStock] = useState(product.stock);
+
+  // Effect to update current stock when selection changes
+  useEffect(() => {
+      // Check if product needs variant selection
+      const needsSize = product.sizes && product.sizes.length > 0;
+      const needsColor = product.colors && product.colors.length > 0;
+
+      if (needsSize || needsColor) {
+          if (product.variants) {
+              const variant = product.variants.find(v => 
+                  (v.size === selectedSize || (!needsSize)) &&
+                  (v.color === selectedColor || (!needsColor))
+              );
+              // Show variant stock if selection is complete, else show total or fallback
+              if ((!needsSize || selectedSize) && (!needsColor || selectedColor)) {
+                  setCurrentStock(variant ? variant.stock : 0);
+              } else {
+                  setCurrentStock(product.stock); 
+              }
+          } else {
+              // Should not happen if variants synced, but fallback
+              setCurrentStock(product.stock);
+          }
+      } else {
+          setCurrentStock(product.stock);
+      }
+  }, [selectedSize, selectedColor, product]);
+
+  const isOutOfStock = currentStock <= 0;
 
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
@@ -97,7 +127,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   const handleQuantityChange = (delta: number) => {
       const newQty = quantity + delta;
-      if (newQty >= 1 && newQty <= product.stock) {
+      if (newQty >= 1 && newQty <= currentStock) {
           setQuantity(newQty);
       }
   };
@@ -189,8 +219,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       if (isOutOfStock) {
           return (
             <div className="py-4">
-                <h3 className="text-xl font-bold text-gray-500 mb-2">Sản phẩm tạm hết hàng</h3>
-                <p className="text-gray-400">Vui lòng quay lại sau hoặc liên hệ với chúng tôi để biết thêm chi tiết.</p>
+                <h3 className="text-xl font-bold text-gray-500 mb-2">
+                    {(product.sizes?.length || product.colors?.length) ? 'Biến thể này tạm hết hàng' : 'Sản phẩm tạm hết hàng'}
+                </h3>
+                <p className="text-gray-400">Vui lòng chọn phân loại khác hoặc quay lại sau.</p>
             </div>
           );
       }
@@ -275,13 +307,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                 </div>
                 <button 
                     onClick={() => handleQuantityChange(1)}
-                    disabled={quantity >= product.stock || orderStatus === 'PROCESSING'}
+                    disabled={quantity >= currentStock || orderStatus === 'PROCESSING'}
                     className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     +
                 </button>
             </div>
-            <p className="text-sm text-gray-500 mb-4">Còn lại {product.stock} sản phẩm trong kho</p>
+            <p className="text-sm text-gray-500 mb-4">Còn lại {currentStock} sản phẩm</p>
 
             {/* Price Preview */}
             <div className="bg-gray-50 p-3 rounded-lg mb-4 text-sm text-gray-600 space-y-1">

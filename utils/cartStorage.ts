@@ -30,6 +30,18 @@ const parsePrice = (priceStr: string): number => {
     return parseInt(priceStr.replace(/[^0-9]/g, ''), 10) || 0;
 };
 
+// Helper to get stock for item variant
+const getVariantStock = (product: Product, size?: string, color?: string): number => {
+    if (product.variants && (size || color)) {
+        const variant = product.variants.find(v => 
+            (v.size === size || (!v.size && !size)) && 
+            (v.color === color || (!v.color && !color))
+        );
+        return variant ? variant.stock : 0;
+    }
+    return product.stock; // Fallback to global stock
+};
+
 export const addToCart = (product: Product, quantity: number, size?: string, color?: string): void => {
   const key = getStorageKey();
   const cart = getCart();
@@ -52,16 +64,18 @@ export const addToCart = (product: Product, quantity: number, size?: string, col
 
   if (existingItemIndex > -1) {
     // Check if adding exceeds stock
+    const stockLimit = getVariantStock(product, size, color);
     const newQty = cart[existingItemIndex].quantity + quantity;
-    if (newQty <= product.stock) {
+    if (newQty <= stockLimit) {
         cart[existingItemIndex].quantity = newQty;
         cart[existingItemIndex].selectedPrice = price; 
     } else {
         // Cap at stock
-        cart[existingItemIndex].quantity = product.stock;
+        cart[existingItemIndex].quantity = stockLimit;
     }
   } else {
-    if (quantity <= product.stock) {
+    const stockLimit = getVariantStock(product, size, color);
+    if (quantity <= stockLimit) {
         cart.push({
             ...product,
             quantity,
@@ -91,10 +105,17 @@ export const updateCartQuantity = (productId: number, newQuantity: number, size?
           cart.splice(index, 1);
       } else {
           const item = cart[index];
-          if (newQuantity <= item.stock) {
+          // Check stock specific to variant
+          let limit = item.stock; 
+          if (item.variants) {
+              const v = item.variants.find(v => v.size === size && v.color === color);
+              if (v) limit = v.stock;
+          }
+
+          if (newQuantity <= limit) {
               item.quantity = newQuantity;
           } else {
-              item.quantity = item.stock;
+              item.quantity = limit;
           }
       }
       localStorage.setItem(key, JSON.stringify(cart));

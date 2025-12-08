@@ -49,8 +49,9 @@ export const getProducts = (): Product[] => {
         salePrice: p.salePrice || undefined,
         flashSaleStartTime: p.flashSaleStartTime || undefined,
         flashSaleEndTime: p.flashSaleEndTime || undefined,
-        sizes: p.sizes || [], // Ensure sizes is an array
-        colors: p.colors || [] // Ensure colors is an array
+        sizes: p.sizes || [], 
+        colors: p.colors || [],
+        variants: p.variants || [] // Load variants
     }));
 
   } catch (error) {
@@ -75,7 +76,8 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
     flashSaleStartTime: product.flashSaleStartTime,
     flashSaleEndTime: product.flashSaleEndTime,
     sizes: product.sizes || [],
-    colors: product.colors || []
+    colors: product.colors || [],
+    variants: product.variants || []
   };
   
   const updatedProducts = [newProduct, ...products];
@@ -105,23 +107,49 @@ export const deleteProduct = (id: number): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
 };
 
-export const updateProductStock = (id: number, quantityChange: number): boolean => {
+export const updateProductStock = (id: number, quantityChange: number, size?: string, color?: string): boolean => {
     const products = getProducts();
     const productIndex = products.findIndex(p => p.id === id);
     
     if (productIndex === -1) return false;
     
-    const currentStock = products[productIndex].stock;
-    const newStock = currentStock + quantityChange;
+    const product = products[productIndex];
+    let newTotalStock = product.stock + quantityChange;
 
-    if (newStock < 0) return false;
+    // Logic: Optimistic Update for UI
+    if (size || color) {
+        if (!product.variants) product.variants = [];
+        
+        const vIndex = product.variants.findIndex(v => 
+            (v.size === size || (!v.size && !size)) && 
+            (v.color === color || (!v.color && !color))
+        );
 
-    // 1. Cập nhật Optimistic cho UI (Local Storage) để người dùng thấy ngay
-    products[productIndex].stock = newStock;
+        if (vIndex !== -1) {
+            // Update existing variant
+            const variant = product.variants[vIndex];
+            const newVariantStock = variant.stock + quantityChange;
+            if (newVariantStock < 0) return false; // Prevent negative variant stock
+            product.variants[vIndex].stock = newVariantStock;
+        } else if (quantityChange > 0) {
+            // New Variant
+            product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
+        } else {
+            return false; // Can't reduce non-existent variant
+        }
+        
+        // Recalculate total stock sum
+        newTotalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+    } else {
+        if (newTotalStock < 0) return false;
+    }
+
+    product.stock = newTotalStock;
+    products[productIndex] = product;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
-    // 2. Cập nhật Atomic lên Server
-    updateProductStockInDB(id, quantityChange).then(response => {
+    // 2. Cập nhật Atomic lên Server (Send variant info)
+    updateProductStockInDB(id, quantityChange, size, color).then(response => {
         if (response && response.success) {
             console.log(`Đã cập nhật kho an toàn trên server. Tồn kho mới: ${response.newStock}`);
         }

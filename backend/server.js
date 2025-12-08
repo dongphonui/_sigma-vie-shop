@@ -44,7 +44,8 @@ const initDb = async () => {
         flash_sale_start_time BIGINT,
         flash_sale_end_time BIGINT,
         sizes TEXT,
-        colors TEXT
+        colors TEXT,
+        variants TEXT -- Stores JSON: [{"size":"M","color":"Red","stock":10}]
       );
     `);
 
@@ -95,7 +96,7 @@ const initDb = async () => {
       );
     `);
     
-    // Migration: Add columns if they don't exist (Safe for existing DB)
+    // Migration: Add columns if they don't exist
     try {
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0`);
@@ -107,10 +108,14 @@ const initDb = async () => {
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_end_time BIGINT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS colors TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS variants TEXT`); // NEW
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS issue_date TEXT`);
+        // New Inventory Columns
+        await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
+        await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
     } catch (err) {
         console.log("Migration notice (ignore if columns exist):", err.message);
     }
@@ -124,7 +129,9 @@ const initDb = async () => {
         type VARCHAR(20),
         quantity INTEGER,
         timestamp BIGINT,
-        note TEXT
+        note TEXT,
+        selected_size VARCHAR(50),
+        selected_color VARCHAR(50)
       );
     `);
 
@@ -172,7 +179,8 @@ app.get('/api/products', async (req, res) => {
       flashSaleStartTime: r.flash_sale_start_time ? parseInt(r.flash_sale_start_time) : undefined,
       flashSaleEndTime: r.flash_sale_end_time ? parseInt(r.flash_sale_end_time) : undefined,
       sizes: r.sizes ? r.sizes.split(',') : [],
-      colors: r.colors ? r.colors.split(',') : []
+      colors: r.colors ? r.colors.split(',') : [],
+      variants: r.variants ? JSON.parse(r.variants) : [] // Parse variants
     }));
     res.json(products);
   } catch (err) { res.status(500).send(err.message); }
@@ -182,36 +190,70 @@ app.post('/api/products/sync', async (req, res) => {
   const p = req.body;
   const sizesStr = p.sizes ? p.sizes.join(',') : '';
   const colorsStr = p.colors ? p.colors.join(',') : '';
+  const variantsStr = p.variants ? JSON.stringify(p.variants) : '[]';
+
   try {
     await pool.query(
-      `INSERT INTO products (id, name, price, import_price, description, image_url, stock, sku, category, brand, status, is_flash_sale, sale_price, flash_sale_start_time, flash_sale_end_time, sizes, colors)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      `INSERT INTO products (id, name, price, import_price, description, image_url, stock, sku, category, brand, status, is_flash_sale, sale_price, flash_sale_start_time, flash_sale_end_time, sizes, colors, variants)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        ON CONFLICT (id) DO UPDATE SET 
          name = EXCLUDED.name, price = EXCLUDED.price, import_price = EXCLUDED.import_price, 
          description = EXCLUDED.description, image_url = EXCLUDED.image_url, stock = EXCLUDED.stock,
          sku = EXCLUDED.sku, category = EXCLUDED.category, brand = EXCLUDED.brand, status = EXCLUDED.status,
          is_flash_sale = EXCLUDED.is_flash_sale, sale_price = EXCLUDED.sale_price,
          flash_sale_start_time = EXCLUDED.flash_sale_start_time, flash_sale_end_time = EXCLUDED.flash_sale_end_time,
-         sizes = EXCLUDED.sizes, colors = EXCLUDED.colors`,
-      [p.id, p.name, p.price, p.importPrice, p.description, p.imageUrl, p.stock, p.sku, p.category, p.brand, p.status, p.isFlashSale, p.salePrice, p.flashSaleStartTime, p.flashSaleEndTime, sizesStr, colorsStr]
+         sizes = EXCLUDED.sizes, colors = EXCLUDED.colors, variants = EXCLUDED.variants`,
+      [p.id, p.name, p.price, p.importPrice, p.description, p.imageUrl, p.stock, p.sku, p.category, p.brand, p.status, p.isFlashSale, p.salePrice, p.flashSaleStartTime, p.flashSaleEndTime, sizesStr, colorsStr, variantsStr]
     );
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ success: false }); }
 });
 
-// Atomic Stock Update
+// Atomic Stock Update (Handling Variants)
 app.post('/api/products/stock', async (req, res) => {
-    const { id, quantityChange } = req.body;
+    const { id, quantityChange, size, color } = req.body;
     try {
-        const result = await pool.query(
-            `UPDATE products SET stock = stock + $1 WHERE id = $2 RETURNING stock`,
-            [quantityChange, id]
-        );
-        if (result.rows.length > 0) {
-            res.json({ success: true, newStock: result.rows[0].stock });
-        } else {
-            res.status(404).json({ success: false, message: 'Product not found' });
+        // 1. Fetch current product
+        const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
         }
+        
+        const product = result.rows[0];
+        let newTotalStock = product.stock + quantityChange;
+        let variants = product.variants ? JSON.parse(product.variants) : [];
+
+        // 2. If specific variant is provided, update it
+        if (size || color) {
+            const variantIndex = variants.findIndex((v) => 
+                (v.size === size || (!v.size && !size)) && 
+                (v.color === color || (!v.color && !color))
+            );
+
+            if (variantIndex !== -1) {
+                // Update existing variant
+                variants[variantIndex].stock = Math.max(0, variants[variantIndex].stock + quantityChange);
+            } else if (quantityChange > 0) {
+                // Add new variant if receiving stock (and it didn't exist)
+                // For simplicity, we create it.
+                variants.push({ size: size || '', color: color || '', stock: quantityChange });
+            } else {
+               // Reducing stock of non-existent variant? Ignore or error.
+            }
+            
+            // Recalculate total stock from variants if they exist
+            if (variants.length > 0) {
+                newTotalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+            }
+        }
+
+        // 3. Update DB
+        const updateResult = await pool.query(
+            `UPDATE products SET stock = $1, variants = $2 WHERE id = $3 RETURNING stock`,
+            [newTotalStock, JSON.stringify(variants), id]
+        );
+
+        res.json({ success: true, newStock: updateResult.rows[0].stock, variants });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false });
@@ -324,7 +366,9 @@ app.get('/api/inventory', async (req, res) => {
     const result = await pool.query('SELECT * FROM inventory_transactions ORDER BY timestamp DESC');
     const transactions = result.rows.map(r => ({
       id: r.id, productId: parseInt(r.product_id), productName: r.product_name,
-      type: r.type, quantity: r.quantity, timestamp: parseInt(r.timestamp), note: r.note
+      type: r.type, quantity: r.quantity, timestamp: parseInt(r.timestamp), note: r.note,
+      selectedSize: r.selected_size,
+      selectedColor: r.selected_color
     }));
     res.json(transactions);
   } catch (err) { res.status(500).send(err.message); }
@@ -334,10 +378,10 @@ app.post('/api/inventory/sync', async (req, res) => {
   const t = req.body;
   try {
     await pool.query(
-      `INSERT INTO inventory_transactions (id, product_id, product_name, type, quantity, timestamp, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO inventory_transactions (id, product_id, product_name, type, quantity, timestamp, note, selected_size, selected_color)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO NOTHING`,
-      [t.id, t.productId, t.productName, t.type, t.quantity, t.timestamp, t.note]
+      [t.id, t.productId, t.productName, t.type, t.quantity, t.timestamp, t.note, t.selectedSize, t.selectedColor]
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false }); }

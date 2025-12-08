@@ -47,8 +47,18 @@ export const createOrder = (
     color?: string // NEW Param
 ): { success: boolean; message: string; order?: Order } => {
     
-    if (product.stock < quantity) {
-        return { success: false, message: `Xin lỗi, chỉ còn lại ${product.stock} sản phẩm trong kho.` };
+    // Check stock for specific variant
+    let stockAvailable = product.stock;
+    if (product.variants && (size || color)) {
+        const v = product.variants.find(v => 
+            (v.size === size || (!v.size && !size)) && 
+            (v.color === color || (!v.color && !color))
+        );
+        stockAvailable = v ? v.stock : 0;
+    }
+
+    if (stockAvailable < quantity) {
+        return { success: false, message: `Xin lỗi, phân loại này chỉ còn lại ${stockAvailable} sản phẩm.` };
     }
 
     const pricePerUnit = parsePrice(product.price);
@@ -73,7 +83,7 @@ export const createOrder = (
         paymentMethod: paymentMethod
     };
 
-    const stockUpdated = updateProductStock(product.id, -quantity);
+    const stockUpdated = updateProductStock(product.id, -quantity, size, color);
     if (!stockUpdated) {
         return { success: false, message: 'Lỗi cập nhật tồn kho. Vui lòng thử lại.' };
     }

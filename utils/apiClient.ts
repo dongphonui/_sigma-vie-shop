@@ -30,12 +30,12 @@ const syncData = async (endpoint: string, data: any) => {
 };
 
 // Hàm cập nhật kho Atomic (Cộng dồn trực tiếp trên DB)
-export const updateProductStockInDB = async (id: number, quantityChange: number) => {
+export const updateProductStockInDB = async (id: number, quantityChange: number, size?: string, color?: string) => {
   try {
     const res = await fetch(`${API_BASE_URL}/products/stock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, quantityChange })
+      body: JSON.stringify({ id, quantityChange, size, color })
     });
     return await res.json();
   } catch (error) {

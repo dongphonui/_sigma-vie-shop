@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, ShippingSettings, StoreSettings } from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -22,8 +22,6 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { getShippingSettings, updateShippingSettings } from '../utils/shippingSettingsStorage';
-import { getStoreSettings } from '../utils/storeSettingsStorage';
 import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 
@@ -222,6 +220,9 @@ const AdminPage: React.FC = () => {
   const [inventoryFeedback, setInventoryFeedback] = useState('');
   const [inventoryView, setInventoryView] = useState<'stock' | 'history'>('stock');
   const [inventorySearch, setInventorySearch] = useState('');
+  // New Inventory State
+  const [inventorySize, setInventorySize] = useState(''); 
+  const [inventoryColor, setInventoryColor] = useState(''); 
 
   // Dashboard State
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -643,24 +644,50 @@ const AdminPage: React.FC = () => {
         setInventoryFeedback('Số lượng phải lớn hơn 0.');
         return;
     }
+    
+    // Check if product requires size/color
+    if (product.sizes && product.sizes.length > 0 && !inventorySize) {
+        setInventoryFeedback('Vui lòng chọn Size cho sản phẩm này.');
+        return;
+    }
+    if (product.colors && product.colors.length > 0 && !inventoryColor) {
+        setInventoryFeedback('Vui lòng chọn Màu cho sản phẩm này.');
+        return;
+    }
 
     const change = inventoryType === 'IMPORT' ? qty : -qty;
     
-    // Check for stock availability on export
-    if (inventoryType === 'EXPORT' && product.stock < qty) {
-         setInventoryFeedback(`Lỗi: Tồn kho hiện tại (${product.stock}) không đủ để xuất ${qty}.`);
+    // Check for stock availability on export (Variant Aware)
+    let currentStock = product.stock;
+    if (inventorySize || inventoryColor) {
+        const variant = product.variants?.find(v => 
+            (v.size === inventorySize || (!v.size && !inventorySize)) && 
+            (v.color === inventoryColor || (!v.color && !inventoryColor))
+        );
+        currentStock = variant ? variant.stock : 0;
+    }
+
+    if (inventoryType === 'EXPORT' && currentStock < qty) {
+         setInventoryFeedback(`Lỗi: Tồn kho hiện tại (${currentStock}) không đủ để xuất ${qty}.`);
          return;
     }
 
-    const success = updateProductStock(productId, change);
+    // Update with size/color
+    const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
+        let noteDetails = inventoryNote;
+        if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
+        if(inventoryColor) noteDetails += ` [Màu: ${inventoryColor}]`;
+
         addTransaction({
             productId,
             productName: product.name,
             type: inventoryType,
             quantity: qty,
-            note: inventoryNote
+            note: noteDetails,
+            selectedSize: inventorySize,
+            selectedColor: inventoryColor
         });
         
         refreshProducts();
@@ -1440,7 +1467,11 @@ const AdminPage: React.FC = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Chọn sản phẩm</label>
                             <select 
                                 value={selectedProductForInventory} 
-                                onChange={(e) => setSelectedProductForInventory(e.target.value)}
+                                onChange={(e) => {
+                                    setSelectedProductForInventory(e.target.value);
+                                    setInventorySize('');
+                                    setInventoryColor('');
+                                }}
                                 className="w-full border rounded px-3 py-2"
                                 required
                             >
@@ -1450,6 +1481,45 @@ const AdminPage: React.FC = () => {
                                 ))}
                             </select>
                         </div>
+
+                        {/* Dynamic Size/Color Selectors */}
+                        {selectedProductForInventory && (() => {
+                            const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
+                            if (!p) return null;
+                            return (
+                                <div className="grid grid-cols-2 gap-4">
+                                    {p.sizes && p.sizes.length > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước</label>
+                                            <select 
+                                                value={inventorySize} 
+                                                onChange={(e) => setInventorySize(e.target.value)} 
+                                                className="w-full border rounded px-3 py-2"
+                                                required
+                                            >
+                                                <option value="">-- Chọn Size --</option>
+                                                {p.sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {p.colors && p.colors.length > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc</label>
+                                            <select 
+                                                value={inventoryColor} 
+                                                onChange={(e) => setInventoryColor(e.target.value)} 
+                                                className="w-full border rounded px-3 py-2"
+                                                required
+                                            >
+                                                <option value="">-- Chọn Màu --</option>
+                                                {p.colors.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
                         <div className="grid grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Loại giao dịch</label>
@@ -1483,6 +1553,31 @@ const AdminPage: React.FC = () => {
                                 rows={2}
                             />
                         </div>
+                        
+                        {/* Stock Display Helper */}
+                        {selectedProductForInventory && (
+                             <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                                 {(() => {
+                                     const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
+                                     if (!p) return null;
+                                     
+                                     let stockDisplay = p.stock;
+                                     let label = 'Tổng tồn kho';
+                                     
+                                     if (inventorySize || inventoryColor) {
+                                         const v = p.variants?.find(v => 
+                                            (v.size === inventorySize || (!v.size && !inventorySize)) && 
+                                            (v.color === inventoryColor || (!v.color && !inventoryColor))
+                                         );
+                                         stockDisplay = v ? v.stock : 0;
+                                         label = `Tồn kho chi tiết`;
+                                     }
+                                     
+                                     return <span><strong>{label}:</strong> {stockDisplay}</span>;
+                                 })()}
+                             </div>
+                        )}
+
                         <button type="submit" className="w-full bg-[#00695C] text-white py-2 rounded font-bold hover:bg-[#004d40]">
                             Thực hiện
                         </button>
@@ -1509,6 +1604,7 @@ const AdminPage: React.FC = () => {
                             <tr>
                                 <th className="px-4 py-3">Thời gian</th>
                                 <th className="px-4 py-3">Sản phẩm</th>
+                                <th className="px-4 py-3">Phân loại</th>
                                 <th className="px-4 py-3">Loại</th>
                                 <th className="px-4 py-3">Số lượng</th>
                                 <th className="px-4 py-3">Ghi chú</th>
@@ -1521,6 +1617,11 @@ const AdminPage: React.FC = () => {
                                 <tr key={t.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
                                     <td className="px-4 py-3 font-medium text-gray-900">{t.productName}</td>
+                                    <td className="px-4 py-3">
+                                        {t.selectedSize && <span className="mr-2 text-xs bg-gray-100 px-1 rounded">Size: {t.selectedSize}</span>}
+                                        {t.selectedColor && <span className="text-xs bg-gray-100 px-1 rounded">Màu: {t.selectedColor}</span>}
+                                        {!t.selectedSize && !t.selectedColor && '-'}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'IMPORT' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
                                             {t.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}
