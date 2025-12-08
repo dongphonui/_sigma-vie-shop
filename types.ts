@@ -16,11 +16,15 @@ export interface Product {
   category: string;
   brand: string;
   status: 'active' | 'draft' | 'archived';
+  sizes?: string[]; // NEW: Danh sách size (VD: ['S', 'M', 'L'])
+  colors?: string[]; // NEW: Danh sách màu (VD: ['Đen', 'Trắng'])
 }
 
 export interface CartItem extends Product {
   quantity: number;
   selectedPrice: number; // The price at the time of adding (sale or regular)
+  selectedSize?: string; // NEW: Size khách chọn
+  selectedColor?: string; // NEW: Màu khách chọn
 }
 
 export interface Category {
@@ -61,6 +65,8 @@ export interface Order {
   customerAddress: string;
   productId: number;
   productName: string;
+  productSize?: string; // NEW: Size khách chọn
+  productColor?: string; // NEW: Màu khách chọn
   quantity: number;
   totalPrice: number; // Tổng tiền (đã bao gồm ship)
   shippingFee?: number; // NEW: Phí vận chuyển

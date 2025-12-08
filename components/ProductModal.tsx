@@ -61,6 +61,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   
   // Order Logic State
   const [quantity, setQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState<string>(''); // NEW STATE
+  const [selectedColor, setSelectedColor] = useState<string>(''); // NEW STATE
   const [orderStatus, setOrderStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS'>('IDLE');
   const [feedbackMsg, setFeedbackMsg] = useState('');
   
@@ -105,7 +107,21 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
           onOpenAuth();
           return;
       }
-      addToCart(product, quantity);
+      
+      // Validate
+      if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+          setFeedbackMsg('Vui lòng chọn Size.');
+          setTimeout(() => setFeedbackMsg(''), 2000);
+          return;
+      }
+      if (product.colors && product.colors.length > 0 && !selectedColor) {
+          setFeedbackMsg('Vui lòng chọn Màu sắc.');
+          setTimeout(() => setFeedbackMsg(''), 2000);
+          return;
+      }
+
+      addToCart(product, quantity, selectedSize, selectedColor);
+      
       setFeedbackMsg('Đã thêm vào giỏ hàng!');
       setTimeout(() => setFeedbackMsg(''), 2000);
   };
@@ -118,6 +134,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       const customer = getCurrentCustomer();
       if (!customer) {
           onOpenAuth();
+          return;
+      }
+      
+      // Validate
+      if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+          setFeedbackMsg('Vui lòng chọn Size.');
+          setTimeout(() => setFeedbackMsg(''), 2000);
+          return;
+      }
+      if (product.colors && product.colors.length > 0 && !selectedColor) {
+          setFeedbackMsg('Vui lòng chọn Màu sắc.');
+          setTimeout(() => setFeedbackMsg(''), 2000);
           return;
       }
 
@@ -133,7 +161,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       const subtotal = pricePerUnit * quantity;
       const shippingFee = calculateShippingFee(subtotal);
 
-      const result = createOrder(customer, productForOrder, quantity, paymentMethod, shippingFee);
+      // Pass selectedSize and selectedColor
+      const result = createOrder(customer, productForOrder, quantity, paymentMethod, shippingFee, selectedSize, selectedColor);
 
       if (result.success && result.order) {
           setCreatedOrder(result.order);
@@ -195,6 +224,42 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       return (
         <div className="py-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Mua Sản Phẩm</h3>
+            
+            {/* Size Selector */}
+            {product.sizes && product.sizes.length > 0 && (
+                <div className="mb-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2 text-left">Chọn Kích thước:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {product.sizes.map(size => (
+                            <button
+                                key={size}
+                                onClick={() => setSelectedSize(size)}
+                                className={`min-w-[40px] px-3 py-2 rounded border font-medium text-sm transition-colors ${selectedSize === size ? 'bg-[#00695C] text-white border-[#00695C]' : 'bg-white text-gray-700 border-gray-300 hover:border-[#00695C]'}`}
+                            >
+                                {size}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Color Selector */}
+            {product.colors && product.colors.length > 0 && (
+                <div className="mb-6">
+                    <p className="text-sm font-medium text-gray-700 mb-2 text-left">Chọn Màu sắc:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {product.colors.map(color => (
+                            <button
+                                key={color}
+                                onClick={() => setSelectedColor(color)}
+                                className={`px-3 py-2 rounded border font-medium text-sm transition-colors ${selectedColor === color ? 'bg-[#00695C] text-white border-[#00695C]' : 'bg-white text-gray-700 border-gray-300 hover:border-[#00695C]'}`}
+                            >
+                                {color}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
             
             {/* Quantity Selector */}
             <div className="flex items-center justify-center gap-4 mb-2">

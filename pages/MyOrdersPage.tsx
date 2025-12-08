@@ -74,7 +74,15 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                                         </div>
                                         <div className="flex-1">
                                             <h4 className="font-bold text-gray-800">{order.productName}</h4>
-                                            <p className="text-sm text-gray-600">Số lượng: x{order.quantity}</p>
+                                            <div className="flex gap-2 mt-1">
+                                                {order.productSize && (
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Size: {order.productSize}</span>
+                                                )}
+                                                {order.productColor && (
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Màu: {order.productColor}</span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-600 mt-1">Số lượng: x{order.quantity}</p>
                                         </div>
                                     </div>
                                     

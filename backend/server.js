@@ -42,7 +42,9 @@ const initDb = async () => {
         is_flash_sale BOOLEAN DEFAULT FALSE,
         sale_price TEXT,
         flash_sale_start_time BIGINT,
-        flash_sale_end_time BIGINT
+        flash_sale_end_time BIGINT,
+        sizes TEXT,
+        colors TEXT
       );
     `);
 
@@ -87,7 +89,9 @@ const initDb = async () => {
         shipping_fee NUMERIC DEFAULT 0,
         status VARCHAR(50),
         timestamp BIGINT,
-        payment_method VARCHAR(50)
+        payment_method VARCHAR(50),
+        product_size VARCHAR(50),
+        product_color VARCHAR(50)
       );
     `);
     
@@ -95,10 +99,14 @@ const initDb = async () => {
     try {
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0`);
+        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_size VARCHAR(50)`);
+        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_color VARCHAR(50)`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_flash_sale BOOLEAN DEFAULT FALSE`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_price TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_start_time BIGINT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_end_time BIGINT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS colors TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob TEXT`);
@@ -162,7 +170,9 @@ app.get('/api/products', async (req, res) => {
       isFlashSale: r.is_flash_sale,
       salePrice: r.sale_price,
       flashSaleStartTime: r.flash_sale_start_time ? parseInt(r.flash_sale_start_time) : undefined,
-      flashSaleEndTime: r.flash_sale_end_time ? parseInt(r.flash_sale_end_time) : undefined
+      flashSaleEndTime: r.flash_sale_end_time ? parseInt(r.flash_sale_end_time) : undefined,
+      sizes: r.sizes ? r.sizes.split(',') : [],
+      colors: r.colors ? r.colors.split(',') : []
     }));
     res.json(products);
   } catch (err) { res.status(500).send(err.message); }
@@ -170,17 +180,20 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products/sync', async (req, res) => {
   const p = req.body;
+  const sizesStr = p.sizes ? p.sizes.join(',') : '';
+  const colorsStr = p.colors ? p.colors.join(',') : '';
   try {
     await pool.query(
-      `INSERT INTO products (id, name, price, import_price, description, image_url, stock, sku, category, brand, status, is_flash_sale, sale_price, flash_sale_start_time, flash_sale_end_time)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      `INSERT INTO products (id, name, price, import_price, description, image_url, stock, sku, category, brand, status, is_flash_sale, sale_price, flash_sale_start_time, flash_sale_end_time, sizes, colors)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        ON CONFLICT (id) DO UPDATE SET 
          name = EXCLUDED.name, price = EXCLUDED.price, import_price = EXCLUDED.import_price, 
          description = EXCLUDED.description, image_url = EXCLUDED.image_url, stock = EXCLUDED.stock,
          sku = EXCLUDED.sku, category = EXCLUDED.category, brand = EXCLUDED.brand, status = EXCLUDED.status,
          is_flash_sale = EXCLUDED.is_flash_sale, sale_price = EXCLUDED.sale_price,
-         flash_sale_start_time = EXCLUDED.flash_sale_start_time, flash_sale_end_time = EXCLUDED.flash_sale_end_time`,
-      [p.id, p.name, p.price, p.importPrice, p.description, p.imageUrl, p.stock, p.sku, p.category, p.brand, p.status, p.isFlashSale, p.salePrice, p.flashSaleStartTime, p.flashSaleEndTime]
+         flash_sale_start_time = EXCLUDED.flash_sale_start_time, flash_sale_end_time = EXCLUDED.flash_sale_end_time,
+         sizes = EXCLUDED.sizes, colors = EXCLUDED.colors`,
+      [p.id, p.name, p.price, p.importPrice, p.description, p.imageUrl, p.stock, p.sku, p.category, p.brand, p.status, p.isFlashSale, p.salePrice, p.flashSaleStartTime, p.flashSaleEndTime, sizesStr, colorsStr]
     );
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ success: false }); }
@@ -232,7 +245,7 @@ app.get('/api/customers', async (req, res) => {
     const customers = result.rows.map(r => ({
       id: r.id, fullName: r.full_name, email: r.email, phoneNumber: r.phone_number,
       address: r.address, passwordHash: r.password_hash, createdAt: parseInt(r.created_at),
-      cccdNumber: r.cccd_number, gender: r.gender, dob: r.dob, issueDate: r.issue_date
+      cccd_number: r.cccd_number, gender: r.gender, dob: r.dob, issueDate: r.issue_date
     }));
     res.json(customers);
   } catch (err) { res.status(500).send(err.message); }
@@ -283,6 +296,8 @@ app.get('/api/orders', async (req, res) => {
         productId: parseInt(r.product_id), productName: r.product_name, quantity: r.quantity,
         totalPrice: parseFloat(r.total_price),
         shippingFee: parseFloat(r.shipping_fee || 0),
+        productSize: r.product_size,
+        productColor: r.product_color,
         status: r.status, timestamp: parseInt(r.timestamp),
         paymentMethod: r.payment_method
     }));
@@ -294,10 +309,10 @@ app.post('/api/orders/sync', async (req, res) => {
   const o = req.body;
   try {
     await pool.query(
-      `INSERT INTO orders (id, customer_id, customer_name, customer_contact, customer_address, product_id, product_name, quantity, total_price, status, timestamp, payment_method, shipping_fee)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-       ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payment_method = EXCLUDED.payment_method, shipping_fee = EXCLUDED.shipping_fee`,
-      [o.id, o.customerId, o.customerName, o.customerContact, o.customerAddress, o.productId, o.productName, o.quantity, o.totalPrice, o.status, o.timestamp, o.paymentMethod, o.shippingFee || 0]
+      `INSERT INTO orders (id, customer_id, customer_name, customer_contact, customer_address, product_id, product_name, quantity, total_price, status, timestamp, payment_method, shipping_fee, product_size, product_color)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payment_method = EXCLUDED.payment_method, shipping_fee = EXCLUDED.shipping_fee, product_size = EXCLUDED.product_size, product_color = EXCLUDED.product_color`,
+      [o.id, o.customerId, o.customerName, o.customerContact, o.customerAddress, o.productId, o.productName, o.quantity, o.totalPrice, o.status, o.timestamp, o.paymentMethod, o.shippingFee || 0, o.productSize, o.productColor]
     );
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ success: false }); }

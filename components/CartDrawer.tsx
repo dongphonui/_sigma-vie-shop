@@ -61,21 +61,23 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
       const createdOrders = [];
-
-      // Logic Split Order: Since current backend structure stores 1 item per Order record
-      // We need to decide how to apply shipping fee.
-      // Solution: Apply FULL shipping fee to the FIRST item, and 0 for others in this batch.
       
       let isFirstItem = true;
 
       for (const item of items) {
           const feeForItem = isFirstItem ? shippingFee : 0;
-          const result = createOrder(currentUser, item, item.quantity, paymentMethod, feeForItem);
+          // Pass selectedSize and selectedColor to createOrder
+          const result = createOrder(currentUser, item, item.quantity, paymentMethod, feeForItem, item.selectedSize, item.selectedColor);
           
           if (result.success && result.order) {
-              successfulOrders.push(`${item.name} (x${item.quantity})`);
+              const variants = [];
+              if(item.selectedSize) variants.push(item.selectedSize);
+              if(item.selectedColor) variants.push(item.selectedColor);
+              const variantStr = variants.length > 0 ? `(${variants.join(', ')})` : '';
+
+              successfulOrders.push(`${item.name} ${variantStr} (x${item.quantity})`);
               createdOrders.push(result.order);
-              isFirstItem = false; // Only charge once
+              isFirstItem = false; // Only charge shipping once
           } else {
               failedItems.push(item.name);
           }
@@ -85,7 +87,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
           // If Bank Transfer, show Modal for the total amount
           if (paymentMethod === 'BANK_TRANSFER') {
               // Show QR with info of first order ID but TOTAL Amount
-              setLastOrderId(createdOrders[0].id + (createdOrders.length > 1 ? '...' : ''));
+              setLastOrderId(createdOrders[0].id + (createdOrders.length > 1 ? '-COMBINED' : ''));
               setShowQrModal(true);
           } else {
               // COD
@@ -168,27 +170,35 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                 </div>
             ) : (
                 items.map(item => (
-                    <div key={item.id} className="flex gap-4 border-b border-gray-100 pb-4 animate-fade-in-up">
+                    <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-4 border-b border-gray-100 pb-4 animate-fade-in-up">
                         <div className="w-20 h-24 flex-shrink-0 rounded-md overflow-hidden border border-gray-200">
                             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 flex flex-col justify-between">
                             <div>
                                 <h3 className="font-medium text-gray-800 line-clamp-2 text-sm">{item.name}</h3>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {item.selectedSize && (
+                                        <span className="text-xs text-gray-500 bg-gray-100 px-1.5 rounded">Size: {item.selectedSize}</span>
+                                    )}
+                                    {item.selectedColor && (
+                                        <span className="text-xs text-gray-500 bg-gray-100 px-1.5 rounded">Màu: {item.selectedColor}</span>
+                                    )}
+                                </div>
                                 <p className="text-[#00695C] font-bold text-sm mt-1">{formatPrice(item.selectedPrice)}</p>
                                 <p className="text-xs text-gray-400 mt-0.5">Kho: {item.stock}</p>
                             </div>
                             <div className="flex justify-between items-center mt-2">
                                 <div className="flex items-center border border-gray-300 rounded">
                                     <button 
-                                        onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                                        onClick={() => updateCartQuantity(item.id, item.quantity - 1, item.selectedSize, item.selectedColor)}
                                         className="px-2 py-0.5 text-gray-600 hover:bg-gray-100"
                                     >
                                         -
                                     </button>
                                     <span className="px-2 text-sm font-medium">{item.quantity}</span>
                                     <button 
-                                        onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                                        onClick={() => updateCartQuantity(item.id, item.quantity + 1, item.selectedSize, item.selectedColor)}
                                         className="px-2 py-0.5 text-gray-600 hover:bg-gray-100"
                                         disabled={item.quantity >= item.stock}
                                     >
@@ -196,7 +206,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                                     </button>
                                 </div>
                                 <button 
-                                    onClick={() => removeFromCart(item.id)}
+                                    onClick={() => removeFromCart(item.id, item.selectedSize, item.selectedColor)}
                                     className="text-gray-400 hover:text-red-500 transition-colors"
                                     title="Xóa"
                                 >

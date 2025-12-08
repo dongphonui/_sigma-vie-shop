@@ -42,7 +42,9 @@ export const createOrder = (
     product: Product,
     quantity: number,
     paymentMethod: 'COD' | 'BANK_TRANSFER' = 'COD',
-    shippingFee: number = 0 // NEW Parameter
+    shippingFee: number = 0,
+    size?: string, // NEW Param
+    color?: string // NEW Param
 ): { success: boolean; message: string; order?: Order } => {
     
     if (product.stock < quantity) {
@@ -51,7 +53,7 @@ export const createOrder = (
 
     const pricePerUnit = parsePrice(product.price);
     const subtotal = pricePerUnit * quantity;
-    const finalTotal = subtotal + shippingFee; // Total includes shipping
+    const finalTotal = subtotal + shippingFee; 
 
     const newOrder: Order = {
         id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -61,9 +63,11 @@ export const createOrder = (
         customerAddress: customer.address || 'Chưa cung cấp',
         productId: product.id,
         productName: product.name,
+        productSize: size, 
+        productColor: color, // Save Color
         quantity: quantity,
-        totalPrice: finalTotal, // Save Final Total
-        shippingFee: shippingFee, // Save Fee info
+        totalPrice: finalTotal, 
+        shippingFee: shippingFee,
         status: 'PENDING',
         timestamp: Date.now(),
         paymentMethod: paymentMethod
@@ -77,12 +81,17 @@ export const createOrder = (
     const orders = getOrders();
     localStorage.setItem(STORAGE_KEY, JSON.stringify([newOrder, ...orders]));
 
-    // Sync to DB
     syncOrderToDB(newOrder);
+
+    // Update Transaction Note
+    const variantInfo = [];
+    if(size) variantInfo.push(`Size: ${size}`);
+    if(color) variantInfo.push(`Màu: ${color}`);
+    const variantStr = variantInfo.length > 0 ? ` (${variantInfo.join(', ')})` : '';
 
     addTransaction({
         productId: product.id,
-        productName: product.name,
+        productName: product.name + variantStr,
         type: 'EXPORT',
         quantity: quantity,
         note: `Đơn hàng trực tuyến từ ${customer.fullName} (${newOrder.id}) [${paymentMethod}]`
@@ -98,7 +107,6 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
         const order = orders[index];
         const oldStatus = order.status;
 
-        // LOGIC MỚI: HOÀN TRẢ KHO KHI HỦY ĐƠN
         if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
             const pid = Number(order.productId);
             const qty = Number(order.quantity);
@@ -106,7 +114,6 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
             const success = updateProductStock(pid, qty);
             
             if (success) {
-                // Ghi lại lịch sử giao dịch là NHẬP KHO (Hoàn trả)
                 addTransaction({
                     productId: pid,
                     productName: order.productName,

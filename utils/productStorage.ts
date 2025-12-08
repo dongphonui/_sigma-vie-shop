@@ -22,19 +22,14 @@ export const getProducts = (): Product[] => {
     }
 
     // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API ngầm
-    // Cải tiến: Thêm timeout nhỏ để tránh conflict nếu vừa load trang
     if (!hasLoadedFromDB) {
       setTimeout(() => {
         fetchProductsFromDB().then(dbProducts => {
           if (dbProducts && dbProducts.length > 0) {
             console.log('Đã tải dữ liệu từ Postgres thành công!');
-            // Ghi đè LocalStorage bằng dữ liệu thật từ DB
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
-            
-            // QUAN TRỌNG: Phát tín hiệu để UI cập nhật lại
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           } else {
-             // Even if empty or failed, dispatch event to signal loading attempt finished
              window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
         });
@@ -54,6 +49,8 @@ export const getProducts = (): Product[] => {
         salePrice: p.salePrice || undefined,
         flashSaleStartTime: p.flashSaleStartTime || undefined,
         flashSaleEndTime: p.flashSaleEndTime || undefined,
+        sizes: p.sizes || [], // Ensure sizes is an array
+        colors: p.colors || [] // Ensure colors is an array
     }));
 
   } catch (error) {
@@ -76,7 +73,9 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
     isFlashSale: product.isFlashSale || false,
     salePrice: product.salePrice,
     flashSaleStartTime: product.flashSaleStartTime,
-    flashSaleEndTime: product.flashSaleEndTime
+    flashSaleEndTime: product.flashSaleEndTime,
+    sizes: product.sizes || [],
+    colors: product.colors || []
   };
   
   const updatedProducts = [newProduct, ...products];
@@ -121,8 +120,7 @@ export const updateProductStock = (id: number, quantityChange: number): boolean 
     products[productIndex].stock = newStock;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
-    // 2. Cập nhật Atomic lên Server (Quan trọng: Gửi +10, -5 chứ không gửi số tổng)
-    // Điều này giúp tránh việc ghi đè sai dữ liệu khi thao tác nhanh
+    // 2. Cập nhật Atomic lên Server
     updateProductStockInDB(id, quantityChange).then(response => {
         if (response && response.success) {
             console.log(`Đã cập nhật kho an toàn trên server. Tồn kho mới: ${response.newStock}`);

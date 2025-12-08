@@ -1,15 +1,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  AreaChart, Area
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { 
-    Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, 
-    InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, 
-    BankSettings, ShippingSettings, StoreSettings 
-} from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, ShippingSettings, StoreSettings } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -152,7 +148,10 @@ const AdminPage: React.FC = () => {
   const [newProductSalePrice, setNewProductSalePrice] = useState('');
   const [newProductFlashSaleStartTime, setNewProductFlashSaleStartTime] = useState('');
   const [newProductFlashSaleEndTime, setNewProductFlashSaleEndTime] = useState('');
-
+  
+  // New States for Sizes and Colors
+  const [newProductSizes, setNewProductSizes] = useState(''); 
+  const [newProductColors, setNewProductColors] = useState('');
 
   // Product Filter State
   const [productSearch, setProductSearch] = useState('');
@@ -194,9 +193,6 @@ const AdminPage: React.FC = () => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
-  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
-  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
-
   
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
@@ -257,8 +253,6 @@ const AdminPage: React.FC = () => {
     setSocialSettings(getSocialSettings());
     setTotpEnabled(isTotpEnabled());
     setBankSettings(getBankSettings());
-    setShippingSettings(getShippingSettings());
-    setStoreSettings(getStoreSettings());
     
     // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
@@ -346,6 +340,8 @@ const AdminPage: React.FC = () => {
       setNewProductImage(product.imageUrl);
       setNewProductIsFlashSale(product.isFlashSale || false);
       setNewProductSalePrice(product.salePrice || '');
+      setNewProductSizes(product.sizes ? product.sizes.join(', ') : ''); // Load sizes
+      setNewProductColors(product.colors ? product.colors.join(', ') : ''); // Load colors
       
       setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
       setNewProductFlashSaleEndTime(product.flashSaleEndTime ? toLocalISOString(new Date(product.flashSaleEndTime)) : '');
@@ -367,6 +363,8 @@ const AdminPage: React.FC = () => {
       setNewProductSalePrice('');
       setNewProductFlashSaleStartTime('');
       setNewProductFlashSaleEndTime('');
+      setNewProductSizes(''); 
+      setNewProductColors('');
   };
 
   const handleCancelProductEdit = () => {
@@ -401,6 +399,8 @@ const AdminPage: React.FC = () => {
       salePrice: newProductSalePrice,
       flashSaleStartTime: newProductFlashSaleStartTime ? new Date(newProductFlashSaleStartTime).getTime() : undefined,
       flashSaleEndTime: newProductFlashSaleEndTime ? new Date(newProductFlashSaleEndTime).getTime() : undefined,
+      sizes: newProductSizes ? newProductSizes.split(',').map(s => s.trim()).filter(s => s) : [],
+      colors: newProductColors ? newProductColors.split(',').map(s => s.trim()).filter(s => s) : []
     };
 
     if (editingProduct) {
@@ -495,34 +495,10 @@ const AdminPage: React.FC = () => {
       refreshInventory(); // Refresh inventory history
   };
 
-  // Shipping Handler
-  const handleShippingSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (shippingSettings) {
-        updateShippingSettings(shippingSettings);
-        setSettingsFeedback('Đã cập nhật phí vận chuyển!');
-        setTimeout(() => setSettingsFeedback(''), 3000);
-    }
-  };
-
   // Printer Handler
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
-
-      const storeName = storeSettings?.name || 'Sigma Vie Store';
-      const storePhone = storeSettings?.phoneNumber || '0912.345.678';
-      const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
-      
-      const linkedCustomer = customers.find(c => c.id === order.customerId);
-      const displayPhone = linkedCustomer?.phoneNumber || order.customerContact;
-
-      const productUrl = `${window.location.origin}?product=${order.productId}`;
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
-
-      // Calculate Subtotal (Total - Ship)
-      const shippingFee = order.shippingFee || 0;
-      const subtotal = order.totalPrice - shippingFee;
 
       const html = `
         <!DOCTYPE html>
@@ -540,10 +516,8 @@ const AdminPage: React.FC = () => {
                 .box h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
                 .order-details { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
                 .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
-                .total-section { text-align: right; margin-top: 20px; font-size: 14px; }
-                .final-total { font-size: 18px; font-weight: bold; margin-top: 5px; }
-                .footer { text-align: center; margin-top: 30px; font-size: 12px; font-style: italic; }
-                .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
+                .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
+                .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
                 
                 @media print {
                     @page { margin: 0.5cm; }
@@ -554,7 +528,7 @@ const AdminPage: React.FC = () => {
         </head>
         <body>
             <div class="header">
-                <h1>${storeName.toUpperCase()}</h1>
+                <h1>SIGMA VIE STORE</h1>
                 <p>Phiếu Giao Hàng / Hóa Đơn</p>
                 <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
             </div>
@@ -562,14 +536,14 @@ const AdminPage: React.FC = () => {
             <div class="info-section">
                 <div class="box">
                     <h3>NGƯỜI GỬI</h3>
-                    <p><strong>${storeName}</strong></p>
-                    <p>SĐT: ${storePhone}</p>
-                    <p>Đ/C: ${storeAddress}</p>
+                    <p><strong>Sigma Vie Store</strong></p>
+                    <p>SĐT: 0912.345.678</p>
+                    <p>Đ/C: Hà Nội, Việt Nam</p>
                 </div>
                 <div class="box">
                     <h3>NGƯỜI NHẬN</h3>
                     <p><strong>${order.customerName}</strong></p>
-                    <p>SĐT: <strong>${displayPhone}</strong></p>
+                    <p>SĐT: <strong>${order.customerContact}</strong></p>
                     <p>Đ/C: ${order.customerAddress}</p>
                 </div>
             </div>
@@ -578,6 +552,7 @@ const AdminPage: React.FC = () => {
                 <thead>
                     <tr>
                         <th>Sản phẩm</th>
+                        <th>Phân loại</th>
                         <th>SL</th>
                         <th>Đơn giá</th>
                         <th>Thành tiền</th>
@@ -586,27 +561,25 @@ const AdminPage: React.FC = () => {
                 <tbody>
                     <tr>
                         <td>${order.productName}</td>
+                        <td>
+                            ${order.productSize ? `Size: ${order.productSize}` : ''} 
+                            ${order.productColor ? ` | Màu: ${order.productColor}` : ''}
+                            ${!order.productSize && !order.productColor ? '-' : ''}
+                        </td>
                         <td>${order.quantity}</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
-                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice / order.quantity)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(order.totalPrice)}đ</td>
                     </tr>
                 </tbody>
             </table>
 
             <div class="total-section">
-                <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
-                <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
-                <p class="final-total">Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
+                <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
                 ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
 
-            <div class="qr-section">
-                <p>Quét mã để mua thêm sản phẩm này:</p>
-                <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
-            </div>
-
             <div class="footer">
-                <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
+                <p>Cảm ơn quý khách đã mua hàng tại Sigma Vie!</p>
                 <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
             </div>
         </body>
@@ -614,9 +587,7 @@ const AdminPage: React.FC = () => {
       `;
       printWindow.document.write(html);
       printWindow.document.close();
-      setTimeout(() => {
-          printWindow.print();
-      }, 500);
+      printWindow.print();
   };
 
   // Customer Handlers
@@ -1139,6 +1110,28 @@ const AdminPage: React.FC = () => {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu</label>
                                     <input type="text" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} className="w-full border rounded px-3 py-2" />
                                 </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước (Size)</label>
+                                        <input 
+                                            type="text" 
+                                            value={newProductSizes} 
+                                            onChange={(e) => setNewProductSizes(e.target.value)} 
+                                            className="w-full border rounded px-3 py-2" 
+                                            placeholder="S, M, L (cách nhau bởi dấu phẩy)" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc (Color)</label>
+                                        <input 
+                                            type="text" 
+                                            value={newProductColors} 
+                                            onChange={(e) => setNewProductColors(e.target.value)} 
+                                            className="w-full border rounded px-3 py-2" 
+                                            placeholder="Đen, Trắng, Đỏ (cách nhau bởi dấu phẩy)" 
+                                        />
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
                                     <select value={newProductStatus} onChange={(e) => setNewProductStatus(e.target.value as any)} className="w-full border rounded px-3 py-2">
@@ -1331,7 +1324,11 @@ const AdminPage: React.FC = () => {
                               </td>
                               <td className="px-4 py-3">
                                   <div>{order.productName}</div>
-                                  <div className="text-xs text-gray-400">x{order.quantity}</div>
+                                  <div className="text-xs text-gray-400">
+                                    x{order.quantity}
+                                    {order.productSize && ` | Size: ${order.productSize}`}
+                                    {order.productColor && ` | Màu: ${order.productColor}`}
+                                  </div>
                               </td>
                               <td className="px-4 py-3 font-bold text-gray-800">
                                   {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice)}
@@ -1858,56 +1855,8 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* Shipping Settings (NEW) */}
-              <div>
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <TruckIcon className="w-5 h-5 text-gray-600" />
-                      Cấu hình Phí vận chuyển
-                  </h4>
-                  {shippingSettings && (
-                      <form onSubmit={handleShippingSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                            <div className="flex items-center gap-2 mb-2">
-                                <input 
-                                    type="checkbox" 
-                                    checked={shippingSettings.enabled}
-                                    onChange={(e) => setShippingSettings({...shippingSettings, enabled: e.target.checked})}
-                                    className="w-4 h-4 text-[#D4AF37] rounded"
-                                />
-                                <label className="text-sm font-bold text-gray-800">Bật tính phí vận chuyển</label>
-                            </div>
-                            {shippingSettings.enabled && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Phí ship cơ bản</label>
-                                        <input 
-                                            type="number" 
-                                            value={shippingSettings.baseFee} 
-                                            onChange={(e) => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})}
-                                            className="mt-1 w-full border rounded px-3 py-2"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Áp dụng cho mọi đơn hàng chưa đạt mức miễn phí.</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Mức miễn phí Ship (Freeship)</label>
-                                        <input 
-                                            type="number" 
-                                            value={shippingSettings.freeShipThreshold} 
-                                            onChange={(e) => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})}
-                                            className="mt-1 w-full border rounded px-3 py-2"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Đơn hàng có giá trị lớn hơn mức này sẽ được Free Ship.</p>
-                                    </div>
-                                </div>
-                            )}
-                            <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
-                                Lưu cấu hình Ship
-                            </button>
-                      </form>
-                  )}
-              </div>
-
               {/* Email Management */}
-              <div className="border-t pt-6">
+              <div>
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
                   <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
                   

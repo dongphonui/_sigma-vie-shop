@@ -30,10 +30,16 @@ const parsePrice = (priceStr: string): number => {
     return parseInt(priceStr.replace(/[^0-9]/g, ''), 10) || 0;
 };
 
-export const addToCart = (product: Product, quantity: number): void => {
+export const addToCart = (product: Product, quantity: number, size?: string, color?: string): void => {
   const key = getStorageKey();
-  const cart = getCart(); // Đã dùng key động bên trong hàm này
-  const existingItemIndex = cart.findIndex(item => item.id === product.id);
+  const cart = getCart();
+  
+  // Find item matching ID AND Size AND Color
+  const existingItemIndex = cart.findIndex(item => 
+      item.id === product.id && 
+      item.selectedSize === size &&
+      item.selectedColor === color
+  );
 
   // Determine effective price
   let price = parsePrice(product.price);
@@ -59,7 +65,9 @@ export const addToCart = (product: Product, quantity: number): void => {
         cart.push({
             ...product,
             quantity,
-            selectedPrice: price
+            selectedPrice: price,
+            selectedSize: size, // Store size
+            selectedColor: color // Store color
         });
     }
   }
@@ -68,10 +76,15 @@ export const addToCart = (product: Product, quantity: number): void => {
   dispatchUpdateEvent();
 };
 
-export const updateCartQuantity = (productId: number, newQuantity: number): void => {
+export const updateCartQuantity = (productId: number, newQuantity: number, size?: string, color?: string): void => {
   const key = getStorageKey();
   const cart = getCart();
-  const index = cart.findIndex(item => item.id === productId);
+  // Match ID + Size + Color
+  const index = cart.findIndex(item => 
+      item.id === productId && 
+      item.selectedSize === size &&
+      item.selectedColor === color
+  );
 
   if (index > -1) {
       if (newQuantity <= 0) {
@@ -89,10 +102,13 @@ export const updateCartQuantity = (productId: number, newQuantity: number): void
   }
 };
 
-export const removeFromCart = (productId: number): void => {
+export const removeFromCart = (productId: number, size?: string, color?: string): void => {
   const key = getStorageKey();
   const cart = getCart();
-  const newCart = cart.filter(item => item.id !== productId);
+  // Filter out the specific item variant
+  const newCart = cart.filter(item => 
+      !(item.id === productId && item.selectedSize === size && item.selectedColor === color)
+  );
   localStorage.setItem(key, JSON.stringify(newCart));
   dispatchUpdateEvent();
 };
