@@ -87,22 +87,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                   (v.size === selectedSize || (!needsSize)) &&
                   (v.color === selectedColor || (!needsColor))
               );
-              // Show variant stock ONLY if we have selected required options
-              // OR allow showing general stock if user hasn't selected yet.
-              // Here, we show specific if selected, otherwise fallback to general stock for UX context.
+              // Show variant stock only if all required options are selected
               if ((!needsSize || selectedSize) && (!needsColor || selectedColor)) {
                   setCurrentStock(variant ? variant.stock : 0);
               } else {
-                  // If not fully selected, show general stock? Or keep 0?
-                  // Showing general stock is usually better to indicate "it's available"
+                  // Fallback to general stock or 0? 
+                  // Better UX: Show total stock of product, or hint to select options
                   setCurrentStock(product.stock); 
               }
           } else {
-              // No variants data but has sizes/colors defined (legacy data?)
               setCurrentStock(product.stock);
           }
       } else {
-          // Simple product
           setCurrentStock(product.stock);
       }
   }, [selectedSize, selectedColor, product]);

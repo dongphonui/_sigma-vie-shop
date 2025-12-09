@@ -10,19 +10,16 @@ let hasLoadedFromDB = false;
 
 export const getProducts = (): Product[] => {
   try {
-    // 1. Lấy từ LocalStorage trước (để hiển thị ngay lập tức)
+    // 1. Lấy từ LocalStorage trước
     const storedProducts = localStorage.getItem(STORAGE_KEY);
-    let localData = [];
+    let localData: Product[] = [];
     
     if (storedProducts) {
       try {
         localData = JSON.parse(storedProducts);
-        // Kiểm tra tính hợp lệ của dữ liệu
-        if (!Array.isArray(localData)) {
-            throw new Error("Data in localStorage is not an array");
-        }
+        if (!Array.isArray(localData)) throw new Error("Data is not array");
       } catch (e) {
-        console.error("LocalStorage data corrupted, resetting to defaults.", e);
+        console.error("LocalStorage corrupted, resetting.", e);
         localStorage.removeItem(STORAGE_KEY);
         localData = PRODUCTS;
       }
@@ -31,30 +28,50 @@ export const getProducts = (): Product[] => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
     }
 
-    // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API NGAY LẬP TỨC
+    // 2. Load từ DB và Merge thông minh
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
       
-      // Gọi bất đồng bộ, không chặn UI
       fetchProductsFromDB().then(dbProducts => {
-          if (dbProducts && Array.isArray(dbProducts) && dbProducts.length > 0) {
-            console.log('Đã đồng bộ dữ liệu sản phẩm từ Server.');
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
-            // Phát sự kiện quan trọng để Home.tsx biết mà render lại
+          if (dbProducts && Array.isArray(dbProducts)) {
+            console.log('Đã tải dữ liệu từ Server. Bắt đầu hợp nhất...');
+            
+            // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH (Tránh lỗi: 123 !== "123")
+            const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
+            
+            // Tìm những sản phẩm có ở Local nhưng chưa có ở Server (Sản phẩm mới tạo nhưng chưa sync xong)
+            const unsavedLocalProducts = localData.filter(p => !serverIdSet.has(String(p.id)));
+            
+            if (unsavedLocalProducts.length > 0) {
+                console.log(`Đang đồng bộ lại ${unsavedLocalProducts.length} sản phẩm chưa được lưu...`);
+                // Gửi lại từng sản phẩm chưa được lưu
+                unsavedLocalProducts.forEach(p => syncProductToDB(p));
+            }
+
+            // Merge: Ưu tiên dữ liệu Server, cộng thêm những cái chưa lưu từ Local
+            const mergedProducts = [...dbProducts, ...unsavedLocalProducts];
+            
+            // Sắp xếp: Mới nhất lên đầu
+            mergedProducts.sort((a, b) => Number(b.id) - Number(a.id));
+
+            // Cập nhật lại LocalStorage và UI
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedProducts));
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           } else {
-             // Kể cả không có dữ liệu mới, cũng phát sự kiện để tắt loading (nếu có)
+             console.warn("Không lấy được dữ liệu Server hoặc rỗng, dùng dữ liệu Local.");
              window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
       }).catch(err => {
-          console.error("Lỗi đồng bộ sản phẩm:", err);
-          // Vẫn phát sự kiện để UI tắt loading
+          console.error("Lỗi kết nối Server:", err);
           window.dispatchEvent(new Event('sigma_vie_products_update'));
       });
     }
 
+    // Ensure data integrity when returning
     return localData.map((p: any) => ({
         ...p,
+        // Ép kiểu ID về number để đồng nhất trong app
+        id: Number(p.id), 
         stock: p.stock !== undefined ? p.stock : 0,
         importPrice: p.importPrice || '0₫',
         sku: p.sku || `SKU-${p.id}`,
@@ -100,32 +117,38 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
   
   // Gửi lên Server Postgres
-  syncProductToDB(newProduct);
+  // Quan trọng: Gọi syncProductToDB nhưng không chặn UI, và log lỗi nếu thất bại
+  syncProductToDB(newProduct).then(res => {
+      if (!res || !res.success) {
+          console.warn("Lưu lên server thất bại, sẽ thử lại ở lần tải sau.");
+      }
+  });
   
   return newProduct;
 };
 
 export const updateProduct = (updatedProduct: Product): void => {
   const products = getProducts();
-  const index = products.findIndex(p => p.id === updatedProduct.id);
+  // So sánh ID dạng String để an toàn
+  const index = products.findIndex(p => String(p.id) === String(updatedProduct.id));
   if (index !== -1) {
     products[index] = updatedProduct;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
-    // Gửi cập nhật lên Server
     syncProductToDB(updatedProduct); 
   }
 };
 
 export const deleteProduct = (id: number): void => {
   const products = getProducts();
-  const updatedProducts = products.filter(product => product.id !== id);
+  const updatedProducts = products.filter(product => String(product.id) !== String(id));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
+  // Note: Cần thêm API xóa trên server nếu muốn đồng bộ hoàn toàn việc xóa
 };
 
 export const updateProductStock = (id: number, quantityChange: number, size?: string, color?: string): boolean => {
     const products = getProducts();
-    const productIndex = products.findIndex(p => p.id === id);
+    const productIndex = products.findIndex(p => String(p.id) === String(id));
     
     if (productIndex === -1) return false;
     
@@ -145,13 +168,13 @@ export const updateProductStock = (id: number, quantityChange: number, size?: st
             // Update existing variant
             const variant = product.variants[vIndex];
             const newVariantStock = variant.stock + quantityChange;
-            if (newVariantStock < 0) return false; // Prevent negative variant stock
+            if (newVariantStock < 0) return false; 
             product.variants[vIndex].stock = newVariantStock;
         } else if (quantityChange > 0) {
             // New Variant
             product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
         } else {
-            return false; // Can't reduce non-existent variant
+            return false;
         }
         
         // Recalculate total stock sum
@@ -164,7 +187,6 @@ export const updateProductStock = (id: number, quantityChange: number, size?: st
     products[productIndex] = product;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
-    // 2. Cập nhật Atomic lên Server (Send variant info)
     updateProductStockInDB(id, quantityChange, size, color).then(response => {
         if (response && response.success) {
             console.log(`Đã cập nhật kho an toàn trên server.`);

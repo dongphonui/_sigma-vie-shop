@@ -108,12 +108,11 @@ const initDb = async () => {
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_end_time BIGINT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS colors TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS variants TEXT`); // NEW
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS variants TEXT`); 
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS issue_date TEXT`);
-        // New Inventory Columns
         await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
         await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
     } catch (err) {
@@ -180,7 +179,7 @@ app.get('/api/products', async (req, res) => {
       flashSaleEndTime: r.flash_sale_end_time ? parseInt(r.flash_sale_end_time) : undefined,
       sizes: r.sizes ? r.sizes.split(',') : [],
       colors: r.colors ? r.colors.split(',') : [],
-      variants: r.variants ? JSON.parse(r.variants) : [] // Parse variants
+      variants: r.variants ? JSON.parse(r.variants) : [] 
     }));
     res.json(products);
   } catch (err) { res.status(500).send(err.message); }
@@ -188,8 +187,10 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products/sync', async (req, res) => {
   const p = req.body;
-  const sizesStr = p.sizes ? p.sizes.join(',') : '';
-  const colorsStr = p.colors ? p.colors.join(',') : '';
+  // Safely convert arrays to comma-separated strings
+  const sizesStr = Array.isArray(p.sizes) ? p.sizes.join(',') : '';
+  const colorsStr = Array.isArray(p.colors) ? p.colors.join(',') : '';
+  // Safely stringify variants, default to empty array
   const variantsStr = p.variants ? JSON.stringify(p.variants) : '[]';
 
   try {
@@ -206,14 +207,16 @@ app.post('/api/products/sync', async (req, res) => {
       [p.id, p.name, p.price, p.importPrice, p.description, p.imageUrl, p.stock, p.sku, p.category, p.brand, p.status, p.isFlashSale, p.salePrice, p.flashSaleStartTime, p.flashSaleEndTime, sizesStr, colorsStr, variantsStr]
     );
     res.json({ success: true });
-  } catch (err) { console.error(err); res.status(500).json({ success: false }); }
+  } catch (err) { 
+      console.error("Error syncing product:", err); 
+      res.status(500).json({ success: false, error: err.message }); 
+  }
 });
 
-// Atomic Stock Update (Handling Variants)
+// Atomic Stock Update
 app.post('/api/products/stock', async (req, res) => {
     const { id, quantityChange, size, color } = req.body;
     try {
-        // 1. Fetch current product
         const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Product not found' });
@@ -223,7 +226,6 @@ app.post('/api/products/stock', async (req, res) => {
         let newTotalStock = product.stock + quantityChange;
         let variants = product.variants ? JSON.parse(product.variants) : [];
 
-        // 2. If specific variant is provided, update it
         if (size || color) {
             const variantIndex = variants.findIndex((v) => 
                 (v.size === size || (!v.size && !size)) && 
@@ -231,23 +233,16 @@ app.post('/api/products/stock', async (req, res) => {
             );
 
             if (variantIndex !== -1) {
-                // Update existing variant
                 variants[variantIndex].stock = Math.max(0, variants[variantIndex].stock + quantityChange);
             } else if (quantityChange > 0) {
-                // Add new variant if receiving stock (and it didn't exist)
-                // For simplicity, we create it.
                 variants.push({ size: size || '', color: color || '', stock: quantityChange });
-            } else {
-               // Reducing stock of non-existent variant? Ignore or error.
             }
             
-            // Recalculate total stock from variants if they exist
             if (variants.length > 0) {
                 newTotalStock = variants.reduce((sum, v) => sum + v.stock, 0);
             }
         }
 
-        // 3. Update DB
         const updateResult = await pool.query(
             `UPDATE products SET stock = $1, variants = $2 WHERE id = $3 RETURNING stock`,
             [newTotalStock, JSON.stringify(variants), id]
@@ -260,6 +255,7 @@ app.post('/api/products/stock', async (req, res) => {
     }
 });
 
+// ... (Rest of existing routes for Categories, Customers, Orders, Inventory, Email, Logs) ...
 // 2. CATEGORIES
 app.get('/api/categories', async (req, res) => {
   try {
