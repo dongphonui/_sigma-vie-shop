@@ -17,8 +17,12 @@ export const getProducts = (): Product[] => {
     if (storedProducts) {
       try {
         localData = JSON.parse(storedProducts);
+        // Kiểm tra tính hợp lệ của dữ liệu
+        if (!Array.isArray(localData)) {
+            throw new Error("Data in localStorage is not an array");
+        }
       } catch (e) {
-        console.error("Dữ liệu sản phẩm trong LocalStorage bị lỗi, đang reset...", e);
+        console.error("LocalStorage data corrupted, resetting to defaults.", e);
         localStorage.removeItem(STORAGE_KEY);
         localData = PRODUCTS;
       }
@@ -27,22 +31,24 @@ export const getProducts = (): Product[] => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
     }
 
-    // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API NGAY LẬP TỨC (Không delay)
+    // 2. Nếu chưa load từ DB lần nào trong phiên này, hãy gọi API NGAY LẬP TỨC
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
       
-      // Gọi bất đồng bộ
+      // Gọi bất đồng bộ, không chặn UI
       fetchProductsFromDB().then(dbProducts => {
-          if (dbProducts && dbProducts.length > 0) {
+          if (dbProducts && Array.isArray(dbProducts) && dbProducts.length > 0) {
             console.log('Đã đồng bộ dữ liệu sản phẩm từ Server.');
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
-            // Phát sự kiện cập nhật
+            // Phát sự kiện quan trọng để Home.tsx biết mà render lại
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           } else {
+             // Kể cả không có dữ liệu mới, cũng phát sự kiện để tắt loading (nếu có)
              window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
       }).catch(err => {
           console.error("Lỗi đồng bộ sản phẩm:", err);
+          // Vẫn phát sự kiện để UI tắt loading
           window.dispatchEvent(new Event('sigma_vie_products_update'));
       });
     }
@@ -65,7 +71,7 @@ export const getProducts = (): Product[] => {
     }));
 
   } catch (error) {
-    console.error("Lỗi nghiêm trọng trong productStorage", error);
+    console.error("Lỗi storage nghiêm trọng", error);
     return PRODUCTS;
   }
 };

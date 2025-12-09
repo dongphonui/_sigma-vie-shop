@@ -109,7 +109,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         if (found) {
             setSelectedProduct(found);
         } else {
-            // Not found in local yet, waiting for DB update...
+            // Not found locally yet, set loading state and wait for DB
             setIsLookingForProduct(true);
         }
     }
@@ -119,7 +119,6 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         const updated = getProducts();
         setProducts(updated);
         
-        // Cập nhật lại filteredProducts nếu đang không tìm kiếm
         if (!searchQuery) {
             setFilteredProducts(updated);
         }
@@ -131,15 +130,17 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
                 setSelectedProduct(found);
                 setIsLookingForProduct(false); // Found it!
             } else {
-                // If still not found after DB load, stop looking
-                setIsLookingForProduct(false);
+                // If not found after update, stop loading.
+                setIsLookingForProduct(false); 
             }
+        } else {
+             setIsLookingForProduct(false);
         }
     };
     
     window.addEventListener('sigma_vie_products_update', handleProductUpdate);
     return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
-  }, [initialProductId]); // Re-run if ID changes
+  }, [initialProductId]);
 
   // Flash Sale Logic
   useEffect(() => {
@@ -216,12 +217,12 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         
         {/* Loading Indicator for Deep Link */}
         {isLookingForProduct && !selectedProduct && (
-            <div className="fixed inset-0 bg-black/30 z-[60] flex items-center justify-center backdrop-blur-sm">
+            <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center backdrop-blur-sm">
                 <div className="bg-white p-6 rounded-lg shadow-xl flex items-center gap-4 animate-fade-in-up">
-                    <div className="w-6 h-6 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-8 h-8 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin"></div>
                     <div>
-                        <p className="font-bold text-gray-800">Đang tìm sản phẩm...</p>
-                        <p className="text-xs text-gray-500">Đang đồng bộ dữ liệu mới nhất</p>
+                        <p className="font-bold text-gray-800 text-lg">Đang tìm sản phẩm...</p>
+                        <p className="text-sm text-gray-500">Vui lòng chờ trong giây lát</p>
                     </div>
                 </div>
             </div>

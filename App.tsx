@@ -68,8 +68,6 @@ const App: React.FC = () => {
       if (pid) {
           console.log("Deep link detected for product:", pid);
           setInitialProductId(pid);
-          // Optional: Clean URL to remove param so refresh doesn't re-trigger?
-          // window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       }
 
       // Base route logic
