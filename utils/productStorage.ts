@@ -28,7 +28,7 @@ export const getProducts = (): Product[] => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
     }
 
-    // 2. Load từ DB và Merge thông minh
+    // 2. Load từ DB và Merge thông minh (ngay lập tức, không delay)
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
       
@@ -36,22 +36,22 @@ export const getProducts = (): Product[] => {
           if (dbProducts && Array.isArray(dbProducts)) {
             console.log('Đã tải dữ liệu từ Server. Bắt đầu hợp nhất...');
             
-            // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH (Tránh lỗi: 123 !== "123")
+            // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH (Tránh lỗi so sánh number vs string)
             const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
             
-            // Tìm những sản phẩm có ở Local nhưng chưa có ở Server (Sản phẩm mới tạo nhưng chưa sync xong)
+            // Tìm những sản phẩm có ở Local nhưng chưa có ở Server (Sản phẩm mới tạo)
             const unsavedLocalProducts = localData.filter(p => !serverIdSet.has(String(p.id)));
             
             if (unsavedLocalProducts.length > 0) {
-                console.log(`Đang đồng bộ lại ${unsavedLocalProducts.length} sản phẩm chưa được lưu...`);
+                console.log(`Phát hiện ${unsavedLocalProducts.length} sản phẩm chưa được lưu. Đang đồng bộ lại...`);
                 // Gửi lại từng sản phẩm chưa được lưu
                 unsavedLocalProducts.forEach(p => syncProductToDB(p));
             }
 
-            // Merge: Ưu tiên dữ liệu Server, cộng thêm những cái chưa lưu từ Local
+            // Merge: Dữ liệu Server là chuẩn + Dữ liệu Local chưa lưu
             const mergedProducts = [...dbProducts, ...unsavedLocalProducts];
             
-            // Sắp xếp: Mới nhất lên đầu
+            // Sắp xếp: Mới nhất lên đầu (theo ID giảm dần)
             mergedProducts.sort((a, b) => Number(b.id) - Number(a.id));
 
             // Cập nhật lại LocalStorage và UI
@@ -67,7 +67,7 @@ export const getProducts = (): Product[] => {
       });
     }
 
-    // Ensure data integrity when returning
+    // Ensure data integrity when returning (parse arrays if needed)
     return localData.map((p: any) => ({
         ...p,
         // Ép kiểu ID về number để đồng nhất trong app
@@ -93,6 +93,22 @@ export const getProducts = (): Product[] => {
   }
 };
 
+// Hàm thủ công để đẩy toàn bộ dữ liệu Local lên Server (Fix lỗi không đồng bộ)
+export const syncAllLocalDataToServer = async (): Promise<boolean> => {
+    try {
+        const products = getProducts();
+        console.log("Bắt đầu đồng bộ thủ công...", products.length, "sản phẩm");
+        
+        const promises = products.map(p => syncProductToDB(p));
+        await Promise.all(promises);
+        
+        return true;
+    } catch (e) {
+        console.error("Lỗi đồng bộ thủ công:", e);
+        return false;
+    }
+};
+
 export const addProduct = (product: Omit<Product, 'id'>): Product => {
   const products = getProducts();
   const newProduct: Product = {
@@ -116,8 +132,7 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
   const updatedProducts = [newProduct, ...products];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
   
-  // Gửi lên Server Postgres
-  // Quan trọng: Gọi syncProductToDB nhưng không chặn UI, và log lỗi nếu thất bại
+  // Gửi lên Server Postgres (Không chặn UI)
   syncProductToDB(newProduct).then(res => {
       if (!res || !res.success) {
           console.warn("Lưu lên server thất bại, sẽ thử lại ở lần tải sau.");
@@ -174,7 +189,7 @@ export const updateProductStock = (id: number, quantityChange: number, size?: st
             // New Variant
             product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
         } else {
-            return false;
+            return false; // Can't reduce non-existent variant
         }
         
         // Recalculate total stock sum
@@ -187,6 +202,7 @@ export const updateProductStock = (id: number, quantityChange: number, size?: st
     products[productIndex] = product;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
+    // Update server
     updateProductStockInDB(id, quantityChange, size, color).then(response => {
         if (response && response.success) {
             console.log(`Đã cập nhật kho an toàn trên server.`);

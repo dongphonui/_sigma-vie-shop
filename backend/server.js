@@ -45,7 +45,7 @@ const initDb = async () => {
         flash_sale_end_time BIGINT,
         sizes TEXT,
         colors TEXT,
-        variants TEXT -- Stores JSON: [{"size":"M","color":"Red","stock":10}]
+        variants TEXT -- Stores JSON
       );
     `);
 
@@ -161,26 +161,37 @@ const initDb = async () => {
 app.get('/api/products', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
-    const products = result.rows.map(r => ({
-      id: parseInt(r.id),
-      name: r.name,
-      price: r.price,
-      importPrice: r.import_price,
-      description: r.description,
-      imageUrl: r.image_url,
-      stock: r.stock,
-      sku: r.sku,
-      category: r.category,
-      brand: r.brand,
-      status: r.status,
-      isFlashSale: r.is_flash_sale,
-      salePrice: r.sale_price,
-      flashSaleStartTime: r.flash_sale_start_time ? parseInt(r.flash_sale_start_time) : undefined,
-      flashSaleEndTime: r.flash_sale_end_time ? parseInt(r.flash_sale_end_time) : undefined,
-      sizes: r.sizes ? r.sizes.split(',') : [],
-      colors: r.colors ? r.colors.split(',') : [],
-      variants: r.variants ? JSON.parse(r.variants) : [] 
-    }));
+    const products = result.rows.map(r => {
+        let variants = [];
+        try {
+            if (r.variants && typeof r.variants === 'string') {
+                variants = JSON.parse(r.variants);
+            }
+        } catch (e) {
+            console.error("Error parsing variants for product", r.id, e);
+        }
+        
+        return {
+          id: parseInt(r.id),
+          name: r.name,
+          price: r.price,
+          importPrice: r.import_price,
+          description: r.description,
+          imageUrl: r.image_url,
+          stock: r.stock,
+          sku: r.sku,
+          category: r.category,
+          brand: r.brand,
+          status: r.status,
+          isFlashSale: r.is_flash_sale,
+          salePrice: r.sale_price,
+          flashSaleStartTime: r.flash_sale_start_time ? parseInt(r.flash_sale_start_time) : undefined,
+          flashSaleEndTime: r.flash_sale_end_time ? parseInt(r.flash_sale_end_time) : undefined,
+          sizes: r.sizes ? r.sizes.split(',') : [],
+          colors: r.colors ? r.colors.split(',') : [],
+          variants: variants 
+        };
+    });
     res.json(products);
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -224,7 +235,11 @@ app.post('/api/products/stock', async (req, res) => {
         
         const product = result.rows[0];
         let newTotalStock = product.stock + quantityChange;
-        let variants = product.variants ? JSON.parse(product.variants) : [];
+        
+        let variants = [];
+        try {
+            if (product.variants) variants = JSON.parse(product.variants);
+        } catch (e) { variants = []; }
 
         if (size || color) {
             const variantIndex = variants.findIndex((v) => 
@@ -299,7 +314,7 @@ app.post('/api/customers/sync', async (req, res) => {
          full_name = EXCLUDED.full_name, email = EXCLUDED.email, phone_number = EXCLUDED.phone_number,
          address = EXCLUDED.address, password_hash = EXCLUDED.password_hash,
          cccd_number = EXCLUDED.cccd_number, gender = EXCLUDED.gender, dob = EXCLUDED.dob, issue_date = EXCLUDED.issue_date`,
-      [c.id, c.fullName, c.email, c.phoneNumber, c.address, c.passwordHash, c.createdAt, c.cccdNumber, c.gender, c.dob, c.issueDate]
+      [c.id, c.fullName, c.email, c.phoneNumber, c.address, c.passwordHash, c.createdAt, c.cccd_number, c.gender, c.dob, c.issue_date]
     );
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ success: false }); }

@@ -17,21 +17,15 @@ export const parseCCCDQrCode = (qrString: string): CCCDData | null => {
 
   // 1. Clean string: Remove only control characters that are NOT part of Vietnamese text or standard delimiters.
   // \u0000-\u001F are standard ASCII control chars.
-  // Avoid stripping high unicode ranges where Vietnamese chars live.
   let cleanStr = qrString.replace(/[\x00-\x1F\x7F]/g, "").trim();
 
-  // Handle cases where delimiters might be different (some older readers output semicolon or spaces - rare but possible)
-  // Standard is '|'.
-  
   if (!cleanStr.includes('|')) {
-      // Try to detect if it's a raw ID without separators (unlikely for QR code but good for fallback)
-      // console.log("Invalid CCCD QR Format (No pipe separator):", cleanStr);
       return null;
   }
 
   const parts = cleanStr.split('|');
   
-  // Basic Validation: Must have at least ID, Name, DoB (Parts length >= 4 usually)
+  // Basic Validation: Must have at least ID, Name, DoB
   // Index 0: CCCD (12 digits)
   // Index 1: Old CMND (9 digits or empty)
   // Index 2: Name
@@ -53,7 +47,7 @@ export const parseCCCDQrCode = (qrString: string): CCCDData | null => {
       dob: formatDate(parts[3]),
       gender: parts[4] || '',
       address: parts[5] || '',
-      issueDate: formatDate(parts[6])
+      issueDate: formatDate(parts[6] || '') // Extract issue date
     };
   } catch (e) {
     console.error("Error parsing CCCD Data:", e);

@@ -15,9 +15,19 @@ export const getCart = (): CartItem[] => {
   try {
     const key = getStorageKey();
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    
+    try {
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) return [];
+        return parsed;
+    } catch (e) {
+        console.error("Cart data corrupted, resetting.", e);
+        localStorage.removeItem(key);
+        return [];
+    }
   } catch (error) {
-    console.error("Failed to parse cart", error);
+    console.error("Failed to access cart storage", error);
     return [];
   }
 };

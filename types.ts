@@ -22,8 +22,8 @@ export interface Product {
   category: string;
   brand: string;
   status: 'active' | 'draft' | 'archived';
-  sizes?: string[]; // Danh sách size
-  colors?: string[]; // Danh sách màu
+  sizes?: string[]; // Danh sách size (VD: ['S', 'M', 'L'])
+  colors?: string[]; // Danh sách màu (VD: ['Đen', 'Trắng'])
   variants?: ProductVariant[]; // NEW: Quản lý tồn kho chi tiết
 }
 

@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings } from '../types';
-import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
+import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct, syncAllLocalDataToServer } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
@@ -931,6 +931,18 @@ const AdminPage: React.FC = () => {
       }
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
+  
+  // NEW: Manual Sync Handler
+  const handleManualSync = async () => {
+      setProductFeedback('Đang đồng bộ dữ liệu lên Server...');
+      const success = await syncAllLocalDataToServer();
+      if (success) {
+          setProductFeedback('✅ Đồng bộ thành công! Hãy kiểm tra trên điện thoại.');
+      } else {
+          setProductFeedback('❌ Lỗi đồng bộ. Vui lòng kiểm tra kết nối Server.');
+      }
+      setTimeout(() => setProductFeedback(''), 5000);
+  };
 
   // --- RENDER FUNCTIONS IMPLEMENTATION ---
 
@@ -1022,8 +1034,16 @@ const AdminPage: React.FC = () => {
 
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
-        {/* Toggle Category Manager */}
-        <div className="flex justify-end">
+        {/* Toggle Category Manager & Sync Button */}
+        <div className="flex justify-end gap-3">
+             <button 
+                onClick={handleManualSync}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 shadow-sm"
+                title="Bấm vào đây nếu sản phẩm không hiện trên điện thoại"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                Đồng bộ Máy chủ
+            </button>
              <button 
                 onClick={() => setIsManagingCategories(!isManagingCategories)}
                 className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50"

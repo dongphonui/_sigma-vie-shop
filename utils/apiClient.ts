@@ -22,9 +22,15 @@ const syncData = async (endpoint: string, data: any) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Server returned ${res.status}: ${errText}`);
+    }
+    
     return await res.json();
   } catch (error) {
-    console.warn(`Không đồng bộ được DB (${endpoint}).`);
+    console.error(`Không đồng bộ được DB (${endpoint}):`, error);
     return null;
   }
 };

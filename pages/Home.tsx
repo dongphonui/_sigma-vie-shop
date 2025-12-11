@@ -130,17 +130,16 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
                 setSelectedProduct(found);
                 setIsLookingForProduct(false); // Found it!
             } else {
-                // If not found after update, stop loading.
-                setIsLookingForProduct(false); 
+                // If still not found after DB load, stop looking (product might be deleted or invalid ID)
+                // But allow a grace period or keep loading? For now stop to avoid infinite spin.
+                setIsLookingForProduct(false);
             }
-        } else {
-             setIsLookingForProduct(false);
         }
     };
     
     window.addEventListener('sigma_vie_products_update', handleProductUpdate);
     return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
-  }, [initialProductId]);
+  }, [initialProductId]); // Re-run if ID changes
 
   // Flash Sale Logic
   useEffect(() => {

@@ -121,7 +121,8 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
             const pid = Number(order.productId);
             const qty = Number(order.quantity);
 
-            const success = updateProductStock(pid, qty);
+            // Refund stock
+            const success = updateProductStock(pid, qty, order.productSize, order.productColor);
             
             if (success) {
                 addTransaction({
