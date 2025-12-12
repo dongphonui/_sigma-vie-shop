@@ -35,7 +35,7 @@ const processAndMergeData = (localData: Product[], dbProducts: any[]) => {
     return null;
 };
 
-// Force reload helper (Updated to be Async and blocking)
+// Force reload helper (Standard - attempts to merge)
 export const forceReloadProducts = async (): Promise<Product[]> => {
     hasLoadedFromDB = false; // Reset flag
     
@@ -61,6 +61,36 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
         console.error("Lỗi khi ép buộc tải lại:", e);
         // Fallback to local
         return getProducts();
+    }
+};
+
+// NUCLEAR OPTION: Hard Reset
+// Wipes local storage product cache completely and trusts the Server.
+export const hardResetProducts = async (): Promise<Product[]> => {
+    console.warn("HARD RESET TRIGGERED: Clearing local product cache.");
+    // 1. Clear Local Cache
+    localStorage.removeItem(STORAGE_KEY);
+    hasLoadedFromDB = false;
+
+    try {
+        // 2. Fetch fresh
+        const dbProducts = await fetchProductsFromDB();
+        
+        if (dbProducts && Array.isArray(dbProducts)) {
+            // Save fresh server data
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
+            window.dispatchEvent(new Event('sigma_vie_products_update'));
+            hasLoadedFromDB = true;
+            return dbProducts.map(formatProduct);
+        } else {
+            throw new Error("Không kết nối được Server hoặc Server không trả về dữ liệu.");
+        }
+    } catch (e) {
+        console.error("Hard Reset Failed:", e);
+        // If fail, restore defaults or leave empty? 
+        // Restore defaults so app doesn't break
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
+        throw e; // Re-throw so UI can handle alert
     }
 };
 

@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { getHeaderSettings } from '../utils/headerSettingsStorage';
 import { getCurrentCustomer, logoutCustomer } from '../utils/customerStorage';
-import { forceReloadProducts } from '../utils/productStorage';
+import { hardResetProducts } from '../utils/productStorage';
+import { API_BASE_URL } from '../utils/apiClient';
 import type { HeaderSettings, Customer } from '../types';
 
 interface HeaderProps {
@@ -46,19 +47,22 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
 
   const handleManualRefresh = async () => {
       if (isRefreshing) return;
+      
+      const confirmReset = window.confirm("Bạn có muốn xóa dữ liệu cũ và tải lại mới nhất từ Server không?");
+      if (!confirmReset) return;
+
       setIsRefreshing(true);
       try {
-          const updatedProducts = await forceReloadProducts();
-          
-          // Kiểm tra xem dữ liệu có thực sự được tải không
-          // Chúng ta không hiển thị alert vì UX, nhưng có thể console.log
+          // Use Hard Reset to wipe local cache and force fetch
+          const updatedProducts = await hardResetProducts();
           console.log("Dữ liệu đã được làm mới:", updatedProducts.length, "sản phẩm");
+          alert(`Đã cập nhật thành công! Tìm thấy ${updatedProducts.length} sản phẩm.`);
+          window.location.reload(); // Reload page to reflect changes cleanly
           
       } catch (e) {
           console.error("Refresh failed", e);
-          alert("Không thể kết nối với máy chủ. Vui lòng kiểm tra Wifi hoặc Tường lửa trên máy tính.");
+          alert(`KHÔNG THỂ KẾT NỐI SERVER!\n\nĐiện thoại của bạn không tìm thấy máy chủ tại: ${API_BASE_URL}\n\nCách khắc phục:\n1. Tắt tường lửa (Firewall) trên máy tính chạy Server.\n2. Đảm bảo điện thoại và máy tính chung Wifi.`);
       } finally {
-          // Delay tắt xoay để người dùng cảm nhận được hành động
           setTimeout(() => setIsRefreshing(false), 800);
       }
   };
@@ -145,7 +149,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                 <button 
                     onClick={handleManualRefresh}
                     className={`p-2 text-gray-600 transition-all rounded-full hover:bg-gray-100 ${isRefreshing ? 'bg-yellow-50 text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`}
-                    title="Làm mới dữ liệu từ Server"
+                    title="Xóa Cache & Tải lại dữ liệu"
                 >
                     <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>

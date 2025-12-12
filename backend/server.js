@@ -506,8 +506,8 @@ app.get('/api/admin/logs', async (req, res) => {
     } catch (err) { res.status(500).send(err.message); }
 });
 
-// Start Server
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+// Start Server - Listen on 0.0.0.0 for external access
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server is running on port ${port} and accepting external connections`);
   initDb();
 });
