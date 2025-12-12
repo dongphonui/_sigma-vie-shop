@@ -2,7 +2,29 @@
 // File này quản lý việc gọi API
 // Nếu Server chưa chạy, nó sẽ trả về null để App dùng LocalStorage fallback
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+const getApiBaseUrl = () => {
+    // 1. Prioritize Environment Variable
+    if ((import.meta as any).env?.VITE_API_URL) {
+        return (import.meta as any).env.VITE_API_URL;
+    }
+    
+    // 2. Dynamic Hostname for LAN/WiFi testing
+    // If accessing via 192.168.x.x, try to hit port 5000 on that same IP
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        // Simple IP check or localhost
+        const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
+        if (isIp || hostname === 'localhost') {
+            return `http://${hostname}:5000/api`;
+        }
+    }
+
+    // 3. Fallback
+    return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+console.log("API Base URL:", API_BASE_URL); // Debug log
 
 const fetchData = async (endpoint: string) => {
   try {
@@ -10,7 +32,7 @@ const fetchData = async (endpoint: string) => {
     if (!res.ok) throw new Error('Server error');
     return await res.json();
   } catch (error) {
-    console.warn(`Không kết nối được DB (${endpoint}), dùng LocalStorage.`);
+    console.warn(`Không kết nối được DB (${endpoint}) tại ${API_BASE_URL}, dùng LocalStorage.`);
     return null;
   }
 };

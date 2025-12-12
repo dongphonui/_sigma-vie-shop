@@ -8,6 +8,12 @@ const STORAGE_KEY = 'sigma_vie_products';
 // Biến cờ để kiểm tra xem đã load từ DB chưa
 let hasLoadedFromDB = false;
 
+// Force reload helper (called manually by UI)
+export const forceReloadProducts = async () => {
+    hasLoadedFromDB = false; // Reset flag
+    return getProducts(); // This will trigger the fetch logic below
+}
+
 export const getProducts = (): Product[] => {
   try {
     // 1. Lấy từ LocalStorage trước
@@ -32,9 +38,10 @@ export const getProducts = (): Product[] => {
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
       
+      console.log("Đang tải sản phẩm từ Server...");
       fetchProductsFromDB().then(dbProducts => {
           if (dbProducts && Array.isArray(dbProducts)) {
-            console.log('Đã tải dữ liệu từ Server. Bắt đầu hợp nhất...');
+            console.log('Đã tải dữ liệu từ Server. Số lượng:', dbProducts.length);
             
             // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH (Tránh lỗi so sánh number vs string)
             const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
@@ -58,11 +65,13 @@ export const getProducts = (): Product[] => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedProducts));
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           } else {
-             console.warn("Không lấy được dữ liệu Server hoặc rỗng, dùng dữ liệu Local.");
+             console.warn("Không lấy được dữ liệu Server hoặc rỗng (NULL), giữ nguyên dữ liệu Local.");
+             // Nếu server trả về null (lỗi kết nối), ta KHÔNG ghi đè local bằng rỗng.
+             // Ta chỉ giữ nguyên localData.
              window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
       }).catch(err => {
-          console.error("Lỗi kết nối Server:", err);
+          console.error("Lỗi kết nối Server khi tải sản phẩm:", err);
           window.dispatchEvent(new Event('sigma_vie_products_update'));
       });
     }
