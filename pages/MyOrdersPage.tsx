@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { getOrdersByCustomerId } from '../utils/orderStorage';
+import { getOrdersByCustomerId, forceReloadOrders } from '../utils/orderStorage';
 import type { Customer, Order } from '../types';
 
 interface MyOrdersPageProps {
@@ -16,13 +16,38 @@ const PackageIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
 );
 
+const RefreshIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+);
+
 const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVisible, cartItemCount, onOpenCart }) => {
     const [orders, setOrders] = useState<Order[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const loadOrders = async (force: boolean = false) => {
+        if (!currentUser) return;
+        
+        setIsLoading(true);
+        if (force) {
+            await forceReloadOrders();
+        }
+        setOrders(getOrdersByCustomerId(currentUser.id));
+        setIsLoading(false);
+    };
 
     useEffect(() => {
-        if (currentUser) {
-            setOrders(getOrdersByCustomerId(currentUser.id));
-        }
+        // Initial load (Force sync from server to ensure mobile matches PC)
+        loadOrders(true);
+
+        // Listen for background updates
+        const handleOrderUpdate = () => {
+            if (currentUser) {
+                setOrders(getOrdersByCustomerId(currentUser.id));
+            }
+        };
+
+        window.addEventListener('sigma_vie_orders_update', handleOrderUpdate);
+        return () => window.removeEventListener('sigma_vie_orders_update', handleOrderUpdate);
     }, [currentUser]);
 
     if (!currentUser) {
@@ -41,13 +66,29 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
         <div className="min-h-screen bg-[#F7F5F2] flex flex-col">
             <Header currentUser={currentUser} cartItemCount={cartItemCount} onOpenCart={onOpenCart} />
             <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
-                <h1 className="text-3xl font-bold font-serif text-gray-900 mb-8">Đơn hàng của tôi</h1>
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold font-serif text-gray-900">Đơn hàng của tôi</h1>
+                    <button 
+                        onClick={() => loadOrders(true)} 
+                        className="text-sm text-[#00695C] flex items-center gap-1 hover:underline"
+                        disabled={isLoading}
+                    >
+                        <RefreshIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                        {isLoading ? 'Đang cập nhật...' : 'Làm mới'}
+                    </button>
+                </div>
                 
                 <div className="space-y-6">
                     {orders.length === 0 ? (
                         <div className="bg-white p-8 rounded-lg shadow-sm text-center">
-                            <p className="text-gray-500">Bạn chưa có đơn hàng nào.</p>
-                            <a href="#/" className="text-[#D4AF37] hover:underline mt-2 inline-block">Mua sắm ngay</a>
+                            {isLoading ? (
+                                <p className="text-gray-500">Đang tải dữ liệu từ máy chủ...</p>
+                            ) : (
+                                <>
+                                    <p className="text-gray-500">Bạn chưa có đơn hàng nào.</p>
+                                    <a href="#/" className="text-[#D4AF37] hover:underline mt-2 inline-block">Mua sắm ngay</a>
+                                </>
+                            )}
                         </div>
                     ) : (
                         orders.map(order => (

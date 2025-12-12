@@ -7,6 +7,11 @@ import type { Order, Customer, Product } from '../types';
 const STORAGE_KEY = 'sigma_vie_orders';
 let hasLoadedFromDB = false;
 
+// Helper to trigger UI update
+const dispatchOrderUpdate = () => {
+    window.dispatchEvent(new Event('sigma_vie_orders_update'));
+};
+
 export const getOrders = (): Order[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -14,36 +19,13 @@ export const getOrders = (): Order[] => {
 
     if (!hasLoadedFromDB) {
         hasLoadedFromDB = true;
-        console.log("Đang tải đơn hàng từ Server...");
-        
+        // Background fetch (silent)
         fetchOrdersFromDB().then(dbOrders => {
             if (dbOrders && Array.isArray(dbOrders)) {
-                // --- LOGIC HỢP NHẤT (SMART MERGE) ---
-                // 1. Tạo Set các ID đã có trên Server
-                const serverIdSet = new Set(dbOrders.map((o: any) => String(o.id)));
-                
-                // 2. Tìm các đơn hàng chỉ có ở Local (Chưa được sync)
-                const unsavedLocalOrders = localData.filter(o => !serverIdSet.has(String(o.id)));
-                
-                if (unsavedLocalOrders.length > 0) {
-                    console.log(`Phát hiện ${unsavedLocalOrders.length} đơn hàng chưa đồng bộ. Đang gửi lại...`);
-                    // Gửi lại lên server
-                    unsavedLocalOrders.forEach(o => syncOrderToDB(o));
-                }
-
-                // 3. Gộp lại: Ưu tiên dữ liệu Server + Dữ liệu Local chưa lưu
-                const mergedOrders = [...dbOrders, ...unsavedLocalOrders];
-                
-                // 4. Sắp xếp theo thời gian mới nhất
-                mergedOrders.sort((a, b) => b.timestamp - a.timestamp);
-
-                // 5. Lưu ngược lại LocalStorage
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedOrders));
-                
-                // Trigger update event nếu cần (nhưng React state thường tự re-render khi gọi lại getOrders)
+                processAndMergeOrders(localData, dbOrders);
             }
         }).catch(err => {
-            console.error("Lỗi tải đơn hàng từ Server:", err);
+            console.error("Lỗi tải đơn hàng (Background):", err);
         });
     }
     
@@ -51,6 +33,56 @@ export const getOrders = (): Order[] => {
   } catch (error) {
     return [];
   }
+};
+
+// Hàm xử lý merge dữ liệu (Dùng chung)
+const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
+    // 1. Tạo Set các ID đã có trên Server
+    const serverIdSet = new Set(dbOrders.map((o: any) => String(o.id)));
+    
+    // 2. Tìm các đơn hàng chỉ có ở Local (Chưa được sync)
+    const unsavedLocalOrders = localData.filter(o => !serverIdSet.has(String(o.id)));
+    
+    if (unsavedLocalOrders.length > 0) {
+        console.log(`Phát hiện ${unsavedLocalOrders.length} đơn hàng chưa đồng bộ. Đang gửi lại...`);
+        unsavedLocalOrders.forEach(o => syncOrderToDB(o));
+    }
+
+    // 3. Gộp lại: Ưu tiên dữ liệu Server + Dữ liệu Local chưa lưu
+    const mergedOrders = [...dbOrders, ...unsavedLocalOrders];
+    
+    // 4. Sắp xếp theo thời gian mới nhất
+    mergedOrders.sort((a, b) => b.timestamp - a.timestamp);
+
+    // 5. Lưu ngược lại LocalStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedOrders));
+    
+    // 6. Báo cho UI cập nhật
+    dispatchOrderUpdate();
+    
+    return mergedOrders;
+};
+
+// --- NEW: FORCE RELOAD (Dùng cho MyOrdersPage để đồng bộ thiết bị mới) ---
+export const forceReloadOrders = async (): Promise<Order[]> => {
+    try {
+        console.log("Đang ép buộc tải lại đơn hàng từ Server...");
+        const dbOrders = await fetchOrdersFromDB();
+        
+        // Lấy dữ liệu local hiện tại để không mất đơn hàng vừa tạo offline
+        const stored = localStorage.getItem(STORAGE_KEY);
+        const localData = stored ? JSON.parse(stored) : [];
+
+        if (dbOrders && Array.isArray(dbOrders)) {
+            const merged = processAndMergeOrders(localData, dbOrders);
+            hasLoadedFromDB = true;
+            return merged;
+        }
+        return localData;
+    } catch (e) {
+        console.error("Lỗi force reload orders:", e);
+        return getOrders(); // Fallback
+    }
 };
 
 // Hàm đồng bộ thủ công (Gọi từ AdminPage)
@@ -134,6 +166,7 @@ export const createOrder = (
     const orders = getOrders(); // Lấy danh sách hiện tại
     const updatedOrders = [newOrder, ...orders];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedOrders));
+    dispatchOrderUpdate(); // Update UI
 
     // 3. Sync to DB (Async)
     console.log("Sending order to DB:", newOrder);
@@ -193,6 +226,7 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
 
         orders[index].status = newStatus;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+        dispatchOrderUpdate(); // Update UI
         
         syncOrderToDB(orders[index]);
     }
