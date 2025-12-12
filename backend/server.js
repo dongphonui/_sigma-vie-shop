@@ -157,6 +157,11 @@ const initDb = async () => {
 
 // --- ROUTES ---
 
+// 0. HEALTH CHECK
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: Date.now() });
+});
+
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {
   try {

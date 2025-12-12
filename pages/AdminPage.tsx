@@ -22,7 +22,7 @@ import { getOrders, updateOrderStatus, syncAllOrdersToServer } from '../utils/or
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
+import { sendEmail, fetchAdminLoginLogs, checkServerConnection } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 
 
@@ -120,6 +120,7 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
 const AdminPage: React.FC = () => {
   // General State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -301,6 +302,20 @@ const AdminPage: React.FC = () => {
   useEffect(() => {
     setOrderCurrentPage(1);
   }, [orderSearch, orderFilterStatus]);
+
+  // Check Server Status
+  useEffect(() => {
+      const checkStatus = async () => {
+          setServerStatus('checking');
+          const isOnline = await checkServerConnection();
+          setServerStatus(isOnline ? 'online' : 'offline');
+      };
+      
+      checkStatus();
+      
+      const interval = setInterval(checkStatus, 10000); // Check every 10s
+      return () => clearInterval(interval);
+  }, []);
 
 
   const handleLogout = () => {
@@ -955,7 +970,7 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
-  // --- RENDER FUNCTIONS IMPLEMENTATION (Moved inside Component) ---
+  // --- RENDER FUNCTIONS IMPLEMENTATION ---
 
   const renderDashboard = () => (
       <div className="space-y-6 animate-fade-in-up">
@@ -2047,18 +2062,19 @@ const AdminPage: React.FC = () => {
                       <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
                   
-                  <div className="flex gap-4 items-center mt-4">
+                  <div className="flex items-center">
                       <button 
                           onClick={handleTestEmail}
                           className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
                       >
                           📧 Gửi Email kiểm tra
                       </button>
+                      
                       <button 
                           onClick={handleManualSync}
-                          className="text-sm text-green-600 hover:text-green-800 hover:underline flex items-center gap-1"
+                          className="text-sm text-green-600 hover:text-green-800 hover:underline flex items-center gap-1 ml-4"
                       >
-                          🔄 Đồng bộ thủ công
+                          🔄 Đồng bộ Server thủ công
                       </button>
                   </div>
               </div>
@@ -2430,16 +2446,39 @@ const AdminPage: React.FC = () => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 font-serif">
-                {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
-                 activeTab === 'products' ? 'Quản lý Sản phẩm' : 
-                 activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
-                 activeTab === 'inventory' ? 'Nhập xuất Kho' : 
-                 activeTab === 'customers' ? 'Danh sách Khách hàng' :
-                 activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
-                 activeTab === 'home' ? 'Cấu hình Trang chủ' :
-                 activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
-            </h2>
+            <div>
+                <h2 className="text-2xl font-bold text-gray-800 font-serif">
+                    {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
+                    activeTab === 'products' ? 'Quản lý Sản phẩm' : 
+                    activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
+                    activeTab === 'inventory' ? 'Nhập xuất Kho' : 
+                    activeTab === 'customers' ? 'Danh sách Khách hàng' :
+                    activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
+                    activeTab === 'home' ? 'Cấu hình Trang chủ' :
+                    activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
+                </h2>
+                
+                {/* SERVER STATUS BADGE */}
+                <div className="flex items-center gap-2 mt-2">
+                    <span className="text-sm font-medium text-gray-500">Trạng thái Server:</span>
+                    {serverStatus === 'checking' && (
+                        <span className="flex items-center gap-1 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                            <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div> Đang kiểm tra...
+                        </span>
+                    )}
+                    {serverStatus === 'online' && (
+                        <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold border border-green-200">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div> ONLINE
+                        </span>
+                    )}
+                    {serverStatus === 'offline' && (
+                        <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold border border-red-200" title="Chưa chạy lệnh: node backend/server.js">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div> OFFLINE (Chưa bật Server)
+                        </span>
+                    )}
+                </div>
+            </div>
+
             <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
                 <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">

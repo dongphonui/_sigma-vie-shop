@@ -26,6 +26,22 @@ const getApiBaseUrl = () => {
 export const API_BASE_URL = getApiBaseUrl(); // Exported for Debugging
 console.log("API Base URL:", API_BASE_URL); // Debug log
 
+// Check health of server
+export const checkServerConnection = async (): Promise<boolean> => {
+    try {
+        // Timeout after 2 seconds to avoid hanging UI
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        
+        const res = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        return res.ok;
+    } catch (e) {
+        return false;
+    }
+};
+
 const fetchData = async (endpoint: string) => {
   try {
     const res = await fetch(`${API_BASE_URL}/${endpoint}`);

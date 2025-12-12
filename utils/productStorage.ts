@@ -1,7 +1,7 @@
 
 import { PRODUCTS } from '../constants';
 import type { Product } from '../types';
-import { fetchProductsFromDB, syncProductToDB, updateProductStockInDB } from './apiClient';
+import { fetchProductsFromDB, syncProductToDB, updateProductStockInDB, checkServerConnection } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_products';
 
@@ -65,43 +65,51 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
 };
 
 // NUCLEAR OPTION: Hard Reset (SAFE VERSION)
-// 1. Pushes Local Data to Server FIRST.
-// 2. Wipes Local Cache.
-// 3. Fetches Fresh Data.
 export const hardResetProducts = async (): Promise<Product[]> => {
     console.warn("SAFE HARD RESET TRIGGERED");
     
-    // BƯỚC 1: CỐ GẮNG ĐỒNG BỘ DỮ LIỆU CŨ LÊN SERVER TRƯỚC
-    // Để tránh mất dữ liệu nếu người dùng thêm offline
-    try {
-        await syncAllLocalDataToServer();
-        console.log("Đã hoàn tất sao lưu dữ liệu lên Server trước khi reset.");
-    } catch (syncError) {
-        console.error("Cảnh báo: Không thể sao lưu dữ liệu lên server. Vẫn tiếp tục reset để sửa lỗi hiển thị.", syncError);
+    // 1. CHECK SERVER HEALTH FIRST
+    // If server is down, ABORT immediately to save local data.
+    const isOnline = await checkServerConnection();
+    if (!isOnline) {
+        const errorMsg = "KHÔNG THỂ KẾT NỐI SERVER. Hủy thao tác xóa cache để bảo vệ dữ liệu bạn vừa nhập.";
+        alert(errorMsg);
+        throw new Error(errorMsg);
     }
 
-    // BƯỚC 2: XÓA CACHE
+    // 2. ATTEMPT SYNC
+    try {
+        const success = await syncAllLocalDataToServer();
+        if (!success) {
+             const confirm = window.confirm("Cảnh báo: Có lỗi xảy ra khi đồng bộ một số sản phẩm lên Server. Nếu bạn tiếp tục, dữ liệu chưa lưu sẽ bị MẤT. Bạn có chắc chắn muốn tiếp tục không?");
+             if (!confirm) throw new Error("User cancelled reset due to sync failure.");
+        } else {
+            console.log("Đã hoàn tất sao lưu dữ liệu lên Server trước khi reset.");
+        }
+    } catch (syncError) {
+        throw syncError; // Abort
+    }
+
+    // 3. WIPE CACHE ONLY IF SERVER IS REACHABLE
     localStorage.removeItem(STORAGE_KEY);
     hasLoadedFromDB = false;
 
-    // BƯỚC 3: TẢI LẠI
+    // 4. FETCH FRESH
     try {
         const dbProducts = await fetchProductsFromDB();
         
         if (dbProducts && Array.isArray(dbProducts)) {
-            // Save fresh server data
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbProducts));
             window.dispatchEvent(new Event('sigma_vie_products_update'));
             hasLoadedFromDB = true;
             return dbProducts.map(formatProduct);
         } else {
-            throw new Error("Không kết nối được Server hoặc Server không trả về dữ liệu.");
+            throw new Error("Server connected but returned no data.");
         }
     } catch (e) {
         console.error("Hard Reset Failed:", e);
-        // If fail, restore defaults
         localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
-        throw e; // Re-throw so UI can handle alert
+        throw e;
     }
 };
 
@@ -180,11 +188,11 @@ export const syncAllLocalDataToServer = async (): Promise<boolean> => {
         
         if (failed.length > 0) {
             console.warn(`Có ${failed.length} sản phẩm đồng bộ thất bại.`);
+            return false;
         } else {
             console.log("Đồng bộ tất cả sản phẩm thành công!");
+            return true;
         }
-        
-        return true;
     } catch (e) {
         console.error("Lỗi đồng bộ thủ công:", e);
         return false;
