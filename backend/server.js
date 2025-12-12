@@ -100,11 +100,17 @@ const initDb = async () => {
     try {
         console.log("Running Migrations...");
         
-        // --- FIX CRITICAL ERROR: "value out of range for type integer" ---
-        // Ensure ID is BIGINT (for Date.now() timestamps)
+        // --- FIX 1: ID to BIGINT (Fix "out of range") ---
         await client.query(`ALTER TABLE products ALTER COLUMN id TYPE BIGINT`);
         await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_start_time TYPE BIGINT`);
         await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_end_time TYPE BIGINT`);
+
+        // --- FIX 2: PRICES TO TEXT (Fix "invalid input syntax for type numeric") ---
+        // Frontend gửi giá dạng "500.000 đ" (String), DB cũ có thể đang là NUMERIC nên lỗi.
+        // Lệnh này ép kiểu về TEXT.
+        await client.query(`ALTER TABLE products ALTER COLUMN price TYPE TEXT`);
+        await client.query(`ALTER TABLE products ALTER COLUMN import_price TYPE TEXT`);
+        await client.query(`ALTER TABLE products ALTER COLUMN sale_price TYPE TEXT`);
         
         // Orders Migrations
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
