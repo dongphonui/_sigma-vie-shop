@@ -5,7 +5,7 @@ import Header from '../components/Header';
 import ProductCard from '../components/ProductCard';
 import ProductModal from '../components/ProductModal';
 import Footer from '../components/Footer';
-import { getProducts } from '../utils/productStorage';
+import { getProducts, forceReloadProducts } from '../utils/productStorage';
 import { getHomePageSettings } from '../utils/homePageSettingsStorage';
 
 interface HomeProps {
@@ -97,11 +97,17 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
   const [isLookingForProduct, setIsLookingForProduct] = useState(false);
 
   useEffect(() => {
-    // Initial Load
+    // 1. Initial Load from local cache immediately for speed
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
     setSettings(getHomePageSettings());
+
+    // 2. FORCE RELOAD from Server to ensure mobile is up to date
+    // This is crucial for mobile users who might keep the tab open
+    forceReloadProducts().then(() => {
+        console.log("Forced reload complete via Home mount");
+    });
 
     // Deep Link Check on Initial Load
     if (initialProductId) {
@@ -109,12 +115,12 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         if (found) {
             setSelectedProduct(found);
         } else {
-            // Not found locally yet, set loading state and wait for DB
+            // Not found locally yet, set loading state and wait for DB update
             setIsLookingForProduct(true);
         }
     }
 
-    // Listener for async updates (DB fetch)
+    // Listener for async updates (DB fetch results)
     const handleProductUpdate = () => {
         const updated = getProducts();
         setProducts(updated);
@@ -130,8 +136,6 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
                 setSelectedProduct(found);
                 setIsLookingForProduct(false); // Found it!
             } else {
-                // If still not found after DB load, stop looking (product might be deleted or invalid ID)
-                // But allow a grace period or keep loading? For now stop to avoid infinite spin.
                 setIsLookingForProduct(false);
             }
         }

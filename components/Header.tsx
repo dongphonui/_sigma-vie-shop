@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { getHeaderSettings } from '../utils/headerSettingsStorage';
 import { getCurrentCustomer, logoutCustomer } from '../utils/customerStorage';
+import { forceReloadProducts } from '../utils/productStorage';
 import type { HeaderSettings, Customer } from '../types';
 
 interface HeaderProps {
@@ -19,9 +20,14 @@ const ShoppingBagIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
 );
 
+const RefreshIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+);
+
 const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount = 0, onOpenCart }) => {
   const [settings, setSettings] = useState<HeaderSettings | null>(null);
   const [userMenuVisible, setUserMenuVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     setSettings(getHeaderSettings());
@@ -36,6 +42,18 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
       logoutCustomer();
       window.location.hash = '#/'; 
       window.location.reload(); 
+  };
+
+  const handleManualRefresh = async () => {
+      setIsRefreshing(true);
+      try {
+          await forceReloadProducts();
+          // Optional: Give visual feedback
+      } catch (e) {
+          console.error("Refresh failed", e);
+      } finally {
+          setTimeout(() => setIsRefreshing(false), 500);
+      }
   };
 
   const brandStyle = settings ? {
@@ -116,6 +134,15 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
             </nav>
 
             <div className="flex items-center gap-4">
+                {/* Refresh Button (Mobile Friendly) */}
+                <button 
+                    onClick={handleManualRefresh}
+                    className={`p-2 text-gray-600 hover:text-[#D4AF37] transition-all rounded-full hover:bg-gray-100 ${isRefreshing ? 'animate-spin text-[#D4AF37]' : ''}`}
+                    title="Làm mới dữ liệu"
+                >
+                    <RefreshIcon className="w-5 h-5" />
+                </button>
+
                 {/* Cart Icon */}
                 <button 
                     onClick={onOpenCart}
