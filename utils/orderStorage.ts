@@ -83,17 +83,27 @@ export const createOrder = (
         paymentMethod: paymentMethod
     };
 
+    // 1. Update Stock Local
     const stockUpdated = updateProductStock(product.id, -quantity, size, color);
     if (!stockUpdated) {
         return { success: false, message: 'Lỗi cập nhật tồn kho. Vui lòng thử lại.' };
     }
 
+    // 2. Save Order Local
     const orders = getOrders();
     localStorage.setItem(STORAGE_KEY, JSON.stringify([newOrder, ...orders]));
 
-    syncOrderToDB(newOrder);
+    // 3. Sync to DB
+    console.log("Sending order to DB:", newOrder);
+    syncOrderToDB(newOrder).then(res => {
+        if(res && res.success) {
+            console.log("Order synced successfully");
+        } else {
+            console.error("Order sync failed", res);
+        }
+    });
 
-    // Update Transaction Note
+    // 4. Update Inventory Transaction
     const variantInfo = [];
     if(size) variantInfo.push(`Size: ${size}`);
     if(color) variantInfo.push(`Màu: ${color}`);
@@ -104,7 +114,9 @@ export const createOrder = (
         productName: product.name + variantStr,
         type: 'EXPORT',
         quantity: quantity,
-        note: `Đơn hàng trực tuyến từ ${customer.fullName} (${newOrder.id}) [${paymentMethod}]`
+        note: `Đơn hàng trực tuyến từ ${customer.fullName} (${newOrder.id}) [${paymentMethod}]`,
+        selectedSize: size,
+        selectedColor: color
     });
 
     return { success: true, message: 'Đặt hàng thành công!', order: newOrder };
@@ -130,7 +142,9 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
                     productName: order.productName,
                     type: 'IMPORT',
                     quantity: qty,
-                    note: `Hoàn trả tồn kho do hủy đơn hàng ${order.id}`
+                    note: `Hoàn trả tồn kho do hủy đơn hàng ${order.id}`,
+                    selectedSize: order.productSize,
+                    selectedColor: order.productColor
                 });
             }
         }

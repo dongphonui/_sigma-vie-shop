@@ -215,7 +215,26 @@ app.post('/api/products/sync', async (req, res) => {
          is_flash_sale = EXCLUDED.is_flash_sale, sale_price = EXCLUDED.sale_price,
          flash_sale_start_time = EXCLUDED.flash_sale_start_time, flash_sale_end_time = EXCLUDED.flash_sale_end_time,
          sizes = EXCLUDED.sizes, colors = EXCLUDED.colors, variants = EXCLUDED.variants`,
-      [p.id, p.name, p.price, p.importPrice, p.description, p.imageUrl, p.stock, p.sku, p.category, p.brand, p.status, p.isFlashSale, p.salePrice, p.flashSaleStartTime, p.flashSaleEndTime, sizesStr, colorsStr, variantsStr]
+      [
+        p.id, 
+        p.name, 
+        p.price, 
+        p.importPrice, 
+        p.description, 
+        p.imageUrl, 
+        p.stock, 
+        p.sku, 
+        p.category, 
+        p.brand, 
+        p.status, 
+        p.isFlashSale || false, 
+        p.salePrice || null, 
+        p.flashSaleStartTime || null, 
+        p.flashSaleEndTime || null, 
+        sizesStr, 
+        colorsStr, 
+        variantsStr
+      ]
     );
     res.json({ success: true });
   } catch (err) { 
@@ -285,7 +304,7 @@ app.post('/api/categories/sync', async (req, res) => {
     await pool.query(
       `INSERT INTO categories (id, name, description) VALUES ($1, $2, $3)
        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description`,
-      [c.id, c.name, c.description]
+      [c.id, c.name, c.description || null]
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false }); }
@@ -314,7 +333,19 @@ app.post('/api/customers/sync', async (req, res) => {
          full_name = EXCLUDED.full_name, email = EXCLUDED.email, phone_number = EXCLUDED.phone_number,
          address = EXCLUDED.address, password_hash = EXCLUDED.password_hash,
          cccd_number = EXCLUDED.cccd_number, gender = EXCLUDED.gender, dob = EXCLUDED.dob, issue_date = EXCLUDED.issue_date`,
-      [c.id, c.fullName, c.email, c.phoneNumber, c.address, c.passwordHash, c.createdAt, c.cccd_number, c.gender, c.dob, c.issue_date]
+      [
+        c.id, 
+        c.fullName, 
+        c.email || null, 
+        c.phoneNumber || null, 
+        c.address || null, 
+        c.passwordHash, 
+        c.createdAt, 
+        c.cccdNumber || null, 
+        c.gender || null, 
+        c.dob || null, 
+        c.issueDate || null
+      ]
     );
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ success: false }); }
@@ -326,7 +357,7 @@ app.put('/api/customers/:id', async (req, res) => {
     try {
         await pool.query(
             `UPDATE customers SET full_name = $1, email = $2, phone_number = $3, address = $4 WHERE id = $5`,
-            [c.fullName, c.email, c.phoneNumber, c.address, id]
+            [c.fullName, c.email || null, c.phoneNumber || null, c.address || null, id]
         );
         res.json({ success: true });
     } catch (err) { console.error(err); res.status(500).json({ success: false }); }
@@ -361,14 +392,31 @@ app.get('/api/orders', async (req, res) => {
 app.post('/api/orders/sync', async (req, res) => {
   const o = req.body;
   try {
+    // Ensure all optional fields are handled (undefined -> null)
     await pool.query(
       `INSERT INTO orders (id, customer_id, customer_name, customer_contact, customer_address, product_id, product_name, quantity, total_price, status, timestamp, payment_method, shipping_fee, product_size, product_color)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, payment_method = EXCLUDED.payment_method, shipping_fee = EXCLUDED.shipping_fee, product_size = EXCLUDED.product_size, product_color = EXCLUDED.product_color`,
-      [o.id, o.customerId, o.customerName, o.customerContact, o.customerAddress, o.productId, o.productName, o.quantity, o.totalPrice, o.status, o.timestamp, o.paymentMethod, o.shippingFee || 0, o.productSize, o.productColor]
+      [
+        o.id, 
+        o.customerId, 
+        o.customerName, 
+        o.customerContact, 
+        o.customerAddress, 
+        o.productId, 
+        o.productName, 
+        o.quantity, 
+        o.totalPrice, 
+        o.status, 
+        o.timestamp, 
+        o.paymentMethod || null, 
+        o.shippingFee || 0, 
+        o.productSize || null, 
+        o.productColor || null
+      ]
     );
     res.json({ success: true });
-  } catch (err) { console.error(err); res.status(500).json({ success: false }); }
+  } catch (err) { console.error("Order sync error:", err); res.status(500).json({ success: false, error: err.message }); }
 });
 
 // 5. INVENTORY
@@ -392,7 +440,17 @@ app.post('/api/inventory/sync', async (req, res) => {
       `INSERT INTO inventory_transactions (id, product_id, product_name, type, quantity, timestamp, note, selected_size, selected_color)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO NOTHING`,
-      [t.id, t.productId, t.productName, t.type, t.quantity, t.timestamp, t.note, t.selectedSize, t.selectedColor]
+      [
+        t.id, 
+        t.productId, 
+        t.productName, 
+        t.type, 
+        t.quantity, 
+        t.timestamp, 
+        t.note || null, 
+        t.selectedSize || null, 
+        t.selectedColor || null
+      ]
     );
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false }); }
