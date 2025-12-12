@@ -15,10 +15,10 @@ import {
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
 import { getHeaderSettings, updateHeaderSettings } from '../utils/headerSettingsStorage';
-import { getTransactions, addTransaction } from '../utils/inventoryStorage';
+import { getTransactions, addTransaction, syncAllTransactionsToServer } from '../utils/inventoryStorage';
 import { getDashboardMetrics, type DashboardData } from '../utils/analytics';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../utils/categoryStorage';
-import { getOrders, updateOrderStatus } from '../utils/orderStorage';
+import { getOrders, updateOrderStatus, syncAllOrdersToServer } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
@@ -932,19 +932,30 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
   
-  // NEW: Manual Sync Handler
+  // MANUAL SYNC HANDLER (Updated to sync ALL data types)
   const handleManualSync = async () => {
-      setProductFeedback('Đang đồng bộ dữ liệu lên Server...');
-      const success = await syncAllLocalDataToServer();
-      if (success) {
-          setProductFeedback('✅ Đồng bộ thành công! Hãy kiểm tra trên điện thoại.');
-      } else {
-          setProductFeedback('❌ Lỗi đồng bộ. Vui lòng kiểm tra kết nối Server.');
+      setSettingsFeedback('Đang đồng bộ dữ liệu lên Server...');
+      
+      try {
+          const results = await Promise.all([
+              syncAllLocalDataToServer(), // Sync Products
+              syncAllOrdersToServer(),    // Sync Orders (NEW)
+              syncAllTransactionsToServer() // Sync Inventory (NEW)
+          ]);
+          
+          if (results.every(r => r)) {
+              setSettingsFeedback('✅ Đồng bộ thành công tất cả dữ liệu (Sản phẩm, Đơn hàng, Kho).');
+          } else {
+              setSettingsFeedback('⚠️ Một số dữ liệu đồng bộ thất bại. Vui lòng thử lại.');
+          }
+      } catch (e) {
+          setSettingsFeedback('❌ Lỗi đồng bộ nghiêm trọng.');
       }
-      setTimeout(() => setProductFeedback(''), 5000);
+      
+      setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
-  // --- RENDER FUNCTIONS IMPLEMENTATION ---
+  // --- RENDER FUNCTIONS IMPLEMENTATION (Moved inside Component) ---
 
   const renderDashboard = () => (
       <div className="space-y-6 animate-fade-in-up">
@@ -1034,16 +1045,8 @@ const AdminPage: React.FC = () => {
 
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
-        {/* Toggle Category Manager & Sync Button */}
-        <div className="flex justify-end gap-3">
-             <button 
-                onClick={handleManualSync}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-                title="Bấm vào đây nếu sản phẩm không hiện trên điện thoại"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-                Đồng bộ Máy chủ
-            </button>
+        {/* Toggle Category Manager */}
+        <div className="flex justify-end">
              <button 
                 onClick={() => setIsManagingCategories(!isManagingCategories)}
                 className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50"
@@ -2044,12 +2047,20 @@ const AdminPage: React.FC = () => {
                       <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
                   
-                  <button 
-                      onClick={handleTestEmail}
-                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                  >
-                      📧 Gửi Email kiểm tra
-                  </button>
+                  <div className="flex gap-4 items-center mt-4">
+                      <button 
+                          onClick={handleTestEmail}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      >
+                          📧 Gửi Email kiểm tra
+                      </button>
+                      <button 
+                          onClick={handleManualSync}
+                          className="text-sm text-green-600 hover:text-green-800 hover:underline flex items-center gap-1"
+                      >
+                          🔄 Đồng bộ thủ công
+                      </button>
+                  </div>
               </div>
 
               {/* Login Logs Section */}
