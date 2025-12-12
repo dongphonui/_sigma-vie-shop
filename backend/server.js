@@ -96,12 +96,24 @@ const initDb = async () => {
       );
     `);
     
-    // Migration: Add columns if they don't exist
+    // Migration: Add columns if they don't exist (Fixing missing column errors)
     try {
+        console.log("Running Migrations...");
+        // Orders Migrations
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_size VARCHAR(50)`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_color VARCHAR(50)`);
+        
+        // Products Migrations (Fixing "column category does not exist")
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS import_price TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
+        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT`);
+        
+        // Product Advanced Features Migrations
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_flash_sale BOOLEAN DEFAULT FALSE`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_price TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_start_time BIGINT`);
@@ -109,12 +121,18 @@ const initDb = async () => {
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS colors TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS variants TEXT`); 
+        
+        // Customer Migrations
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob TEXT`);
         await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS issue_date TEXT`);
+        
+        // Inventory Migrations
         await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
         await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
+        
+        console.log("Migrations completed.");
     } catch (err) {
         console.log("Migration notice (ignore if columns exist):", err.message);
     }
