@@ -96,9 +96,15 @@ const initDb = async () => {
       );
     `);
     
-    // Migration: Add columns if they don't exist (Fixing missing column errors)
+    // Migration: Fix Missing Columns & Data Types
     try {
-        console.log("Running Migrations (Adding missing columns)...");
+        console.log("Running Migrations...");
+        
+        // --- FIX CRITICAL ERROR: "value out of range for type integer" ---
+        // Ensure ID is BIGINT (for Date.now() timestamps)
+        await client.query(`ALTER TABLE products ALTER COLUMN id TYPE BIGINT`);
+        await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_start_time TYPE BIGINT`);
+        await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_end_time TYPE BIGINT`);
         
         // Orders Migrations
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
@@ -106,7 +112,7 @@ const initDb = async () => {
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_size VARCHAR(50)`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_color VARCHAR(50)`);
         
-        // Products Migrations (Fixing "column category does not exist")
+        // Products Migrations
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT`);
         await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT`);
@@ -135,7 +141,7 @@ const initDb = async () => {
         
         console.log("Migrations completed successfully.");
     } catch (err) {
-        console.log("Migration notice (ignore if columns exist):", err.message);
+        console.log("Migration notice:", err.message);
     }
 
     // 5. Inventory Transactions
