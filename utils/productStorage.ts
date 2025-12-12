@@ -64,16 +64,28 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
     }
 };
 
-// NUCLEAR OPTION: Hard Reset
-// Wipes local storage product cache completely and trusts the Server.
+// NUCLEAR OPTION: Hard Reset (SAFE VERSION)
+// 1. Pushes Local Data to Server FIRST.
+// 2. Wipes Local Cache.
+// 3. Fetches Fresh Data.
 export const hardResetProducts = async (): Promise<Product[]> => {
-    console.warn("HARD RESET TRIGGERED: Clearing local product cache.");
-    // 1. Clear Local Cache
+    console.warn("SAFE HARD RESET TRIGGERED");
+    
+    // BƯỚC 1: CỐ GẮNG ĐỒNG BỘ DỮ LIỆU CŨ LÊN SERVER TRƯỚC
+    // Để tránh mất dữ liệu nếu người dùng thêm offline
+    try {
+        await syncAllLocalDataToServer();
+        console.log("Đã hoàn tất sao lưu dữ liệu lên Server trước khi reset.");
+    } catch (syncError) {
+        console.error("Cảnh báo: Không thể sao lưu dữ liệu lên server. Vẫn tiếp tục reset để sửa lỗi hiển thị.", syncError);
+    }
+
+    // BƯỚC 2: XÓA CACHE
     localStorage.removeItem(STORAGE_KEY);
     hasLoadedFromDB = false;
 
+    // BƯỚC 3: TẢI LẠI
     try {
-        // 2. Fetch fresh
         const dbProducts = await fetchProductsFromDB();
         
         if (dbProducts && Array.isArray(dbProducts)) {
@@ -87,8 +99,7 @@ export const hardResetProducts = async (): Promise<Product[]> => {
         }
     } catch (e) {
         console.error("Hard Reset Failed:", e);
-        // If fail, restore defaults or leave empty? 
-        // Restore defaults so app doesn't break
+        // If fail, restore defaults
         localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
         throw e; // Re-throw so UI can handle alert
     }
@@ -157,11 +168,21 @@ export const getProducts = (): Product[] => {
 // Hàm thủ công để đẩy toàn bộ dữ liệu Local lên Server (Fix lỗi không đồng bộ)
 export const syncAllLocalDataToServer = async (): Promise<boolean> => {
     try {
-        const products = getProducts();
+        const storedProducts = localStorage.getItem(STORAGE_KEY);
+        const products: Product[] = storedProducts ? JSON.parse(storedProducts) : [];
+        
         console.log("Bắt đầu đồng bộ thủ công...", products.length, "sản phẩm");
         
-        const promises = products.map(p => syncProductToDB(p));
-        await Promise.all(promises);
+        // Dùng Promise.allSettled để đảm bảo 1 cái lỗi không làm dừng tất cả
+        const results = await Promise.allSettled(products.map(p => syncProductToDB(p)));
+        
+        const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.success));
+        
+        if (failed.length > 0) {
+            console.warn(`Có ${failed.length} sản phẩm đồng bộ thất bại.`);
+        } else {
+            console.log("Đồng bộ tất cả sản phẩm thành công!");
+        }
         
         return true;
     } catch (e) {
@@ -194,9 +215,13 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
   
   // Gửi lên Server Postgres (Không chặn UI)
+  console.log("Đang gửi sản phẩm mới lên Server:", newProduct.name);
   syncProductToDB(newProduct).then(res => {
       if (!res || !res.success) {
-          console.warn("Lưu lên server thất bại, sẽ thử lại ở lần tải sau.");
+          console.error("❌ LƯU SERVER THẤT BẠI. Dữ liệu chỉ nằm ở Local.", res);
+          alert("Cảnh báo: Không thể lưu sản phẩm lên Server (Lỗi mạng hoặc Server chưa chạy). Sản phẩm này sẽ mất nếu bạn xóa cache.");
+      } else {
+          console.log("✅ Đã lưu sản phẩm lên Server thành công.");
       }
   });
   
