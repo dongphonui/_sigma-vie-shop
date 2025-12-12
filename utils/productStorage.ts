@@ -8,11 +8,79 @@ const STORAGE_KEY = 'sigma_vie_products';
 // Biến cờ để kiểm tra xem đã load từ DB chưa
 let hasLoadedFromDB = false;
 
-// Force reload helper (called manually by UI)
-export const forceReloadProducts = async () => {
+// Helper function to handle the merging logic (extracted to reuse)
+const processAndMergeData = (localData: Product[], dbProducts: any[]) => {
+    if (dbProducts && Array.isArray(dbProducts)) {
+        console.log('Đã tải dữ liệu từ Server. Số lượng:', dbProducts.length);
+        
+        // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH
+        const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
+        
+        // Tìm những sản phẩm có ở Local nhưng chưa có ở Server (Sản phẩm mới tạo offline)
+        const unsavedLocalProducts = localData.filter(p => !serverIdSet.has(String(p.id)));
+        
+        if (unsavedLocalProducts.length > 0) {
+            console.log(`Phát hiện ${unsavedLocalProducts.length} sản phẩm chưa được lưu. Đang đồng bộ lại...`);
+            unsavedLocalProducts.forEach(p => syncProductToDB(p));
+        }
+
+        // Merge: Dữ liệu Server là chuẩn + Dữ liệu Local chưa lưu
+        const mergedProducts = [...dbProducts, ...unsavedLocalProducts];
+        
+        // Sắp xếp: Mới nhất lên đầu
+        mergedProducts.sort((a, b) => Number(b.id) - Number(a.id));
+
+        return mergedProducts;
+    }
+    return null;
+};
+
+// Force reload helper (Updated to be Async and blocking)
+export const forceReloadProducts = async (): Promise<Product[]> => {
     hasLoadedFromDB = false; // Reset flag
-    return getProducts(); // This will trigger the fetch logic below
-}
+    
+    // 1. Get current local data to preserve unsaved items
+    const storedProducts = localStorage.getItem(STORAGE_KEY);
+    let localData: Product[] = storedProducts ? JSON.parse(storedProducts) : PRODUCTS;
+
+    try {
+        console.log("Đang ép buộc tải lại từ Server...");
+        const dbProducts = await fetchProductsFromDB();
+        
+        if (dbProducts) {
+            const merged = processAndMergeData(localData, dbProducts);
+            if (merged) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+                window.dispatchEvent(new Event('sigma_vie_products_update'));
+                hasLoadedFromDB = true;
+                return merged.map(formatProduct);
+            }
+        }
+        throw new Error("Không lấy được dữ liệu mới từ Server");
+    } catch (e) {
+        console.error("Lỗi khi ép buộc tải lại:", e);
+        // Fallback to local
+        return getProducts();
+    }
+};
+
+const formatProduct = (p: any): Product => ({
+    ...p,
+    id: Number(p.id), 
+    stock: p.stock !== undefined ? p.stock : 0,
+    importPrice: p.importPrice || '0₫',
+    sku: p.sku || `SKU-${p.id}`,
+    category: p.category || 'Chung',
+    brand: p.brand || 'Sigma Vie',
+    status: p.status || 'active',
+    isFlashSale: p.isFlashSale || false,
+    salePrice: p.salePrice || undefined,
+    flashSaleStartTime: p.flashSaleStartTime || undefined,
+    flashSaleEndTime: p.flashSaleEndTime || undefined,
+    sizes: Array.isArray(p.sizes) ? p.sizes : [], 
+    colors: Array.isArray(p.colors) ? p.colors : [],
+    variants: Array.isArray(p.variants) ? p.variants : [] 
+});
 
 export const getProducts = (): Product[] => {
   try {
@@ -34,67 +102,21 @@ export const getProducts = (): Product[] => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
     }
 
-    // 2. Load từ DB và Merge thông minh (ngay lập tức, không delay)
+    // 2. Load từ DB và Merge thông minh (Non-blocking background update)
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
-      
-      console.log("Đang tải sản phẩm từ Server...");
       fetchProductsFromDB().then(dbProducts => {
-          if (dbProducts && Array.isArray(dbProducts)) {
-            console.log('Đã tải dữ liệu từ Server. Số lượng:', dbProducts.length);
-            
-            // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH (Tránh lỗi so sánh number vs string)
-            const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
-            
-            // Tìm những sản phẩm có ở Local nhưng chưa có ở Server (Sản phẩm mới tạo)
-            const unsavedLocalProducts = localData.filter(p => !serverIdSet.has(String(p.id)));
-            
-            if (unsavedLocalProducts.length > 0) {
-                console.log(`Phát hiện ${unsavedLocalProducts.length} sản phẩm chưa được lưu. Đang đồng bộ lại...`);
-                // Gửi lại từng sản phẩm chưa được lưu
-                unsavedLocalProducts.forEach(p => syncProductToDB(p));
-            }
-
-            // Merge: Dữ liệu Server là chuẩn + Dữ liệu Local chưa lưu
-            const mergedProducts = [...dbProducts, ...unsavedLocalProducts];
-            
-            // Sắp xếp: Mới nhất lên đầu (theo ID giảm dần)
-            mergedProducts.sort((a, b) => Number(b.id) - Number(a.id));
-
-            // Cập nhật lại LocalStorage và UI
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedProducts));
+          const merged = processAndMergeData(localData, dbProducts);
+          if (merged) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
             window.dispatchEvent(new Event('sigma_vie_products_update'));
-          } else {
-             console.warn("Không lấy được dữ liệu Server hoặc rỗng (NULL), giữ nguyên dữ liệu Local.");
-             // Nếu server trả về null (lỗi kết nối), ta KHÔNG ghi đè local bằng rỗng.
-             // Ta chỉ giữ nguyên localData.
-             window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
       }).catch(err => {
-          console.error("Lỗi kết nối Server khi tải sản phẩm:", err);
-          window.dispatchEvent(new Event('sigma_vie_products_update'));
+          console.error("Lỗi kết nối Server khi tải sản phẩm (Background):", err);
       });
     }
 
-    // Ensure data integrity when returning (parse arrays if needed)
-    return localData.map((p: any) => ({
-        ...p,
-        // Ép kiểu ID về number để đồng nhất trong app
-        id: Number(p.id), 
-        stock: p.stock !== undefined ? p.stock : 0,
-        importPrice: p.importPrice || '0₫',
-        sku: p.sku || `SKU-${p.id}`,
-        category: p.category || 'Chung',
-        brand: p.brand || 'Sigma Vie',
-        status: p.status || 'active',
-        isFlashSale: p.isFlashSale || false,
-        salePrice: p.salePrice || undefined,
-        flashSaleStartTime: p.flashSaleStartTime || undefined,
-        flashSaleEndTime: p.flashSaleEndTime || undefined,
-        sizes: Array.isArray(p.sizes) ? p.sizes : [], 
-        colors: Array.isArray(p.colors) ? p.colors : [],
-        variants: Array.isArray(p.variants) ? p.variants : [] 
-    }));
+    return localData.map(formatProduct);
 
   } catch (error) {
     console.error("Lỗi storage nghiêm trọng", error);

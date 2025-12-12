@@ -45,14 +45,21 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
   };
 
   const handleManualRefresh = async () => {
+      if (isRefreshing) return;
       setIsRefreshing(true);
       try {
-          await forceReloadProducts();
-          // Optional: Give visual feedback
+          const updatedProducts = await forceReloadProducts();
+          
+          // Kiểm tra xem dữ liệu có thực sự được tải không
+          // Chúng ta không hiển thị alert vì UX, nhưng có thể console.log
+          console.log("Dữ liệu đã được làm mới:", updatedProducts.length, "sản phẩm");
+          
       } catch (e) {
           console.error("Refresh failed", e);
+          alert("Không thể kết nối với máy chủ. Vui lòng kiểm tra Wifi hoặc Tường lửa trên máy tính.");
       } finally {
-          setTimeout(() => setIsRefreshing(false), 500);
+          // Delay tắt xoay để người dùng cảm nhận được hành động
+          setTimeout(() => setIsRefreshing(false), 800);
       }
   };
 
@@ -137,10 +144,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                 {/* Refresh Button (Mobile Friendly) */}
                 <button 
                     onClick={handleManualRefresh}
-                    className={`p-2 text-gray-600 hover:text-[#D4AF37] transition-all rounded-full hover:bg-gray-100 ${isRefreshing ? 'animate-spin text-[#D4AF37]' : ''}`}
-                    title="Làm mới dữ liệu"
+                    className={`p-2 text-gray-600 transition-all rounded-full hover:bg-gray-100 ${isRefreshing ? 'bg-yellow-50 text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`}
+                    title="Làm mới dữ liệu từ Server"
                 >
-                    <RefreshIcon className="w-5 h-5" />
+                    <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </button>
 
                 {/* Cart Icon */}
