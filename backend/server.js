@@ -98,7 +98,8 @@ const initDb = async () => {
     
     // Migration: Add columns if they don't exist (Fixing missing column errors)
     try {
-        console.log("Running Migrations...");
+        console.log("Running Migrations (Adding missing columns)...");
+        
         // Orders Migrations
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0`);
@@ -132,7 +133,7 @@ const initDb = async () => {
         await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
         await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
         
-        console.log("Migrations completed.");
+        console.log("Migrations completed successfully.");
     } catch (err) {
         console.log("Migration notice (ignore if columns exist):", err.message);
     }
@@ -529,8 +530,12 @@ app.get('/api/admin/logs', async (req, res) => {
     } catch (err) { res.status(500).send(err.message); }
 });
 
-// Start Server - Listen on 0.0.0.0 for external access
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server is running on port ${port} and accepting external connections`);
-  initDb();
+// QUAN TRỌNG: Khởi tạo DB TRƯỚC, sau đó mới bật Server lắng nghe
+// Điều này ngăn chặn việc nhận request khi DB chưa cập nhật xong cột
+initDb().then(() => {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Server is running on port ${port} and accepting external connections`);
+  });
+}).catch(err => {
+  console.error("FAILED TO START SERVER:", err);
 });
