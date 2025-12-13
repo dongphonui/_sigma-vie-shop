@@ -12,6 +12,7 @@ import { getSocialSettings } from './socialSettingsStorage';
 import { getBankSettings } from './bankSettingsStorage';
 import { getStoreSettings } from './storeSettingsStorage';
 import { getShippingSettings } from './shippingSettingsStorage';
+import { resetDatabase } from './apiClient';
 
 // List of all storage keys used in the app
 const KEYS = {
@@ -109,21 +110,31 @@ export const restoreBackup = async (file: File): Promise<{ success: boolean; mes
     });
 };
 
-export const performFactoryReset = (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
+// Updated to return Promise and call Server API
+export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
+    
+    // 1. Wipe LocalStorage first (Optimistic UI)
     if (scope === 'ORDERS') {
         localStorage.removeItem(KEYS.orders);
-        localStorage.removeItem(KEYS.transactions); // Transaction history often links to orders
+        localStorage.removeItem(KEYS.transactions);
     } else if (scope === 'PRODUCTS') {
         localStorage.removeItem(KEYS.products);
-        localStorage.removeItem(KEYS.transactions); // Stock history invalid without products
+        localStorage.removeItem(KEYS.transactions);
     } else if (scope === 'FULL') {
-        // Clear everything except Admin Settings (to keep login)
         const adminSettings = localStorage.getItem(KEYS.adminSettings);
         localStorage.clear();
         if (adminSettings) {
             localStorage.setItem(KEYS.adminSettings, adminSettings);
         }
-        // Keep Auth session
         sessionStorage.setItem('isAuthenticated', 'true');
+    }
+
+    // 2. Call Server API to Wipe DB
+    const serverResult = await resetDatabase(scope);
+    
+    if (serverResult && serverResult.success) {
+        return { success: true, message: 'Đã xóa dữ liệu thành công trên cả Trình duyệt và Server.' };
+    } else {
+        return { success: false, message: 'Đã xóa ở Trình duyệt nhưng LỖI xóa Server. Dữ liệu có thể quay lại khi tải trang. ' + (serverResult?.error || '') };
     }
 };

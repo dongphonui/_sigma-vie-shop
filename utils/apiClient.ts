@@ -1,42 +1,9 @@
 
-// File này quản lý việc gọi API
-// Nếu Server chưa chạy, nó sẽ trả về null để App dùng LocalStorage fallback
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-const getApiBaseUrl = () => {
-    // 1. Prioritize Environment Variable
-    if ((import.meta as any).env?.VITE_API_URL) {
-        return (import.meta as any).env.VITE_API_URL;
-    }
-    
-    // 2. Dynamic Hostname for LAN/WiFi testing
-    // If accessing via 192.168.x.x, try to hit port 5000 on that same IP
-    if (typeof window !== 'undefined') {
-        const hostname = window.location.hostname;
-        // Simple IP check or localhost
-        const isIp = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(hostname);
-        if (isIp || hostname === 'localhost') {
-            return `http://${hostname}:5000/api`;
-        }
-    }
-
-    // 3. Fallback
-    return 'http://localhost:5000/api';
-};
-
-export const API_BASE_URL = getApiBaseUrl(); // Exported for Debugging
-console.log("API Base URL:", API_BASE_URL); // Debug log
-
-// Check health of server
 export const checkServerConnection = async (): Promise<boolean> => {
     try {
-        // Timeout after 2 seconds to avoid hanging UI
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        
-        // Anti-cache param
-        const res = await fetch(`${API_BASE_URL}/health?t=${Date.now()}`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
+        const res = await fetch(`${API_BASE_URL}/health`, { method: 'GET' });
         return res.ok;
     } catch (e) {
         return false;
@@ -44,91 +11,37 @@ export const checkServerConnection = async (): Promise<boolean> => {
 };
 
 const fetchData = async (endpoint: string) => {
-  try {
-    // Thêm timestamp (?t=...) để chặn Mobile Browser cache kết quả cũ
-    const antiCacheUrl = `${API_BASE_URL}/${endpoint}?t=${Date.now()}`;
-    const res = await fetch(antiCacheUrl);
-    if (!res.ok) throw new Error('Server error');
-    return await res.json();
-  } catch (error) {
-    console.warn(`Không kết nối được DB (${endpoint}) tại ${API_BASE_URL}, dùng LocalStorage.`, error);
-    return null;
-  }
-};
-
-const syncData = async (endpoint: string, data: any) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/${endpoint}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Server returned ${res.status}: ${errText}`);
-    }
-    
-    return await res.json();
-  } catch (error) {
-    console.error(`Không đồng bộ được DB (${endpoint}):`, error);
-    return null;
-  }
-};
-
-// Hàm cập nhật kho Atomic (Cộng dồn trực tiếp trên DB)
-export const updateProductStockInDB = async (id: number, quantityChange: number, size?: string, color?: string) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/products/stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, quantityChange, size, color })
-    });
-    return await res.json();
-  } catch (error) {
-    console.warn('Không thể cập nhật tồn kho trên Server.');
-    return null;
-  }
-};
-
-// Hàm gửi email thật qua Backend
-export const sendEmail = async (to: string, subject: string, html: string) => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, html })
-    });
-    return await res.json();
-  } catch (error) {
-    console.error('Không thể gửi email:', error);
-    return { success: false, message: 'Lỗi kết nối khi gửi email.' };
-  }
-};
-
-// Admin Logs
-export const recordAdminLogin = async (method: 'EMAIL_OTP' | 'GOOGLE_AUTH', status: 'SUCCESS' | 'FAILED') => {
     try {
-        await fetch(`${API_BASE_URL}/admin/logs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                username: 'admin',
-                method,
-                status,
-                timestamp: Date.now()
-            })
-        });
+        if (!(await checkServerConnection())) return null;
+        const res = await fetch(`${API_BASE_URL}/${endpoint}`);
+        if (!res.ok) return null;
+        return await res.json();
     } catch (e) {
-        console.warn('Could not record login log');
+        console.error(`Error fetching ${endpoint}:`, e);
+        return null;
     }
 };
 
-export const fetchAdminLoginLogs = () => fetchData('admin/logs');
+const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'DELETE' = 'POST') => {
+    try {
+        if (!(await checkServerConnection())) return { success: false, message: 'Server offline' };
+        const res = await fetch(`${API_BASE_URL}/${endpoint}`, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return await res.json();
+    } catch (e) {
+        console.error(`Error syncing ${endpoint}:`, e);
+        return { success: false, message: 'Network error' };
+    }
+};
 
 // Products
 export const fetchProductsFromDB = () => fetchData('products');
 export const syncProductToDB = (product: any) => syncData('products', product);
+export const updateProductStockInDB = (id: number, quantityChange: number, size?: string, color?: string) => 
+    syncData('products/stock', { id, quantityChange, size, color }, 'POST');
 
 // Categories
 export const fetchCategoriesFromDB = () => fetchData('categories');
@@ -137,33 +50,8 @@ export const syncCategoryToDB = (category: any) => syncData('categories', catego
 // Customers
 export const fetchCustomersFromDB = () => fetchData('customers');
 export const syncCustomerToDB = (customer: any) => syncData('customers', customer);
-
-export const updateCustomerInDB = async (customer: any) => {
-    try {
-        const res = await fetch(`${API_BASE_URL}/customers/${customer.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(customer)
-        });
-        return await res.json();
-    } catch (error) {
-        console.warn('Không thể cập nhật khách hàng trên Server.');
-        return null;
-    }
-};
-
-export const deleteCustomerFromDB = async (id: string) => {
-    try {
-        const res = await fetch(`${API_BASE_URL}/customers/${id}`, {
-            method: 'DELETE'
-        });
-        return await res.json();
-    } catch (error) {
-        console.warn('Không thể xóa khách hàng trên Server.');
-        return null;
-    }
-};
-
+export const updateCustomerInDB = (customer: any) => syncData(`customers/${customer.id}`, customer, 'PUT');
+export const deleteCustomerFromDB = (id: string) => syncData(`customers/${id}`, {}, 'DELETE');
 
 // Orders
 export const fetchOrdersFromDB = () => fetchData('orders');
@@ -172,3 +60,13 @@ export const syncOrderToDB = (order: any) => syncData('orders', order);
 // Inventory
 export const fetchTransactionsFromDB = () => fetchData('inventory');
 export const syncTransactionToDB = (transaction: any) => syncData('inventory', transaction);
+
+// Admin
+export const recordAdminLogin = (method: string, status: string) => syncData('admin/login', { method, status });
+export const fetchAdminLoginLogs = () => fetchData('admin/logs');
+export const sendEmail = (to: string, subject: string, html: string) => syncData('admin/email', { to, subject, html });
+
+// Reset
+export const resetDatabase = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
+    return syncData('admin/reset', { scope });
+};
