@@ -50,6 +50,7 @@ export interface InventoryTransaction {
   note?: string;
   selectedSize?: string; // NEW: Size cụ thể
   selectedColor?: string; // NEW: Màu cụ thể
+  stockAfter?: number; // NEW: Tồn kho sau giao dịch
 }
 
 export interface Customer {

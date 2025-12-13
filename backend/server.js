@@ -117,7 +117,8 @@ const initDb = async () => {
         timestamp BIGINT,
         note TEXT,
         selected_size VARCHAR(50),
-        selected_color VARCHAR(50)
+        selected_color VARCHAR(50),
+        stock_after INTEGER
       );
     `);
 
@@ -184,6 +185,7 @@ const initDb = async () => {
     
     await runMigration(client, `ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
     await runMigration(client, `ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
+    await runMigration(client, `ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS stock_after INTEGER`);
     
     console.log("Database & Migrations Initialized Successfully.");
   } catch (err) {
@@ -471,7 +473,8 @@ app.get('/api/inventory', async (req, res) => {
       id: r.id, productId: parseInt(r.product_id), productName: r.product_name,
       type: r.type, quantity: r.quantity, timestamp: parseInt(r.timestamp), note: r.note,
       selectedSize: r.selected_size,
-      selectedColor: r.selected_color
+      selectedColor: r.selected_color,
+      stockAfter: r.stock_after // Return stock after
     }));
     res.json(transactions);
   } catch (err) { res.status(500).send(err.message); }
@@ -481,8 +484,8 @@ app.post('/api/inventory/sync', async (req, res) => {
   const t = req.body;
   try {
     await pool.query(
-      `INSERT INTO inventory_transactions (id, product_id, product_name, type, quantity, timestamp, note, selected_size, selected_color)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO inventory_transactions (id, product_id, product_name, type, quantity, timestamp, note, selected_size, selected_color, stock_after)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (id) DO NOTHING`,
       [
         t.id, 
@@ -493,7 +496,8 @@ app.post('/api/inventory/sync', async (req, res) => {
         t.timestamp, 
         t.note || null, 
         t.selectedSize || null, 
-        t.selectedColor || null
+        t.selectedColor || null,
+        t.stockAfter !== undefined ? t.stockAfter : null
       ]
     );
     res.json({ success: true });
