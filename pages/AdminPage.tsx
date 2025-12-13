@@ -712,6 +712,19 @@ const AdminPage = () => {
     const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
+        // Fetch FRESH product data to get the accurate stock level AFTER update
+        const freshProducts = getProducts();
+        const freshProduct = freshProducts.find(p => String(p.id) === String(productId));
+        let stockAfter = freshProduct ? freshProduct.stock : 0;
+
+        if (inventorySize || inventoryColor) {
+             const v = freshProduct?.variants?.find(v => 
+                (v.size === inventorySize || (!v.size && !inventorySize)) && 
+                (v.color === inventoryColor || (!v.color && !inventoryColor))
+            );
+            stockAfter = v ? v.stock : 0;
+        }
+
         // Construct Note
         let noteDetails = inventoryNote;
         if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
@@ -724,12 +737,13 @@ const AdminPage = () => {
             quantity: qty,
             note: noteDetails,
             selectedSize: inventorySize,
-            selectedColor: inventoryColor
+            selectedColor: inventoryColor,
+            stockAfter: stockAfter // Save Stock After
         });
         
         refreshProducts();
         refreshInventory();
-        setInventoryFeedback(`Thành công: ${inventoryType === 'IMPORT' ? 'Nhập' : 'Xuất'} ${qty} sản phẩm.`);
+        setInventoryFeedback(`Thành công: ${inventoryType === 'IMPORT' ? 'Nhập' : 'Xuất'} ${qty} sản phẩm. Tồn kho mới: ${stockAfter}`);
         setInventoryQuantity('');
         setInventoryNote('');
         setTimeout(() => setInventoryFeedback(''), 3000);
