@@ -106,11 +106,16 @@ const initDb = async () => {
         await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_end_time TYPE BIGINT`);
 
         // --- FIX 2: PRICES TO TEXT (Fix "invalid input syntax for type numeric") ---
-        // Frontend gửi giá dạng "500.000 đ" (String), DB cũ có thể đang là NUMERIC nên lỗi.
-        // Lệnh này ép kiểu về TEXT.
         await client.query(`ALTER TABLE products ALTER COLUMN price TYPE TEXT`);
         await client.query(`ALTER TABLE products ALTER COLUMN import_price TYPE TEXT`);
         await client.query(`ALTER TABLE products ALTER COLUMN sale_price TYPE TEXT`);
+
+        // --- FIX 3: TIMESTAMPS TO BIGINT (Fix "value is out of range for type integer") ---
+        // Lệnh này sửa lỗi Order sync error bạn vừa gặp
+        await client.query(`ALTER TABLE orders ALTER COLUMN timestamp TYPE BIGINT`);
+        await client.query(`ALTER TABLE customers ALTER COLUMN created_at TYPE BIGINT`);
+        // Chúng ta cũng sửa luôn cho bảng Inventory để tránh lỗi tương lai
+        await client.query(`ALTER TABLE inventory_transactions ALTER COLUMN timestamp TYPE BIGINT`);
         
         // Orders Migrations
         await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
@@ -177,6 +182,11 @@ const initDb = async () => {
         status VARCHAR(20)
       );
     `);
+    
+    // Fix Admin Logs Timestamp as well just in case
+    try {
+        await client.query(`ALTER TABLE admin_logs ALTER COLUMN timestamp TYPE BIGINT`);
+    } catch(e) {}
 
     console.log("Database Initialized Successfully.");
   } catch (err) {
