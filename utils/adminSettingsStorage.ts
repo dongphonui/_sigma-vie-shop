@@ -118,10 +118,10 @@ export const generateTotpSecret = (): string => {
     return secret.base32;
 };
 
-export const getTotpUri = (secret: string): string => {
+export const getTotpUri = (secret: string, label?: string): string => {
     const totp = new OTPAuth.TOTP({
         issuer: 'Sigma Vie Admin',
-        label: getPrimaryAdminEmail(),
+        label: label || getPrimaryAdminEmail(),
         algorithm: 'SHA1',
         digits: 6,
         period: 30,

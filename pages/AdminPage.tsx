@@ -243,16 +243,22 @@ const AdminPage: React.FC = () => {
       if (userStr) {
           const user = JSON.parse(userStr);
           setCurrentUser(user);
-          // Set initial TOTP state for Staff UI
+          
+          // Initial TOTP State Logic
           if (user.role === 'STAFF') {
+              // For Staff, trust the DB value sent during login
               setTotpEnabled(!!user.is_totp_enabled);
+          } else {
+              // For Master, check LocalStorage
+              setTotpEnabled(isTotpEnabled());
           }
+
           // Auto select first available tab if dashboard is not allowed
           if (user.role !== 'MASTER' && user.permissions && !user.permissions.includes('dashboard') && !user.permissions.includes('ALL')) {
               if (user.permissions.length > 0) setActiveTab(user.permissions[0] as any);
           }
       } else {
-          // Fallback to Master Admin if no session data (Legacy LocalStorage Auth)
+          // Fallback to Master Admin if no session data
           setCurrentUser({
               id: 'master',
               username: 'admin',
@@ -294,10 +300,12 @@ const AdminPage: React.FC = () => {
   const refreshSettings = useCallback(() => {
     setAdminEmails(getAdminEmails());
     setSocialSettings(getSocialSettings());
-    // Only refresh global master settings if master
-    if (!currentUser || currentUser.role === 'MASTER') {
+    
+    // Refresh global settings only if Master, otherwise keep local staff state
+    if (currentUser?.role === 'MASTER') {
         setTotpEnabled(isTotpEnabled());
     }
+    
     setBankSettings(getBankSettings());
     
     // Fetch Logs
@@ -361,6 +369,7 @@ const AdminPage: React.FC = () => {
     window.location.hash = '/';
   };
 
+  // ... [Image Upload & Date Format Helper] ...
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -399,7 +408,7 @@ const AdminPage: React.FC = () => {
           await updateAdminUser(editingStaffId, {
               fullname: newStaffFullname,
               permissions: newStaffPermissions,
-              password: newStaffPassword || undefined // Only update if provided
+              password: newStaffPassword || undefined 
           });
       } else {
           if (!newStaffPassword) {
@@ -428,7 +437,7 @@ const AdminPage: React.FC = () => {
       setNewStaffUsername(user.username);
       setNewStaffFullname(user.fullname);
       setNewStaffPermissions(user.permissions || []);
-      setNewStaffPassword(''); // Don't show old password
+      setNewStaffPassword(''); 
       setIsAddingStaff(true);
   };
 
@@ -439,7 +448,7 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // ... [Keep Product Handlers] ...
+  // ... [Product Handlers] ...
   const handleEditProduct = (product: Product) => {
       setEditingProduct(product);
       setNewProductName(product.name);
@@ -548,7 +557,7 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // ... [Keep Category, Order, Customer, Inventory Handlers] ...
+  // ... [Other Handlers: Category, Order, Customer, Inventory] ...
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName) {
@@ -861,12 +870,12 @@ const AdminPage: React.FC = () => {
       const secret = generateTotpSecret();
       setTempTotpSecret(secret);
       
-      // If Staff, use their username as label, otherwise default
+      // Use Custom Label for Staff so they don't see Admin Email in their App
       const label = currentUser?.role === 'STAFF' 
           ? `Sigma Staff (${currentUser.username})` 
           : getPrimaryAdminEmail();
           
-      setTempTotpUri(getTotpUri(secret)); // Note: getTotpUri needs to handle custom label if we want it perfect, but default is fine
+      setTempTotpUri(getTotpUri(secret, label));
       setShowTotpSetup(true);
       setVerificationCode('');
   };
@@ -882,6 +891,12 @@ const AdminPage: React.FC = () => {
                   totp_secret: tempTotpSecret,
                   is_totp_enabled: true
               });
+              
+              // Update local currentUser state to reflect changes immediately
+              const updatedUser = { ...currentUser, is_totp_enabled: true, totp_secret: tempTotpSecret };
+              setCurrentUser(updatedUser);
+              sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
+              
               setTotpEnabled(true);
               setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công cho tài khoản nhân viên!');
           } else {
@@ -904,6 +919,12 @@ const AdminPage: React.FC = () => {
                   totp_secret: '', // Clear secret
                   is_totp_enabled: false
               });
+              
+              // Update local state
+              const updatedUser = { ...currentUser, is_totp_enabled: false, totp_secret: undefined };
+              setCurrentUser(updatedUser);
+              sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
+              
               setTotpEnabled(false);
           } else {
               disableTotp();
@@ -930,8 +951,11 @@ const AdminPage: React.FC = () => {
 
   const handleBankSettingsSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Need 2FA if enabled
-      if (isTotpEnabled() || (currentUser?.role === 'STAFF' && totpEnabled)) {
+      // Need 2FA if enabled (Check either global master setting or local staff setting)
+      const isMaster2FA = currentUser?.role === 'MASTER' && isTotpEnabled();
+      const isStaff2FA = currentUser?.role === 'STAFF' && totpEnabled;
+
+      if (isMaster2FA || isStaff2FA) {
           setShowBankSecurityModal(true);
           setSecurityCode('');
       } else {
@@ -946,8 +970,7 @@ const AdminPage: React.FC = () => {
       let isValid = false;
       
       if (currentUser?.role === 'STAFF') {
-          // Verify against staff's secret if available in context
-          // Note: Ideally we verify on server, but for now reuse client logic with context secret
+          // Verify against staff's secret from context
           if (currentUser.totp_secret) {
               isValid = verifyTempTotpToken(securityCode, currentUser.totp_secret);
           }
@@ -2095,7 +2118,7 @@ const AdminPage: React.FC = () => {
   const renderStaffManager = () => (
       <div className="space-y-6 animate-fade-in-up">
           <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-              <h3 className="text-lg font-bold text-gray-800">Quản lý Nhân viên</h3>
+              <h3 className="font-bold text-gray-800">Danh sách Nhân viên</h3>
               <button 
                   onClick={() => {
                       setEditingStaffId(null);
@@ -2105,15 +2128,15 @@ const AdminPage: React.FC = () => {
                       setNewStaffPermissions([]);
                       setIsAddingStaff(!isAddingStaff);
                   }}
-                  className="bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold hover:bg-[#b89b31]"
+                  className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]"
               >
-                  {isAddingStaff ? 'Hủy bỏ' : 'Thêm nhân viên'}
+                  {isAddingStaff ? 'Hủy' : 'Thêm nhân viên'}
               </button>
           </div>
 
           {isAddingStaff && (
               <div className="bg-white p-6 rounded-lg shadow-md">
-                  <h4 className="font-bold text-gray-700 mb-4">{editingStaffId ? 'Sửa thông tin nhân viên' : 'Thêm nhân viên mới'}</h4>
+                  <h4 className="font-bold text-gray-700 mb-4">{editingStaffId ? 'Sửa nhân viên' : 'Thêm nhân viên mới'}</h4>
                   <form onSubmit={handleStaffSubmit} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -2124,17 +2147,7 @@ const AdminPage: React.FC = () => {
                                   onChange={(e) => setNewStaffUsername(e.target.value)} 
                                   className="w-full border rounded px-3 py-2" 
                                   required 
-                                  disabled={!!editingStaffId}
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
-                              <input 
-                                  type="text" 
-                                  value={newStaffFullname} 
-                                  onChange={(e) => setNewStaffFullname(e.target.value)} 
-                                  className="w-full border rounded px-3 py-2" 
-                                  required 
+                                  disabled={!!editingStaffId} // Username immutable on edit
                               />
                           </div>
                           <div>
@@ -2147,27 +2160,47 @@ const AdminPage: React.FC = () => {
                                   required={!editingStaffId}
                               />
                           </div>
+                          <div className="md:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
+                              <input 
+                                  type="text" 
+                                  value={newStaffFullname} 
+                                  onChange={(e) => setNewStaffFullname(e.target.value)} 
+                                  className="w-full border rounded px-3 py-2" 
+                                  required 
+                              />
+                          </div>
                       </div>
                       
                       <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Phân quyền</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Quyền hạn</label>
                           <div className="flex flex-wrap gap-3">
-                              {['products', 'orders', 'inventory', 'customers', 'home', 'about', 'header', 'settings', 'dashboard'].map(perm => (
-                                  <label key={perm} className="flex items-center gap-2 bg-gray-50 px-3 py-1 rounded border cursor-pointer">
+                              {['products', 'orders', 'inventory', 'customers', 'home', 'header', 'about', 'settings'].map(perm => (
+                                  <label key={perm} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded border cursor-pointer">
                                       <input 
                                           type="checkbox" 
-                                          checked={newStaffPermissions.includes(perm)}
+                                          checked={newStaffPermissions.includes(perm) || newStaffPermissions.includes('ALL')}
                                           onChange={() => togglePermission(perm)}
+                                          disabled={newStaffPermissions.includes('ALL')}
                                       />
                                       <span className="capitalize">{perm}</span>
                                   </label>
                               ))}
+                              <label className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded border border-purple-200 cursor-pointer">
+                                  <input 
+                                      type="checkbox" 
+                                      checked={newStaffPermissions.includes('ALL')}
+                                      onChange={() => togglePermission('ALL')}
+                                  />
+                                  <span className="font-bold text-purple-700">Toàn quyền (ALL)</span>
+                              </label>
                           </div>
                       </div>
 
-                      <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded font-bold hover:bg-[#004d40]">
-                          Lưu
-                      </button>
+                      <div className="flex justify-end gap-3">
+                          <button type="button" onClick={() => setIsAddingStaff(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Hủy</button>
+                          <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu</button>
+                      </div>
                   </form>
               </div>
           )}
@@ -2178,20 +2211,22 @@ const AdminPage: React.FC = () => {
                       <tr>
                           <th className="px-4 py-3">Username</th>
                           <th className="px-4 py-3">Họ tên</th>
-                          <th className="px-4 py-3">Quyền hạn</th>
+                          <th className="px-4 py-3">Quyền</th>
                           <th className="px-4 py-3">Ngày tạo</th>
                           <th className="px-4 py-3 text-right">Thao tác</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                      {adminUsers.filter(u => u.role !== 'MASTER').map(user => (
+                      {adminUsers.filter(u => u.role !== 'MASTER').map((user) => (
                           <tr key={user.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-bold">{user.username}</td>
+                              <td className="px-4 py-3 font-bold text-gray-900">{user.username}</td>
                               <td className="px-4 py-3">{user.fullname}</td>
                               <td className="px-4 py-3">
                                   <div className="flex flex-wrap gap-1">
                                       {user.permissions?.map(p => (
-                                          <span key={p} className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">{p}</span>
+                                          <span key={p} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                              {p}
+                                          </span>
                                       ))}
                                   </div>
                               </td>
@@ -2203,7 +2238,9 @@ const AdminPage: React.FC = () => {
                           </tr>
                       ))}
                       {adminUsers.filter(u => u.role !== 'MASTER').length === 0 && (
-                          <tr><td colSpan={5} className="text-center py-4">Chưa có nhân viên nào.</td></tr>
+                          <tr>
+                              <td colSpan={5} className="text-center py-4 text-gray-400">Chưa có nhân viên nào.</td>
+                          </tr>
                       )}
                   </tbody>
               </table>
@@ -2303,7 +2340,8 @@ const AdminPage: React.FC = () => {
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
-                      Bảo mật 2 lớp (Google Authenticator) {currentUser?.role === 'STAFF' && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Cá nhân</span>}
+                      Bảo mật 2 lớp (Google Authenticator) 
+                      {currentUser?.role === 'STAFF' && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">Cá nhân: {currentUser.username}</span>}
                   </h4>
                   
                   {totpEnabled ? (
