@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { verifyCredentials, isTotpEnabled } from '../utils/adminSettingsStorage';
 import { sendOtpRequest } from '../utils/api';
+import { loginAdminUser } from '../utils/apiClient';
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -14,32 +15,58 @@ const LoginPage: React.FC = () => {
     setError('');
     setIsLoading(true);
 
-    if (verifyCredentials(username, password)) {
-      
-      // Check if 2FA (TOTP) is enabled
-      if (isTotpEnabled()) {
-          sessionStorage.setItem('authMethod', 'TOTP');
-          // If 2FA enabled, skip email sending and go straight to OTP page
-          window.location.hash = '/otp';
-          setIsLoading(false);
-          return;
-      }
-
-      // Default: Fallback to Email OTP
-      sessionStorage.setItem('authMethod', 'EMAIL');
-      try {
-        const response = await sendOtpRequest();
-        if (response.success) {
-          window.location.hash = '/otp';
-        } else {
-          setError('Không thể gửi mã OTP. Vui lòng thử lại.');
+    try {
+        // 1. Try Server Auth (DB Users including Master and Sub-admins)
+        const serverAuth = await loginAdminUser({ username, password });
+        
+        if (serverAuth && serverAuth.success) {
+            // Logged in via DB
+            const user = serverAuth.user;
+            sessionStorage.setItem('adminUser', JSON.stringify(user));
+            sessionStorage.setItem('isAuthenticated', 'true');
+            // Skip 2FA for sub-admins for now (Simplify) or check role
+            // Only Master needs strict 2FA from localStorage settings if enabled there
+            if (user.role === 'MASTER' && isTotpEnabled()) {
+                 sessionStorage.setItem('authMethod', 'TOTP');
+                 window.location.hash = '/otp';
+                 setIsLoading(false);
+                 return;
+            }
+            window.location.hash = '/admin';
+            setIsLoading(false);
+            return;
         }
-      } catch (apiError) {
-         setError('Đã xảy ra lỗi khi cố gắng gửi OTP.');
-         console.error(apiError);
-      }
-    } else {
-      setError('Tên đăng nhập hoặc mật khẩu không đúng.');
+
+        // 2. Fallback to LocalStorage Auth (For recovery Master Admin)
+        if (verifyCredentials(username, password)) {
+            // Check if 2FA (TOTP) is enabled
+            if (isTotpEnabled()) {
+                sessionStorage.setItem('authMethod', 'TOTP');
+                window.location.hash = '/otp';
+                setIsLoading(false);
+                return;
+            }
+
+            // Default: Fallback to Email OTP
+            sessionStorage.setItem('authMethod', 'EMAIL');
+            try {
+                const response = await sendOtpRequest();
+                if (response.success) {
+                    window.location.hash = '/otp';
+                } else {
+                    setError('Không thể gửi mã OTP. Vui lòng thử lại.');
+                }
+            } catch (apiError) {
+                setError('Đã xảy ra lỗi khi cố gắng gửi OTP.');
+                console.error(apiError);
+            }
+        } else {
+            setError('Tên đăng nhập hoặc mật khẩu không đúng.');
+        }
+
+    } catch (e) {
+        console.error("Login logic error", e);
+        setError("Lỗi kết nối Server.");
     }
     
     setIsLoading(false);

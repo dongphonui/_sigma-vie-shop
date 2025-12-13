@@ -32,7 +32,7 @@ const transporter = nodemailer.createTransport({
 const initDb = async () => {
   const client = await pool.connect();
   try {
-    // Products Table: Stores full JSON in 'data' for flexibility
+    // Products Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS products (
         id BIGINT PRIMARY KEY,
@@ -101,6 +101,34 @@ const initDb = async () => {
       );
     `);
 
+    // Admin Users (Sub-admins)
+    // permissions: JSON array of strings e.g. ["products", "orders"]
+    // role: 'MASTER' or 'STAFF'
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE,
+        password TEXT, 
+        fullname TEXT,
+        role TEXT, 
+        permissions JSONB,
+        created_at BIGINT
+      );
+    `);
+
+    // Create Default Master Admin if not exists (Fallback)
+    // Password is 'admin' (hashed simply or plain for this demo context as requested previously)
+    // In a real app, use bcrypt. Here we store plain for simplicity to match existing frontend logic, 
+    // or simple hash if frontend sends hash.
+    const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
+    if (checkAdmin.rows.length === 0) {
+        await client.query(`
+            INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, ['admin_master', 'admin', 'admin', 'Master Admin', 'MASTER', JSON.stringify(['ALL']), Date.now()]);
+        console.log('Default admin user created.');
+    }
+
     console.log('Database initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err);
@@ -137,18 +165,16 @@ app.post('/api/products', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Update Stock (Specific Endpoint for efficiency)
+// Update Stock
 app.post('/api/products/stock', async (req, res) => {
     const { id, quantityChange, size, color } = req.body;
     try {
-        // Fetch current product data
         const result = await pool.query('SELECT data FROM products WHERE id = $1', [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
         
         let product = result.rows[0].data;
         let newStock = product.stock + quantityChange;
 
-        // Variant Logic matches frontend
         if (size || color) {
             if (!product.variants) product.variants = [];
             const vIndex = product.variants.findIndex(v => 
@@ -161,8 +187,6 @@ app.post('/api/products/stock', async (req, res) => {
             } else if (quantityChange > 0) {
                 product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
             }
-            
-            // Recalculate total stock
             newStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
         }
 
@@ -232,7 +256,6 @@ app.post('/api/customers', async (req, res) => {
 });
 
 app.put('/api/customers/:id', async (req, res) => {
-    // Same as POST for upsert
     const c = req.body;
     try {
         await pool.query(
@@ -292,16 +315,108 @@ app.post('/api/inventory', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 6. ADMIN
+// 6. ADMIN & SUB-ADMINS
+
+// Login Check
+app.post('/api/admin/login-auth', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        // Query both master and staff
+        const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
+        
+        if (result.rows.length > 0) {
+            const user = result.rows[0];
+            
+            // Log successful login
+            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+            await pool.query(
+                `INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) 
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [username, 'PASSWORD', 'SUCCESS', ip, req.get('User-Agent'), Date.now()]
+            );
+
+            res.json({ 
+                success: true, 
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    fullname: user.fullname,
+                    role: user.role,
+                    permissions: user.permissions
+                }
+            });
+        } else {
+            res.json({ success: false, message: 'Sai tên đăng nhập hoặc mật khẩu' });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get Admin Users
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at FROM admin_users ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Create Admin User
+app.post('/api/admin/users', async (req, res) => {
+    const { username, password, fullname, permissions } = req.body;
+    try {
+        const id = 'admin_' + Date.now();
+        await pool.query(
+            `INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at)
+             VALUES ($1, $2, $3, $4, 'STAFF', $5, $6)`,
+            [id, username, password, fullname, JSON.stringify(permissions), Date.now()]
+        );
+        res.json({ success: true });
+    } catch (err) { 
+        if (err.code === '23505') {
+            res.json({ success: false, message: 'Tên đăng nhập đã tồn tại' });
+        } else {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
+// Update Admin User
+app.put('/api/admin/users/:id', async (req, res) => {
+    const { password, fullname, permissions } = req.body;
+    const { id } = req.params;
+    try {
+        if (password) {
+            await pool.query(
+                'UPDATE admin_users SET password=$1, fullname=$2, permissions=$3 WHERE id=$4',
+                [password, fullname, JSON.stringify(permissions), id]
+            );
+        } else {
+            await pool.query(
+                'UPDATE admin_users SET fullname=$1, permissions=$2 WHERE id=$3',
+                [fullname, JSON.stringify(permissions), id]
+            );
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Delete Admin User
+app.delete('/api/admin/users/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM admin_users WHERE id = $1 AND role != 'MASTER'", [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Logger (Keep existing)
 app.post('/api/admin/login', async (req, res) => {
+    // This is for the generic log endpoint used by frontend for OTP/Other methods
     const { method, status } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const agent = req.get('User-Agent');
     try {
         await pool.query(
             `INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) 
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            ['admin', method, status, ip, agent, Date.now()]
+            ['admin', method, status, ip, req.get('User-Agent'), Date.now()]
         );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -310,7 +425,7 @@ app.post('/api/admin/login', async (req, res) => {
 app.get('/api/admin/logs', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT 100');
-        const logs = result.rows.map(r => ({
+        res.json(result.rows.map(r => ({
             id: r.id.toString(),
             username: r.username,
             method: r.method,
@@ -318,8 +433,7 @@ app.get('/api/admin/logs', async (req, res) => {
             user_agent: r.user_agent,
             timestamp: parseInt(r.timestamp),
             status: r.status
-        }));
-        res.json(logs);
+        })));
     } catch (err) { res.status(500).send(err.message); }
 });
 
@@ -342,7 +456,7 @@ app.post('/api/admin/email', async (req, res) => {
 
 // 7. FACTORY RESET
 app.post('/api/admin/reset', async (req, res) => {
-    const { scope } = req.body; // 'FULL', 'ORDERS', 'PRODUCTS'
+    const { scope } = req.body; 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -359,6 +473,8 @@ app.post('/api/admin/reset', async (req, res) => {
             await client.query('TRUNCATE TABLE orders');
             await client.query('TRUNCATE TABLE inventory_transactions');
             await client.query('TRUNCATE TABLE admin_logs');
+            // NOTE: We do NOT truncate admin_users to prevent locking everyone out.
+            // Only 'admin' Master is recreated in initDb if missing.
         }
         await client.query('COMMIT');
         res.json({ success: true, message: `Reset scope ${scope} successful.` });

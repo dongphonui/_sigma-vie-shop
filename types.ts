@@ -88,11 +88,20 @@ export interface Order {
 export interface AdminLoginLog {
   id: string;
   username: string;
-  method: 'EMAIL_OTP' | 'GOOGLE_AUTH';
+  method: 'EMAIL_OTP' | 'GOOGLE_AUTH' | 'PASSWORD';
   ip_address?: string;
   user_agent?: string;
   timestamp: number;
   status: 'SUCCESS' | 'FAILED';
+}
+
+export interface AdminUser {
+    id: string;
+    username: string;
+    fullname: string;
+    role: 'MASTER' | 'STAFF';
+    permissions: string[]; // e.g. ['products', 'orders'] or ['ALL']
+    created_at?: number;
 }
 
 export interface AboutPageContent {

@@ -61,10 +61,17 @@ export const syncOrderToDB = (order: any) => syncData('orders', order);
 export const fetchTransactionsFromDB = () => fetchData('inventory');
 export const syncTransactionToDB = (transaction: any) => syncData('inventory', transaction);
 
-// Admin
+// Admin Logs & Email
 export const recordAdminLogin = (method: string, status: string) => syncData('admin/login', { method, status });
 export const fetchAdminLoginLogs = () => fetchData('admin/logs');
 export const sendEmail = (to: string, subject: string, html: string) => syncData('admin/email', { to, subject, html });
+
+// Admin Users (Sub-Admin)
+export const loginAdminUser = (credentials: any) => syncData('admin/login-auth', credentials);
+export const fetchAdminUsers = () => fetchData('admin/users');
+export const createAdminUser = (user: any) => syncData('admin/users', user);
+export const updateAdminUser = (id: string, user: any) => syncData(`admin/users/${id}`, user, 'PUT');
+export const deleteAdminUser = (id: string) => syncData(`admin/users/${id}`, {}, 'DELETE');
 
 // Reset
 export const resetDatabase = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {

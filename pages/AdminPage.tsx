@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings } from '../types';
-import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct, syncAllLocalDataToServer } from '../utils/productStorage';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser } from '../types';
+import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
@@ -15,14 +15,14 @@ import {
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
 import { getHeaderSettings, updateHeaderSettings } from '../utils/headerSettingsStorage';
-import { getTransactions, addTransaction, syncAllTransactionsToServer } from '../utils/inventoryStorage';
+import { getTransactions, addTransaction } from '../utils/inventoryStorage';
 import { getDashboardMetrics, type DashboardData } from '../utils/analytics';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../utils/categoryStorage';
-import { getOrders, updateOrderStatus, syncAllOrdersToServer } from '../utils/orderStorage';
+import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs, checkServerConnection } from '../utils/apiClient';
+import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 
@@ -49,10 +49,6 @@ const BarChart2: React.FC<{className?: string}> = ({className}) => (
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-);
-
-const FilterIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
 );
 
 const LayersIcon: React.FC<{className?: string}> = ({className}) => (
@@ -117,23 +113,15 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
 
-const DownloadIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-);
-
-const UploadIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-);
-
-const RefreshCwIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+const UserCogIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4.9-.9"/><path d="m15.3 22.8.9-.9"/><path d="m15.3 16.4-.9-.9"/><path d="m21.7 22.8-.9-.9"/><path d="m16 19h6"/><path d="m19 16v6"/></svg>
 );
 
 
 const AdminPage: React.FC = () => {
   // General State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings' | 'staff'>('dashboard');
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -238,11 +226,45 @@ const AdminPage: React.FC = () => {
   const [inventorySize, setInventorySize] = useState(''); 
   const [inventoryColor, setInventoryColor] = useState(''); 
 
+  // Staff Management State
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [newStaffUsername, setNewStaffUsername] = useState('');
+  const [newStaffPassword, setNewStaffPassword] = useState('');
+  const [newStaffFullname, setNewStaffFullname] = useState('');
+  const [newStaffPermissions, setNewStaffPermissions] = useState<string[]>([]);
+  const [isAddingStaff, setIsAddingStaff] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+
   // Dashboard State
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+      const userStr = sessionStorage.getItem('adminUser');
+      if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUser(user);
+          // Auto select first available tab if dashboard is not allowed
+          if (user.role !== 'MASTER' && user.permissions && !user.permissions.includes('dashboard') && !user.permissions.includes('ALL')) {
+              if (user.permissions.length > 0) setActiveTab(user.permissions[0] as any);
+          }
+      } else {
+          // Fallback to Master Admin if no session data (Legacy LocalStorage Auth)
+          setCurrentUser({
+              id: 'master',
+              username: 'admin',
+              fullname: 'Master Admin',
+              role: 'MASTER',
+              permissions: ['ALL']
+          });
+      }
+  }, []);
 
+  const hasPermission = (perm: string) => {
+      if (!currentUser) return false;
+      if (currentUser.role === 'MASTER') return true;
+      if (currentUser.permissions && currentUser.permissions.includes('ALL')) return true;
+      return currentUser.permissions && currentUser.permissions.includes(perm);
+  };
 
   const refreshProducts = useCallback(() => {
     setProducts(getProducts());
@@ -293,6 +315,12 @@ const AdminPage: React.FC = () => {
     setDashboardData(getDashboardMetrics());
   }, []);
 
+  const refreshStaff = useCallback(() => {
+      fetchAdminUsers().then(users => {
+          if (users) setAdminUsers(users);
+      });
+  }, []);
+
   useEffect(() => {
     refreshProducts();
     refreshCategories();
@@ -304,7 +332,8 @@ const AdminPage: React.FC = () => {
     refreshHeaderSettings();
     refreshInventory();
     refreshDashboard();
-  }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard]);
+    refreshStaff();
+  }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard, refreshStaff]);
 
   // Re-calculate dashboard when transactions or products change
   useEffect(() => {
@@ -318,27 +347,13 @@ const AdminPage: React.FC = () => {
     setOrderCurrentPage(1);
   }, [orderSearch, orderFilterStatus]);
 
-  // Check Server Status
-  useEffect(() => {
-      const checkStatus = async () => {
-          setServerStatus('checking');
-          const isOnline = await checkServerConnection();
-          setServerStatus(isOnline ? 'online' : 'offline');
-      };
-      
-      checkStatus();
-      
-      const interval = setInterval(checkStatus, 10000); // Check every 10s
-      return () => clearInterval(interval);
-  }, []);
-
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
+    sessionStorage.removeItem('adminUser');
     window.location.hash = '/';
   };
 
-  // ... (Existing product and other handlers remain the same) ...
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -354,9 +369,67 @@ const AdminPage: React.FC = () => {
   };
 
   const toLocalISOString = (date: Date) => {
-      const tzOffset = date.getTimezoneOffset() * 60000; // offset in milliseconds
+      const tzOffset = date.getTimezoneOffset() * 60000;
       const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
       return localISOTime;
+  };
+
+  // --- STAFF MANAGEMENT HANDLERS ---
+  const togglePermission = (perm: string) => {
+      setNewStaffPermissions(prev => 
+          prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
+      );
+  };
+
+  const handleStaffSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newStaffUsername || !newStaffFullname) {
+          alert('Vui lòng điền đủ thông tin.');
+          return;
+      }
+
+      if (editingStaffId) {
+          await updateAdminUser(editingStaffId, {
+              fullname: newStaffFullname,
+              permissions: newStaffPermissions,
+              password: newStaffPassword || undefined // Only update if provided
+          });
+      } else {
+          if (!newStaffPassword) {
+              alert('Vui lòng nhập mật khẩu cho nhân viên mới.');
+              return;
+          }
+          await createAdminUser({
+              username: newStaffUsername,
+              password: newStaffPassword,
+              fullname: newStaffFullname,
+              permissions: newStaffPermissions
+          });
+      }
+      
+      setNewStaffUsername('');
+      setNewStaffPassword('');
+      setNewStaffFullname('');
+      setNewStaffPermissions([]);
+      setEditingStaffId(null);
+      setIsAddingStaff(false);
+      refreshStaff();
+  };
+
+  const handleEditStaff = (user: AdminUser) => {
+      setEditingStaffId(user.id);
+      setNewStaffUsername(user.username);
+      setNewStaffFullname(user.fullname);
+      setNewStaffPermissions(user.permissions || []);
+      setNewStaffPassword(''); // Don't show old password
+      setIsAddingStaff(true);
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+      if (window.confirm("Bạn có chắc chắn muốn xóa nhân viên này?")) {
+          await deleteAdminUser(id);
+          refreshStaff();
+      }
   };
 
   const handleEditProduct = (product: Product) => {
@@ -436,29 +509,22 @@ const AdminPage: React.FC = () => {
     };
 
     if (editingProduct) {
-        // Update existing product
         updateProduct({
             ...editingProduct,
             ...commonData,
-            stock: editingProduct.stock // Preserve stock
+            stock: editingProduct.stock 
         });
         setProductFeedback('Cập nhật sản phẩm thành công!');
     } else {
-        // Add new product
         addProduct({
             ...commonData,
-            stock: 0 // Initial stock is 0
+            stock: 0 
         });
         setProductFeedback('Thêm sản phẩm thành công!');
     }
     
     refreshProducts();
-
-    // Reset form
     handleCancelProductEdit();
-    const fileInput = document.getElementById('image-upload') as HTMLInputElement;
-    if(fileInput) fileInput.value = '';
-    
     setTimeout(() => setProductFeedback(''), 3000);
   };
   
@@ -474,8 +540,6 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // ... (Other handlers like Category, Order, Inventory, Customer, Settings, etc.) ...
-  
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName) {
@@ -523,6 +587,7 @@ const AdminPage: React.FC = () => {
       refreshInventory();
   };
 
+  // Printer Handler (NEW)
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
@@ -530,8 +595,11 @@ const AdminPage: React.FC = () => {
       const storeName = 'Sigma Vie Store'; 
       const storePhone = '0912.345.678';
       const storeAddress = 'Hà Nội, Việt Nam';
+
       const productUrl = `${window.location.origin}/?product=${order.productId}`;
+      
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
+
       const shippingFee = order.shippingFee || 0;
       const subtotal = order.totalPrice - shippingFee;
 
@@ -554,7 +622,12 @@ const AdminPage: React.FC = () => {
                 .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
                 .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
                 .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
-                @media print { @page { margin: 0.5cm; } body { margin: 0; } .box { width: 45%; } }
+                
+                @media print {
+                    @page { margin: 0.5cm; }
+                    body { margin: 0; }
+                    .box { width: 45%; }
+                }
             </style>
         </head>
         <body>
@@ -563,6 +636,7 @@ const AdminPage: React.FC = () => {
                 <p>Phiếu Giao Hàng / Hóa Đơn</p>
                 <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
             </div>
+
             <div class="info-section">
                 <div class="box">
                     <h3>NGƯỜI GỬI</h3>
@@ -577,30 +651,44 @@ const AdminPage: React.FC = () => {
                     <p>Đ/C: ${order.customerAddress}</p>
                 </div>
             </div>
+
             <table class="order-details">
                 <thead>
-                    <tr><th>Sản phẩm</th><th>Phân loại</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>Phân loại</th>
+                        <th>SL</th>
+                        <th>Đơn giá</th>
+                        <th>Thành tiền</th>
+                    </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td>${order.productName}</td>
-                        <td>${order.productSize ? `Size: ${order.productSize}` : ''} ${order.productColor ? ` | Màu: ${order.productColor}` : ''} ${!order.productSize && !order.productColor ? '-' : ''}</td>
+                        <td>
+                            ${order.productSize ? `Size: ${order.productSize}` : ''} 
+                            ${order.productColor ? ` | Màu: ${order.productColor}` : ''}
+                            ${!order.productSize && !order.productColor ? '-' : ''}
+                        </td>
                         <td>${order.quantity}</td>
                         <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
                         <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
                     </tr>
                 </tbody>
             </table>
+
             <div class="total-section">
                 <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
                 <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
                 <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
                 ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
+
             <div class="qr-section">
                 <p>Quét mã để mua thêm sản phẩm này:</p>
                 <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
             </div>
+
             <div class="footer">
                 <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
                 <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
@@ -678,7 +766,6 @@ const AdminPage: React.FC = () => {
     }
 
     const change = inventoryType === 'IMPORT' ? qty : -qty;
-    
     let currentStock = product.stock;
     if (inventorySize || inventoryColor) {
         const variant = product.variants?.find(v => 
@@ -696,22 +783,6 @@ const AdminPage: React.FC = () => {
     const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
-        const freshProducts = getProducts();
-        const freshProduct = freshProducts.find(p => String(p.id) === String(productId));
-        let stockAfter = 0;
-        
-        if (freshProduct) {
-             if (inventorySize || inventoryColor) {
-                 const variant = freshProduct.variants?.find(v => 
-                    (v.size === inventorySize || (!v.size && !inventorySize)) && 
-                    (v.color === inventoryColor || (!v.color && !inventoryColor))
-                );
-                stockAfter = variant ? variant.stock : 0;
-             } else {
-                 stockAfter = freshProduct.stock;
-             }
-        }
-
         let noteDetails = inventoryNote;
         if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
         if(inventoryColor) noteDetails += ` [Màu: ${inventoryColor}]`;
@@ -723,13 +794,12 @@ const AdminPage: React.FC = () => {
             quantity: qty,
             note: noteDetails,
             selectedSize: inventorySize,
-            selectedColor: inventoryColor,
-            stockAfter: stockAfter
+            selectedColor: inventoryColor
         });
         
         refreshProducts();
         refreshInventory();
-        setInventoryFeedback(`Thành công: ${inventoryType === 'IMPORT' ? 'Nhập' : 'Xuất'} ${qty} sản phẩm. Tồn kho mới: ${stockAfter}`);
+        setInventoryFeedback(`Thành công: ${inventoryType === 'IMPORT' ? 'Nhập' : 'Xuất'} ${qty} sản phẩm.`);
         setInventoryQuantity('');
         setInventoryNote('');
         setTimeout(() => setInventoryFeedback(''), 3000);
@@ -792,7 +862,6 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 3000);
   }
 
-  // TOTP & Bank & Social & Header Handlers ... (Keep existing)
   const handleStartTotpSetup = () => {
       const secret = generateTotpSecret();
       setTempTotpSecret(secret);
@@ -882,30 +951,6 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  const handlePromoImageUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file && homeSettings) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newUrls = [...homeSettings.promoImageUrls];
-        if (!newUrls) {
-             handleHomePageSettingsChange('promoImageUrls', [reader.result as string]);
-             return;
-        }
-        if (index === -1) {
-            newUrls.push(reader.result as string);
-        } else {
-            newUrls[index] = reader.result as string;
-        }
-        handleHomePageSettingsChange('promoImageUrls', newUrls);
-      };
-      reader.onerror = () => {
-          setHomeFeedback('Lỗi: Không thể đọc file ảnh.');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleHomePageSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (homeSettings) {
@@ -944,75 +989,28 @@ const AdminPage: React.FC = () => {
       }
   };
   
-  const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
-    e.preventDefault();
-    window.location.hash = path;
-  };
-
   const handleTestEmail = async () => {
       const email = getPrimaryAdminEmail();
-      const result = await sendEmail(email, 'Kiểm tra cấu hình Email Sigma Vie', '<h1>Xin chào!</h1><p>Email này kiểm tra hệ thống gửi mail.</p>');
-      if(result && result.success) {
-          setSettingsFeedback('Thành công: Email kiểm tra đã được gửi.');
-      } else {
-          setSettingsFeedback('Lỗi: Không thể gửi email.');
-      }
+      const result = await sendEmail(email, 'Kiểm tra', 'Hello');
+      if(result && result.success) setSettingsFeedback('Email sent.');
+      else setSettingsFeedback('Email failed.');
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
-  
-  // Backup Handlers
-  const handleBackup = () => {
-      downloadBackup();
-      setSettingsFeedback('Đã tạo file backup thành công!');
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
 
-  const handleRestoreClick = () => {
-      fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      if (window.confirm("Cảnh báo: Hành động này sẽ ghi đè toàn bộ dữ liệu hiện tại bằng dữ liệu trong file backup. Bạn có chắc chắn không?")) {
-          const result = await restoreBackup(file);
-          if (result.success) {
-              setSettingsFeedback(result.message);
-              // Trigger sync to server to update backend with restored data
-              syncAllLocalDataToServer(); 
-              syncAllOrdersToServer();
-              syncAllTransactionsToServer();
-              
-              setTimeout(() => {
-                  window.location.reload();
-              }, 2000);
-          } else {
-              setSettingsFeedback('Lỗi: ' + result.message);
-          }
-      }
-      // Reset input
-      if(fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleFactoryReset = (type: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
-      let msg = "";
-      if (type === 'ORDERS') msg = "Bạn có chắc chắn muốn xóa TOÀN BỘ Đơn hàng và Lịch sử kho không?";
-      if (type === 'PRODUCTS') msg = "Bạn có chắc chắn muốn xóa TOÀN BỘ Sản phẩm không?";
-      if (type === 'FULL') msg = "CẢNH BÁO: Hành động này sẽ xóa sạch toàn bộ dữ liệu (Sản phẩm, Đơn hàng, Khách hàng, Cài đặt...). Ứng dụng sẽ trở về trạng thái ban đầu.";
-
-      if (window.confirm(msg)) {
-          performFactoryReset(type);
-          setSettingsFeedback('Đã reset dữ liệu. Đang tải lại...');
-          setTimeout(() => window.location.reload(), 1500);
+  const handleFactoryReset = async (type: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
+      if (window.confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa dữ liệu không?")) {
+          setSettingsFeedback('Đang tiến hành xóa...');
+          const result = await performFactoryReset(type);
+          setSettingsFeedback(result.message);
+          if (result.success) setTimeout(() => window.location.reload(), 2000);
       }
   };
 
-  // ... (Render Functions for Dashboard, Product, Order, Inventory, Customer, About, Home, Header) ...
-  // Keeping them collapsed for brevity as they haven't changed except for context usage
+  // --- RENDER FUNCTIONS IMPLEMENTATION ---
 
   const renderDashboard = () => (
       <div className="space-y-6 animate-fade-in-up">
+          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
                   <div className="flex justify-between items-center">
@@ -1062,6 +1060,7 @@ const AdminPage: React.FC = () => {
               </div>
           </div>
 
+          {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-md">
                   <h3 className="text-lg font-bold text-gray-800 mb-4">Doanh số 7 ngày qua</h3>
@@ -1095,8 +1094,121 @@ const AdminPage: React.FC = () => {
       </div>
   );
 
+  const renderStaffManager = () => (
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+              <h3 className="text-lg font-bold text-gray-800">Danh sách Nhân viên & Phân quyền</h3>
+              <button 
+                  onClick={() => { setIsAddingStaff(!isAddingStaff); setEditingStaffId(null); setNewStaffUsername(''); setNewStaffFullname(''); setNewStaffPermissions([]); setNewStaffPassword(''); }}
+                  className="bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#b89b31]"
+              >
+                  <UserCogIcon className="w-5 h-5" />
+                  {isAddingStaff ? 'Đóng form' : 'Thêm nhân viên'}
+              </button>
+          </div>
+
+          {isAddingStaff && (
+              <div className="bg-white p-6 rounded-lg shadow-md">
+                  <h4 className="font-bold mb-4">{editingStaffId ? 'Chỉnh sửa nhân viên' : 'Thêm nhân viên mới'}</h4>
+                  <form onSubmit={handleStaffSubmit} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập *</label>
+                              <input 
+                                  type="text" 
+                                  value={newStaffUsername} 
+                                  onChange={(e) => setNewStaffUsername(e.target.value)} 
+                                  className="w-full border rounded px-3 py-2" 
+                                  disabled={!!editingStaffId} // Cannot change username
+                                  required 
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên *</label>
+                              <input type="text" value={newStaffFullname} onChange={(e) => setNewStaffFullname(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu {editingStaffId && '(Để trống nếu không đổi)'}</label>
+                              <input type="text" value={newStaffPassword} onChange={(e) => setNewStaffPassword(e.target.value)} className="w-full border rounded px-3 py-2" placeholder={editingStaffId ? "********" : "Nhập mật khẩu"} />
+                          </div>
+                      </div>
+
+                      <div className="border-t pt-4 mt-2">
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Phân quyền truy cập:</label>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              {['products', 'orders', 'inventory', 'customers', 'about', 'home', 'header', 'settings'].map(perm => (
+                                  <label key={perm} className="flex items-center space-x-2 bg-gray-50 p-2 rounded border cursor-pointer hover:bg-gray-100">
+                                      <input 
+                                          type="checkbox" 
+                                          checked={newStaffPermissions.includes(perm)}
+                                          onChange={() => togglePermission(perm)}
+                                          className="w-4 h-4 text-[#00695C] rounded focus:ring-[#00695C]"
+                                      />
+                                      <span className="capitalize text-sm">{perm === 'products' ? 'Sản phẩm' : perm === 'orders' ? 'Đơn hàng' : perm === 'inventory' ? 'Kho hàng' : perm === 'customers' ? 'Khách hàng' : perm === 'settings' ? 'Cài đặt chung' : perm}</span>
+                                  </label>
+                              ))}
+                          </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-4">
+                          <button type="button" onClick={() => setIsAddingStaff(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded font-medium">Hủy</button>
+                          <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu thông tin</button>
+                      </div>
+                  </form>
+              </div>
+          )}
+
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <table className="min-w-full text-sm text-left text-gray-500">
+                  <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                      <tr>
+                          <th className="px-4 py-3">Username</th>
+                          <th className="px-4 py-3">Họ tên</th>
+                          <th className="px-4 py-3">Vai trò</th>
+                          <th className="px-4 py-3">Quyền hạn</th>
+                          <th className="px-4 py-3 text-right">Thao tác</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {adminUsers.map((user) => (
+                          <tr key={user.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">{user.username}</td>
+                              <td className="px-4 py-3">{user.fullname}</td>
+                              <td className="px-4 py-3">
+                                  {user.role === 'MASTER' ? 
+                                      <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-bold">Admin Tổng</span> : 
+                                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-bold">Nhân viên</span>
+                                  }
+                              </td>
+                              <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-1">
+                                      {user.role === 'MASTER' ? <span className="text-gray-500 italic">Toàn quyền</span> : 
+                                          user.permissions && user.permissions.length > 0 ? 
+                                          user.permissions.map(p => (
+                                              <span key={p} className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border">{p}</span>
+                                          )) : <span className="text-red-500 text-xs">Chưa cấp quyền</span>
+                                      }
+                                  </div>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                  {user.role !== 'MASTER' && (
+                                      <>
+                                          <button onClick={() => handleEditStaff(user)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                          <button onClick={() => handleDeleteStaff(user.id)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                                      </>
+                                  )}
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+          </div>
+      </div>
+  );
+
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
+        {/* Toggle Category Manager */}
         <div className="flex justify-end">
              <button 
                 onClick={() => setIsManagingCategories(!isManagingCategories)}
@@ -1161,6 +1273,7 @@ const AdminPage: React.FC = () => {
             </div>
         ) : (
             <>
+                {/* Product List & Form */}
                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
                     <div className="flex gap-4">
                         <div className="relative">
@@ -1264,6 +1377,7 @@ const AdminPage: React.FC = () => {
                                 </div>
                             </div>
                             
+                            {/* FLASH SALE SETTINGS */}
                             <div className="bg-red-50 p-4 rounded-lg border border-red-100">
                                 <label className="flex items-center gap-2 mb-4 cursor-pointer">
                                     <input 
@@ -1524,6 +1638,7 @@ const AdminPage: React.FC = () => {
                       ))}
                   </tbody>
               </table>
+              {/* Pagination (Simple) */}
               <div className="p-4 border-t flex justify-between items-center">
                   <span className="text-sm text-gray-500">Trang {orderCurrentPage}</span>
                   <div className="flex gap-2">
@@ -1586,6 +1701,7 @@ const AdminPage: React.FC = () => {
                             </select>
                         </div>
 
+                        {/* Dynamic Size/Color Selectors */}
                         {selectedProductForInventory && (() => {
                             const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
                             if (!p) return null;
@@ -1657,6 +1773,7 @@ const AdminPage: React.FC = () => {
                             />
                         </div>
                         
+                        {/* Stock Display Helper */}
                         {selectedProductForInventory && (
                              <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
                                  {(() => {
@@ -1832,6 +1949,7 @@ const AdminPage: React.FC = () => {
     <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
         {aboutContent && aboutSettings ? (
             <form onSubmit={handleAboutSubmit} className="space-y-6">
+                {/* Hero Section */}
                 <div className="border-b pb-4">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Hero (Đầu trang)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1857,6 +1975,7 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Welcome Section */}
                 <div className="border-b pb-4">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Chào mừng</h3>
                     <div className="space-y-4">
@@ -1871,6 +1990,7 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Styling Settings */}
                 <div className="border-b pb-4">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Cài đặt Giao diện</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1907,6 +2027,7 @@ const AdminPage: React.FC = () => {
                <form onSubmit={handleHomePageSubmit} className="space-y-6">
                    <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Trang Chủ</h3>
                    
+                   {/* Hero Headline */}
                    <div className="border p-4 rounded-lg bg-gray-50">
                        <h4 className="font-bold text-gray-700 mb-3">Tiêu đề chính (Headline)</h4>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1920,6 +2041,7 @@ const AdminPage: React.FC = () => {
                        </div>
                    </div>
 
+                   {/* Promotion Section */}
                    <div className="border p-4 rounded-lg bg-gray-50">
                        <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
                        <div className="space-y-3">
@@ -1966,6 +2088,7 @@ const AdminPage: React.FC = () => {
                        </div>
                    </div>
 
+                   {/* Flash Sale Section */}
                     <div className="border p-4 rounded-lg bg-gray-50">
                        <h4 className="font-bold text-gray-700 mb-3">Banner Flash Sale</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2052,67 +2175,20 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* Backup & Restore Section */}
-              <div className="border-b pb-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                      Quản lý Dữ liệu
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-4">Sao lưu dữ liệu để tránh mất mát hoặc khôi phục lại trạng thái cũ.</p>
-                  
-                  <div className="flex flex-wrap gap-4">
-                      <button 
-                          onClick={handleBackup}
-                          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-                      >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                          Tải file Backup
-                      </button>
-                      
-                      <button 
-                          onClick={handleRestoreClick}
-                          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
-                      >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                          Khôi phục từ file
-                      </button>
-                      <input 
-                          type="file" 
-                          ref={fileInputRef}
-                          onChange={handleFileChange} 
-                          className="hidden" 
-                          accept=".json"
-                      />
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-gray-100">
-                      <h5 className="font-bold text-red-600 text-sm mb-3">Vùng Nguy Hiểm (Reset Data)</h5>
-                      <div className="flex flex-wrap gap-3">
-                          <button 
-                              onClick={() => handleFactoryReset('ORDERS')}
-                              className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded hover:bg-red-200 border border-red-200"
-                          >
-                              Xóa tất cả Đơn hàng
-                          </button>
-                          <button 
-                              onClick={() => handleFactoryReset('PRODUCTS')}
-                              className="text-xs bg-red-100 text-red-700 px-3 py-2 rounded hover:bg-red-200 border border-red-200"
-                          >
-                              Xóa tất cả Sản phẩm
-                          </button>
-                          <button 
-                              onClick={() => handleFactoryReset('FULL')}
-                              className="text-xs bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700 font-bold"
-                          >
-                              Factory Reset (Xóa hết)
-                          </button>
-                      </div>
-                  </div>
-              </div>
-
               {/* Email Management */}
               <div>
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
+                  <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
+                  
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                      <p className="text-sm text-blue-700 font-bold">
+                          ℹ️ Hệ thống Email đang hoạt động.
+                      </p>
+                      <p className="text-xs text-blue-600">
+                          Nếu gửi lỗi, mã OTP sẽ tự động hiển thị trên màn hình (Chế độ Fallback).
+                      </p>
+                  </div>
+
                   <ul className="mb-4 space-y-2">
                       {adminEmails.map((email, idx) => (
                           <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
@@ -2357,6 +2433,49 @@ const AdminPage: React.FC = () => {
                       </form>
                   )}
               </div>
+
+              {/* Data Management Section */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-red-700 mb-4 flex items-center gap-2">
+                      <Trash2Icon className="w-5 h-5" />
+                      Quản lý Dữ liệu (Nguy hiểm)
+                  </h4>
+                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg space-y-4">
+                      <p className="text-sm text-red-800 font-medium">
+                          Sao lưu và khôi phục dữ liệu hoặc khôi phục cài đặt gốc.
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                          <button onClick={downloadBackup} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2">
+                              ⬇️ Tải bản sao lưu (Backup)
+                          </button>
+                          <label className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 cursor-pointer">
+                              ⬆️ Khôi phục (Restore)
+                              <input type="file" className="hidden" accept=".json" onChange={(e) => {
+                                  if(e.target.files?.[0]) {
+                                      restoreBackup(e.target.files[0]).then(res => {
+                                          alert(res.message);
+                                          if(res.success) window.location.reload();
+                                      });
+                                  }
+                              }} />
+                          </label>
+                      </div>
+                      <div className="pt-2 border-t border-red-200">
+                          <p className="text-xs text-red-600 mb-2 font-bold">Vùng nguy hiểm: Xóa dữ liệu vĩnh viễn</p>
+                          <div className="flex flex-wrap gap-3">
+                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 text-sm">
+                                  Xóa tất cả Đơn hàng & Kho
+                              </button>
+                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 text-sm">
+                                  Xóa tất cả Sản phẩm
+                              </button>
+                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm font-bold">
+                                  Factory Reset (Toàn bộ)
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
           </div>
           
            {settingsFeedback && (
@@ -2413,6 +2532,17 @@ const AdminPage: React.FC = () => {
   );
 
   const renderContent = () => {
+    // Permission Check Wrapper
+    if (activeTab !== 'dashboard' && !hasPermission(activeTab)) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 py-20">
+                <ShieldCheckIcon className="w-16 h-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-bold">Truy cập bị từ chối</h3>
+                <p>Bạn không có quyền truy cập vào mục này.</p>
+            </div>
+        );
+    }
+
     switch(activeTab) {
       case 'dashboard': return renderDashboard();
       case 'products': return renderProductManager();
@@ -2423,6 +2553,7 @@ const AdminPage: React.FC = () => {
       case 'home': return renderHomePageSettings();
       case 'header': return renderHeaderSettings();
       case 'settings': return renderSettings();
+      case 'staff': return renderStaffManager();
       default: return renderDashboard();
     }
   };
@@ -2434,66 +2565,65 @@ const AdminPage: React.FC = () => {
           <div className="bg-[#D4AF37] p-2 rounded-lg">
              <BarChart2 className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
+          <div>
+              <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
+              <p className="text-xs text-gray-400 mt-1">{currentUser?.fullname}</p>
+          </div>
         </div>
         <nav className="p-4 space-y-2">
-           <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <BarChart2 className="w-5 h-5" /> Tổng quan
-          </button>
-           <button 
-            onClick={() => setActiveTab('products')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <PackageIcon className="w-5 h-5" /> Sản phẩm
-          </button>
-          <button 
-            onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
-          </button>
-          <button 
-            onClick={() => setActiveTab('inventory')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <BarChart2 className="w-5 h-5" /> Kho hàng
-          </button>
-           <button 
-            onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <UsersIcon className="w-5 h-5" /> Khách hàng
-          </button>
+           {(hasPermission('dashboard') || hasPermission('ALL')) && (
+               <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <BarChart2 className="w-5 h-5" /> Tổng quan
+              </button>
+           )}
+           {(hasPermission('products') || hasPermission('ALL')) && (
+               <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <PackageIcon className="w-5 h-5" /> Sản phẩm
+              </button>
+           )}
+           {(hasPermission('orders') || hasPermission('ALL')) && (
+              <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
+              </button>
+           )}
+           {(hasPermission('inventory') || hasPermission('ALL')) && (
+              <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <BarChart2 className="w-5 h-5" /> Kho hàng
+              </button>
+           )}
+           {(hasPermission('customers') || hasPermission('ALL')) && (
+               <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <UsersIcon className="w-5 h-5" /> Khách hàng
+              </button>
+           )}
           
           <div className="pt-4 mt-4 border-t border-gray-700">
             <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Giao diện</p>
-            <button 
-                onClick={() => setActiveTab('home')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <EditIcon className="w-5 h-5" /> Trang chủ
-            </button>
-             <button 
-                onClick={() => setActiveTab('header')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <LayersIcon className="w-5 h-5" /> Header/Menu
-            </button>
-             <button 
-                onClick={() => setActiveTab('about')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <EditIcon className="w-5 h-5" /> Giới thiệu
-            </button>
-            <button 
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <UserIcon className="w-5 h-5" /> Cài đặt chung
-            </button>
+            {(hasPermission('home') || hasPermission('ALL')) && (
+                <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                    <EditIcon className="w-5 h-5" /> Trang chủ
+                </button>
+            )}
+            {(hasPermission('header') || hasPermission('ALL')) && (
+                 <button onClick={() => setActiveTab('header')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                    <LayersIcon className="w-5 h-5" /> Header/Menu
+                </button>
+            )}
+            {(hasPermission('about') || hasPermission('ALL')) && (
+                 <button onClick={() => setActiveTab('about')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                    <EditIcon className="w-5 h-5" /> Giới thiệu
+                </button>
+            )}
+            {(hasPermission('settings') || hasPermission('ALL')) && (
+                <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                    <UserIcon className="w-5 h-5" /> Cài đặt chung
+                </button>
+            )}
+            {currentUser?.role === 'MASTER' && (
+                <button onClick={() => setActiveTab('staff')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'staff' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                    <UserCogIcon className="w-5 h-5" /> Quản lý Nhân viên
+                </button>
+            )}
           </div>
         </nav>
         
@@ -2517,12 +2647,13 @@ const AdminPage: React.FC = () => {
                  activeTab === 'customers' ? 'Danh sách Khách hàng' :
                  activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
                  activeTab === 'home' ? 'Cấu hình Trang chủ' :
+                 activeTab === 'staff' ? 'Quản lý Phân quyền' :
                  activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
             </h2>
             <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
-                <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                    A
+                <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg uppercase" title={currentUser?.fullname}>
+                    {currentUser?.username.charAt(0)}
                 </div>
             </div>
         </header>
