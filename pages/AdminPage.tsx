@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -117,7 +116,7 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
 );
 
 
-const AdminPage = () => {
+const AdminPage: React.FC = () => {
   // General State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
@@ -712,18 +711,23 @@ const AdminPage = () => {
     const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
-        // Fetch FRESH product data to get the accurate stock level AFTER update
+        // --- NEW LOGIC TO CAPTURE STOCK AFTER ---
         const freshProducts = getProducts();
         const freshProduct = freshProducts.find(p => String(p.id) === String(productId));
-        let stockAfter = freshProduct ? freshProduct.stock : 0;
-
-        if (inventorySize || inventoryColor) {
-             const v = freshProduct?.variants?.find(v => 
-                (v.size === inventorySize || (!v.size && !inventorySize)) && 
-                (v.color === inventoryColor || (!v.color && !inventoryColor))
-            );
-            stockAfter = v ? v.stock : 0;
+        let stockAfter = 0;
+        
+        if (freshProduct) {
+             if (inventorySize || inventoryColor) {
+                 const variant = freshProduct.variants?.find(v => 
+                    (v.size === inventorySize || (!v.size && !inventorySize)) && 
+                    (v.color === inventoryColor || (!v.color && !inventoryColor))
+                );
+                stockAfter = variant ? variant.stock : 0;
+             } else {
+                 stockAfter = freshProduct.stock;
+             }
         }
+        // ----------------------------------------
 
         // Construct Note
         let noteDetails = inventoryNote;
@@ -738,7 +742,7 @@ const AdminPage = () => {
             note: noteDetails,
             selectedSize: inventorySize,
             selectedColor: inventoryColor,
-            stockAfter: stockAfter // Save Stock After
+            stockAfter: stockAfter
         });
         
         refreshProducts();
