@@ -1,25 +1,36 @@
 
 import React, { useState, useEffect } from 'react';
-import { getAdminEmails, verifyTotpToken } from '../utils/adminSettingsStorage';
+import { getAdminEmails, verifyTotpToken, verifyTempTotpToken } from '../utils/adminSettingsStorage';
 import { recordAdminLogin } from '../utils/apiClient';
+import type { AdminUser } from '../types';
 
 const AdminOTPPage: React.FC = () => {
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
-  const [authMethod, setAuthMethod] = useState<'EMAIL' | 'TOTP'>('EMAIL');
+  const [authMethod, setAuthMethod] = useState<'EMAIL' | 'TOTP' | 'STAFF_TOTP'>('EMAIL');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingStaffUser, setPendingStaffUser] = useState<AdminUser | null>(null);
   
   // State để lưu mã OTP thực (để hiển thị khẩn cấp - chỉ dùng cho Email)
   const [emergencyOtp, setEmergencyOtp] = useState<string | null>(null);
 
   useEffect(() => {
     setAdminEmails(getAdminEmails());
+    
+    // Check for Staff pending login first
+    const pendingStaff = sessionStorage.getItem('pendingStaffUser');
+    if (pendingStaff) {
+        setAuthMethod('STAFF_TOTP');
+        setPendingStaffUser(JSON.parse(pendingStaff));
+        return;
+    }
+
     const method = sessionStorage.getItem('authMethod') as 'EMAIL' | 'TOTP';
     setAuthMethod(method || 'EMAIL');
 
     if (method === 'TOTP') {
-        // Nếu dùng Google Auth thì không cần check session OTP
+        // Nếu dùng Google Auth Master thì không cần check session OTP
         return;
     }
 
@@ -43,15 +54,37 @@ const AdminOTPPage: React.FC = () => {
     setError('');
     setIsLoading(true);
     
-    if (authMethod === 'TOTP') {
-        // Validate Google Authenticator Code
+    if (authMethod === 'STAFF_TOTP') {
+        // Handle Staff DB-based 2FA
+        if (pendingStaffUser && pendingStaffUser.totp_secret) {
+            // We reuse verifyTempTotpToken because it allows passing a specific secret
+            // instead of reading from localStorage
+            if (verifyTempTotpToken(otp, pendingStaffUser.totp_secret)) {
+                await recordAdminLogin('GOOGLE_AUTH', 'SUCCESS', pendingStaffUser.username);
+                
+                // Promote pending to authenticated
+                sessionStorage.setItem('adminUser', JSON.stringify(pendingStaffUser));
+                sessionStorage.setItem('isAuthenticated', 'true');
+                sessionStorage.removeItem('pendingStaffUser');
+                
+                window.location.hash = '/admin';
+            } else {
+                setError('Mã xác thực không đúng. Vui lòng kiểm tra ứng dụng Google Authenticator.');
+                setIsLoading(false);
+            }
+        } else {
+            setError('Lỗi hệ thống: Không tìm thấy khóa bí mật.');
+            setIsLoading(false);
+        }
+
+    } else if (authMethod === 'TOTP') {
+        // Validate Master Google Authenticator Code (LocalStorage)
         if (verifyTotpToken(otp)) {
-            await recordAdminLogin('GOOGLE_AUTH', 'SUCCESS');
+            await recordAdminLogin('GOOGLE_AUTH', 'SUCCESS', 'admin');
             sessionStorage.removeItem('authMethod');
             sessionStorage.setItem('isAuthenticated', 'true');
             window.location.hash = '/admin';
         } else {
-            // recordAdminLogin('GOOGLE_AUTH', 'FAILED'); // Optional: Record failed attempts
             setError('Mã xác thực không đúng. Vui lòng kiểm tra lại ứng dụng Google Authenticator.');
             setIsLoading(false);
         }
@@ -74,7 +107,7 @@ const AdminOTPPage: React.FC = () => {
         }
 
         if (otp === otpData.otp) {
-            await recordAdminLogin('EMAIL_OTP', 'SUCCESS');
+            await recordAdminLogin('EMAIL_OTP', 'SUCCESS', 'admin');
             sessionStorage.removeItem('otpVerification');
             sessionStorage.removeItem('authMethod');
             sessionStorage.setItem('isAuthenticated', 'true');
@@ -98,7 +131,7 @@ const AdminOTPPage: React.FC = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold font-serif text-gray-900">Xác thực hai yếu tố</h1>
           <p className="text-gray-600 mt-2">
-             {authMethod === 'TOTP' 
+             {authMethod === 'TOTP' || authMethod === 'STAFF_TOTP'
                 ? 'Vui lòng nhập mã từ ứng dụng Google Authenticator.' 
                 : <span>Mã xác thực đã được gửi đến email: <strong>{adminEmails[0]}</strong></span>
              }

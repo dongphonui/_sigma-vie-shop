@@ -62,7 +62,7 @@ export const fetchTransactionsFromDB = () => fetchData('inventory');
 export const syncTransactionToDB = (transaction: any) => syncData('inventory', transaction);
 
 // Admin Logs & Email
-export const recordAdminLogin = (method: string, status: string) => syncData('admin/login', { method, status });
+export const recordAdminLogin = (method: string, status: string, username?: string) => syncData('admin/login', { method, status, username });
 export const fetchAdminLoginLogs = () => fetchData('admin/logs');
 export const sendEmail = (to: string, subject: string, html: string) => syncData('admin/email', { to, subject, html });
 

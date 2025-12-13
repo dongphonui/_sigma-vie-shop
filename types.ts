@@ -102,6 +102,8 @@ export interface AdminUser {
     role: 'MASTER' | 'STAFF';
     permissions: string[]; // e.g. ['products', 'orders'] or ['ALL']
     created_at?: number;
+    totp_secret?: string; // NEW: Secret for Staff 2FA
+    is_totp_enabled?: boolean; // NEW: Flag for Staff 2FA
 }
 
 export interface AboutPageContent {

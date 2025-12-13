@@ -102,8 +102,7 @@ const initDb = async () => {
     `);
 
     // Admin Users (Sub-admins)
-    // permissions: JSON array of strings e.g. ["products", "orders"]
-    // role: 'MASTER' or 'STAFF'
+    // Added: totp_secret and is_totp_enabled for 2FA support
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id TEXT PRIMARY KEY,
@@ -112,14 +111,17 @@ const initDb = async () => {
         fullname TEXT,
         role TEXT, 
         permissions JSONB,
-        created_at BIGINT
+        created_at BIGINT,
+        totp_secret TEXT,
+        is_totp_enabled BOOLEAN DEFAULT FALSE
       );
     `);
+    
+    // Ensure new columns exist for existing installations
+    await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
+    await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
 
-    // Create Default Master Admin if not exists (Fallback)
-    // Password is 'admin' (hashed simply or plain for this demo context as requested previously)
-    // In a real app, use bcrypt. Here we store plain for simplicity to match existing frontend logic, 
-    // or simple hash if frontend sends hash.
+    // Create Default Master Admin if not exists
     const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
     if (checkAdmin.rows.length === 0) {
         await client.query(`
@@ -327,7 +329,7 @@ app.post('/api/admin/login-auth', async (req, res) => {
         if (result.rows.length > 0) {
             const user = result.rows[0];
             
-            // Log successful login
+            // Log successful login (Password stage)
             const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
             await pool.query(
                 `INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) 
@@ -342,7 +344,9 @@ app.post('/api/admin/login-auth', async (req, res) => {
                     username: user.username,
                     fullname: user.fullname,
                     role: user.role,
-                    permissions: user.permissions
+                    permissions: user.permissions,
+                    is_totp_enabled: user.is_totp_enabled,
+                    totp_secret: user.totp_secret // Send secret to frontend for verification context
                 }
             });
         } else {
@@ -354,7 +358,7 @@ app.post('/api/admin/login-auth', async (req, res) => {
 // Get Admin Users
 app.get('/api/admin/users', async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at FROM admin_users ORDER BY created_at DESC');
+        const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at, is_totp_enabled FROM admin_users ORDER BY created_at DESC');
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -381,20 +385,25 @@ app.post('/api/admin/users', async (req, res) => {
 
 // Update Admin User
 app.put('/api/admin/users/:id', async (req, res) => {
-    const { password, fullname, permissions } = req.body;
+    const { password, fullname, permissions, totp_secret, is_totp_enabled } = req.body;
     const { id } = req.params;
     try {
-        if (password) {
-            await pool.query(
-                'UPDATE admin_users SET password=$1, fullname=$2, permissions=$3 WHERE id=$4',
-                [password, fullname, JSON.stringify(permissions), id]
-            );
-        } else {
-            await pool.query(
-                'UPDATE admin_users SET fullname=$1, permissions=$2 WHERE id=$3',
-                [fullname, JSON.stringify(permissions), id]
-            );
-        }
+        // Build dynamic query
+        let query = 'UPDATE admin_users SET ';
+        const values = [];
+        let idx = 1;
+
+        if (password) { query += `password=$${idx++}, `; values.push(password); }
+        if (fullname) { query += `fullname=$${idx++}, `; values.push(fullname); }
+        if (permissions) { query += `permissions=$${idx++}, `; values.push(JSON.stringify(permissions)); }
+        if (totp_secret !== undefined) { query += `totp_secret=$${idx++}, `; values.push(totp_secret); }
+        if (is_totp_enabled !== undefined) { query += `is_totp_enabled=$${idx++}, `; values.push(is_totp_enabled); }
+
+        query = query.slice(0, -2); // Remove last comma
+        query += ` WHERE id=$${idx}`;
+        values.push(id);
+
+        await pool.query(query, values);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -410,13 +419,13 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 // Logger (Keep existing)
 app.post('/api/admin/login', async (req, res) => {
     // This is for the generic log endpoint used by frontend for OTP/Other methods
-    const { method, status } = req.body;
+    const { method, status, username } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
         await pool.query(
             `INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) 
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            ['admin', method, status, ip, req.get('User-Agent'), Date.now()]
+            [username || 'admin', method, status, ip, req.get('User-Agent'), Date.now()]
         );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }

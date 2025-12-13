@@ -22,9 +22,21 @@ const LoginPage: React.FC = () => {
         if (serverAuth && serverAuth.success) {
             // Logged in via DB
             const user = serverAuth.user;
+            
+            // Check Staff 2FA
+            if (user.role === 'STAFF' && user.is_totp_enabled) {
+                // If staff has 2FA enabled, redirect to OTP page
+                // Store temp user info to verify later
+                sessionStorage.setItem('pendingStaffUser', JSON.stringify(user));
+                window.location.hash = '/otp';
+                setIsLoading(false);
+                return;
+            }
+
+            // Normal success (No 2FA or not enabled yet)
             sessionStorage.setItem('adminUser', JSON.stringify(user));
             sessionStorage.setItem('isAuthenticated', 'true');
-            // Skip 2FA for sub-admins for now (Simplify) or check role
+            
             // Only Master needs strict 2FA from localStorage settings if enabled there
             if (user.role === 'MASTER' && isTotpEnabled()) {
                  sessionStorage.setItem('authMethod', 'TOTP');
