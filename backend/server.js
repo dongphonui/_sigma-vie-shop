@@ -355,6 +355,23 @@ app.post('/api/admin/login-auth', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Change Password
+app.post('/api/admin/change-password', async (req, res) => {
+    const { id, oldPassword, newPassword } = req.body;
+    try {
+        // Verify old password
+        const result = await pool.query('SELECT * FROM admin_users WHERE id = $1 AND password = $2', [id, oldPassword]);
+        
+        if (result.rows.length > 0) {
+            // Update to new password
+            await pool.query('UPDATE admin_users SET password = $1 WHERE id = $2', [newPassword, id]);
+            res.json({ success: true, message: 'Đổi mật khẩu thành công' });
+        } else {
+            res.json({ success: false, message: 'Mật khẩu cũ không đúng' });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Get Admin Users
 app.get('/api/admin/users', async (req, res) => {
     try {

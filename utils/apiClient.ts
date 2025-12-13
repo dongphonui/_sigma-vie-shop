@@ -72,6 +72,7 @@ export const fetchAdminUsers = () => fetchData('admin/users');
 export const createAdminUser = (user: any) => syncData('admin/users', user);
 export const updateAdminUser = (id: string, user: any) => syncData(`admin/users/${id}`, user, 'PUT');
 export const deleteAdminUser = (id: string) => syncData(`admin/users/${id}`, {}, 'DELETE');
+export const changeAdminPassword = (data: any) => syncData('admin/change-password', data, 'POST');
 
 // Reset
 export const resetDatabase = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {

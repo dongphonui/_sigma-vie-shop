@@ -22,7 +22,7 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../utils/apiClient';
+import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, changeAdminPassword } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 
@@ -117,7 +117,6 @@ const UserCogIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4.9-.9"/><path d="m15.3 22.8.9-.9"/><path d="m15.3 16.4-.9-.9"/><path d="m21.7 22.8-.9-.9"/><path d="m16 19h6"/><path d="m19 16v6"/></svg>
 );
 
-
 const AdminPage: React.FC = () => {
   // General State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings' | 'staff'>('dashboard');
@@ -194,6 +193,11 @@ const AdminPage: React.FC = () => {
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
   
+  // Password Change State
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [tempTotpSecret, setTempTotpSecret] = useState('');
@@ -985,6 +989,40 @@ const AdminPage: React.FC = () => {
       } else {
           alert('Mã xác thực không đúng! Vui lòng thử lại.');
       }
+  };
+
+  // Change Password Handler
+  const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!currentUser) return;
+
+      if (newPasswordInput !== confirmPasswordInput) {
+          setSettingsFeedback('Mật khẩu mới không khớp.');
+          setTimeout(() => setSettingsFeedback(''), 3000);
+          return;
+      }
+
+      if (newPasswordInput.length < 6) {
+          setSettingsFeedback('Mật khẩu mới phải có ít nhất 6 ký tự.');
+          setTimeout(() => setSettingsFeedback(''), 3000);
+          return;
+      }
+
+      const response = await changeAdminPassword({
+          id: currentUser.id,
+          oldPassword: currentPasswordInput,
+          newPassword: newPasswordInput
+      });
+
+      if (response && response.success) {
+          setSettingsFeedback('Đổi mật khẩu thành công!');
+          setCurrentPasswordInput('');
+          setNewPasswordInput('');
+          setConfirmPasswordInput('');
+      } else {
+          setSettingsFeedback(response?.message || 'Đổi mật khẩu thất bại.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
   // ... [Social, Home, Header Handlers kept same] ...
@@ -2116,136 +2154,152 @@ const AdminPage: React.FC = () => {
   );
 
   const renderStaffManager = () => (
-      <div className="space-y-6 animate-fade-in-up">
-          <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-              <h3 className="font-bold text-gray-800">Danh sách Nhân viên</h3>
-              <button 
-                  onClick={() => {
-                      setEditingStaffId(null);
-                      setNewStaffUsername('');
-                      setNewStaffPassword('');
-                      setNewStaffFullname('');
-                      setNewStaffPermissions([]);
-                      setIsAddingStaff(!isAddingStaff);
-                  }}
-                  className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]"
-              >
-                  {isAddingStaff ? 'Hủy' : 'Thêm nhân viên'}
-              </button>
-          </div>
+    <div className="space-y-6 animate-fade-in-up">
+        <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+            <h3 className="font-bold text-gray-700">Danh sách Nhân viên</h3>
+            <button 
+                onClick={() => { 
+                    setIsAddingStaff(true); 
+                    setEditingStaffId(null);
+                    setNewStaffUsername('');
+                    setNewStaffPassword('');
+                    setNewStaffFullname('');
+                    setNewStaffPermissions([]);
+                }}
+                className="bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#b89b31]"
+            >
+                + Thêm nhân viên
+            </button>
+        </div>
 
-          {isAddingStaff && (
-              <div className="bg-white p-6 rounded-lg shadow-md">
-                  <h4 className="font-bold text-gray-700 mb-4">{editingStaffId ? 'Sửa nhân viên' : 'Thêm nhân viên mới'}</h4>
-                  <form onSubmit={handleStaffSubmit} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Tên đăng nhập</label>
-                              <input 
-                                  type="text" 
-                                  value={newStaffUsername} 
-                                  onChange={(e) => setNewStaffUsername(e.target.value)} 
-                                  className="w-full border rounded px-3 py-2" 
-                                  required 
-                                  disabled={!!editingStaffId} // Username immutable on edit
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Mật khẩu {editingStaffId && '(Để trống nếu không đổi)'}</label>
-                              <input 
-                                  type="password" 
-                                  value={newStaffPassword} 
-                                  onChange={(e) => setNewStaffPassword(e.target.value)} 
-                                  className="w-full border rounded px-3 py-2" 
-                                  required={!editingStaffId}
-                              />
-                          </div>
-                          <div className="md:col-span-2">
-                              <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
-                              <input 
-                                  type="text" 
-                                  value={newStaffFullname} 
-                                  onChange={(e) => setNewStaffFullname(e.target.value)} 
-                                  className="w-full border rounded px-3 py-2" 
-                                  required 
-                              />
-                          </div>
-                      </div>
-                      
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Quyền hạn</label>
-                          <div className="flex flex-wrap gap-3">
-                              {['products', 'orders', 'inventory', 'customers', 'home', 'header', 'about', 'settings'].map(perm => (
-                                  <label key={perm} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded border cursor-pointer">
-                                      <input 
-                                          type="checkbox" 
-                                          checked={newStaffPermissions.includes(perm) || newStaffPermissions.includes('ALL')}
-                                          onChange={() => togglePermission(perm)}
-                                          disabled={newStaffPermissions.includes('ALL')}
-                                      />
-                                      <span className="capitalize">{perm}</span>
-                                  </label>
-                              ))}
-                              <label className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded border border-purple-200 cursor-pointer">
-                                  <input 
-                                      type="checkbox" 
-                                      checked={newStaffPermissions.includes('ALL')}
-                                      onChange={() => togglePermission('ALL')}
-                                  />
-                                  <span className="font-bold text-purple-700">Toàn quyền (ALL)</span>
-                              </label>
-                          </div>
-                      </div>
+        {isAddingStaff && (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h4 className="font-bold text-lg mb-4">{editingStaffId ? 'Sửa thông tin nhân viên' : 'Thêm nhân viên mới'}</h4>
+                <form onSubmit={handleStaffSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Tên đăng nhập</label>
+                            <input 
+                                type="text" 
+                                value={newStaffUsername} 
+                                onChange={(e) => setNewStaffUsername(e.target.value)} 
+                                className="w-full border rounded px-3 py-2"
+                                required
+                                disabled={!!editingStaffId} // Username usually immutable
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Họ và tên</label>
+                            <input 
+                                type="text" 
+                                value={newStaffFullname} 
+                                onChange={(e) => setNewStaffFullname(e.target.value)} 
+                                className="w-full border rounded px-3 py-2"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Mật khẩu {editingStaffId && '(Để trống nếu không đổi)'}</label>
+                            <input 
+                                type="password" 
+                                value={newStaffPassword} 
+                                onChange={(e) => setNewStaffPassword(e.target.value)} 
+                                className="w-full border rounded px-3 py-2"
+                                required={!editingStaffId}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Phân quyền</label>
+                        <div className="flex flex-wrap gap-3">
+                            {['dashboard', 'products', 'orders', 'inventory', 'customers', 'about', 'home', 'header', 'settings'].map(perm => (
+                                <label key={perm} className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded border cursor-pointer hover:bg-gray-100">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={newStaffPermissions.includes(perm) || newStaffPermissions.includes('ALL')}
+                                        onChange={() => togglePermission(perm)}
+                                        disabled={newStaffPermissions.includes('ALL')}
+                                    />
+                                    <span className="capitalize">{perm}</span>
+                                </label>
+                            ))}
+                             <label className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded border border-purple-200 cursor-pointer hover:bg-purple-100">
+                                <input 
+                                    type="checkbox" 
+                                    checked={newStaffPermissions.includes('ALL')}
+                                    onChange={() => {
+                                        if (newStaffPermissions.includes('ALL')) {
+                                            setNewStaffPermissions([]);
+                                        } else {
+                                            setNewStaffPermissions(['ALL']);
+                                        }
+                                    }}
+                                />
+                                <span className="font-bold text-purple-700">Toàn quyền (Super Admin)</span>
+                            </label>
+                        </div>
+                    </div>
 
-                      <div className="flex justify-end gap-3">
-                          <button type="button" onClick={() => setIsAddingStaff(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Hủy</button>
-                          <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu</button>
-                      </div>
-                  </form>
-              </div>
-          )}
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <button type="button" onClick={() => setIsAddingStaff(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-300">Hủy</button>
+                        <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded font-bold hover:bg-[#004d40]">Lưu</button>
+                    </div>
+                </form>
+            </div>
+        )}
 
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <table className="min-w-full text-sm text-left text-gray-500">
-                  <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
-                      <tr>
-                          <th className="px-4 py-3">Username</th>
-                          <th className="px-4 py-3">Họ tên</th>
-                          <th className="px-4 py-3">Quyền</th>
-                          <th className="px-4 py-3">Ngày tạo</th>
-                          <th className="px-4 py-3 text-right">Thao tác</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                      {adminUsers.filter(u => u.role !== 'MASTER').map((user) => (
-                          <tr key={user.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-bold text-gray-900">{user.username}</td>
-                              <td className="px-4 py-3">{user.fullname}</td>
-                              <td className="px-4 py-3">
-                                  <div className="flex flex-wrap gap-1">
-                                      {user.permissions?.map(p => (
-                                          <span key={p} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                              {p}
-                                          </span>
-                                      ))}
-                                  </div>
-                              </td>
-                              <td className="px-4 py-3">{user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '-'}</td>
-                              <td className="px-4 py-3 text-right">
-                                  <button onClick={() => handleEditStaff(user)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
-                                  <button onClick={() => handleDeleteStaff(user.id)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
-                              </td>
-                          </tr>
-                      ))}
-                      {adminUsers.filter(u => u.role !== 'MASTER').length === 0 && (
-                          <tr>
-                              <td colSpan={5} className="text-center py-4 text-gray-400">Chưa có nhân viên nào.</td>
-                          </tr>
-                      )}
-                  </tbody>
-              </table>
-          </div>
-      </div>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <table className="min-w-full text-sm text-left text-gray-500">
+                <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                    <tr>
+                        <th className="px-4 py-3">Username</th>
+                        <th className="px-4 py-3">Họ tên</th>
+                        <th className="px-4 py-3">Quyền hạn</th>
+                        <th className="px-4 py-3">Ngày tạo</th>
+                        <th className="px-4 py-3">2FA</th>
+                        <th className="px-4 py-3 text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                    {adminUsers.filter(u => u.role !== 'MASTER').map((user) => (
+                        <tr key={user.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-900">{user.username}</td>
+                            <td className="px-4 py-3">{user.fullname}</td>
+                            <td className="px-4 py-3">
+                                {user.permissions?.includes('ALL') ? (
+                                    <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">Toàn quyền</span>
+                                ) : (
+                                    <div className="flex flex-wrap gap-1">
+                                        {user.permissions?.map(p => (
+                                            <span key={p} className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs border">{p}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </td>
+                            <td className="px-4 py-3">{user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '-'}</td>
+                            <td className="px-4 py-3">
+                                {user.is_totp_enabled ? (
+                                    <span className="text-green-600 font-bold text-xs flex items-center gap-1"><ShieldCheckIcon className="w-3 h-3"/> Bật</span>
+                                ) : (
+                                    <span className="text-gray-400 text-xs">Tắt</span>
+                                )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                                <button onClick={() => handleEditStaff(user)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                <button onClick={() => handleDeleteStaff(user.id)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                            </td>
+                        </tr>
+                    ))}
+                    {adminUsers.filter(u => u.role !== 'MASTER').length === 0 && (
+                        <tr>
+                            <td colSpan={6} className="text-center py-4 italic">Chưa có nhân viên nào.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    </div>
   );
 
   const renderSettings = () => (
@@ -2253,12 +2307,20 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* Email Management - Only Master can manage global emails */}
-              {currentUser?.role === 'MASTER' && (
+              {/* Email Management */}
               <div>
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
-                  <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP (Master).</p>
+                  <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
                   
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                      <p className="text-sm text-blue-700 font-bold">
+                          ℹ️ Hệ thống Email đang hoạt động.
+                      </p>
+                      <p className="text-xs text-blue-600">
+                          Nếu gửi lỗi, mã OTP sẽ tự động hiển thị trên màn hình (Chế độ Fallback).
+                      </p>
+                  </div>
+
                   <ul className="mb-4 space-y-2">
                       {adminEmails.map((email, idx) => (
                           <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
@@ -2280,11 +2342,13 @@ const AdminPage: React.FC = () => {
                       <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
                   
-                  <button onClick={handleTestEmail} className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                  <button 
+                      onClick={handleTestEmail}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                  >
                       📧 Gửi Email kiểm tra
                   </button>
               </div>
-              )}
 
               {/* Login Logs Section */}
               <div className="border-t pt-6">
@@ -2303,6 +2367,7 @@ const AdminPage: React.FC = () => {
                           }}
                           className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                       >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
                           Làm mới
                       </button>
                   </div>
@@ -2311,8 +2376,8 @@ const AdminPage: React.FC = () => {
                           <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">
                               <tr>
                                   <th className="px-3 py-2">Thời gian</th>
-                                  <th className="px-3 py-2">User</th>
                                   <th className="px-3 py-2">Phương thức</th>
+                                  <th className="px-3 py-2">IP</th>
                                   <th className="px-3 py-2">Trạng thái</th>
                               </tr>
                           </thead>
@@ -2320,28 +2385,34 @@ const AdminPage: React.FC = () => {
                               {adminLogs.map((log) => (
                                   <tr key={log.id} className="hover:bg-white">
                                       <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
-                                      <td className="px-3 py-2 font-bold">{log.username}</td>
                                       <td className="px-3 py-2">
-                                          {log.method === 'GOOGLE_AUTH' ? '2FA App' : 'Email OTP'}
+                                          {log.method === 'GOOGLE_AUTH' ? 
+                                            <span className="text-purple-600 font-bold flex items-center gap-1"><ShieldCheckIcon className="w-3 h-3"/> 2FA App</span> : 
+                                            <span className="text-blue-600 flex items-center gap-1">📧 Email OTP</span>}
                                       </td>
+                                      <td className="px-3 py-2 font-mono">{log.ip_address || 'Unknown'}</td>
                                       <td className="px-3 py-2">
                                           {log.status === 'SUCCESS' ? 
-                                            <span className="text-green-600 font-bold">Thành công</span> : 
-                                            <span className="text-red-600 font-bold">Thất bại</span>}
+                                            <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">Thành công</span> : 
+                                            <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">Thất bại</span>}
                                       </td>
                                   </tr>
                               ))}
+                              {adminLogs.length === 0 && (
+                                  <tr>
+                                      <td colSpan={4} className="text-center py-4 italic text-gray-400">Chưa có dữ liệu nhật ký.</td>
+                                  </tr>
+                              )}
                           </tbody>
                       </table>
                   </div>
               </div>
 
-              {/* 2FA Setup Section - Adapted for Staff */}
+              {/* 2FA Setup Section */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
-                      Bảo mật 2 lớp (Google Authenticator) 
-                      {currentUser?.role === 'STAFF' && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">Cá nhân: {currentUser.username}</span>}
+                      Bảo mật 2 lớp (Google Authenticator)
                   </h4>
                   
                   {totpEnabled ? (
@@ -2353,7 +2424,7 @@ const AdminPage: React.FC = () => {
                               <h5 className="font-bold text-green-800">Đã kích hoạt</h5>
                           </div>
                           <p className="text-sm text-green-700 mb-4">
-                              Tài khoản của bạn đang được bảo vệ.
+                              Tài khoản của bạn đang được bảo vệ bởi Google Authenticator. Bạn cần nhập mã từ ứng dụng khi đăng nhập.
                           </p>
                           <button 
                               onClick={handleDisableTotp}
@@ -2367,7 +2438,7 @@ const AdminPage: React.FC = () => {
                           {!showTotpSetup ? (
                               <>
                                 <p className="text-sm text-gray-600 mb-4">
-                                    Tăng cường bảo mật bằng cách sử dụng Google Authenticator.
+                                    Tăng cường bảo mật bằng cách sử dụng Google Authenticator. Bạn sẽ không cần phụ thuộc vào Email để lấy OTP nữa.
                                 </p>
                                 <button 
                                     onClick={handleStartTotpSetup}
@@ -2385,15 +2456,16 @@ const AdminPage: React.FC = () => {
                                       </div>
                                       <div className="flex-1 space-y-3">
                                           <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-2">
-                                              <li>Tải ứng dụng <strong>Google Authenticator</strong>.</li>
-                                              <li>Quét mã QR bên cạnh.</li>
-                                              <li>Nhập mã 6 số để xác nhận.</li>
+                                              <li>Tải ứng dụng <strong>Google Authenticator</strong> trên điện thoại.</li>
+                                              <li>Mở ứng dụng và chọn <strong>Quét mã QR</strong>.</li>
+                                              <li>Quét mã bên cạnh.</li>
+                                              <li>Nhập mã 6 số hiển thị trong ứng dụng vào ô dưới đây để xác nhận.</li>
                                           </ol>
                                           
                                           <form onSubmit={handleVerifyAndEnableTotp} className="mt-4 flex gap-2">
                                               <input 
                                                   type="text" 
-                                                  placeholder="123456"
+                                                  placeholder="Nhập mã 6 số (VD: 123456)"
                                                   value={verificationCode}
                                                   onChange={(e) => setVerificationCode(e.target.value)}
                                                   className="border rounded px-3 py-2 w-48 text-center tracking-widest font-mono"
@@ -2466,47 +2538,33 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* Data Management Section (Only Master) */}
-              {currentUser?.role === 'MASTER' && (
+              {/* Social Media Links */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-red-700 mb-4 flex items-center gap-2">
-                      <Trash2Icon className="w-5 h-5" />
-                      Quản lý Dữ liệu (Nguy hiểm)
-                  </h4>
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg space-y-4">
-                      <div className="flex flex-wrap gap-3">
-                          <button onClick={downloadBackup} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2">
-                              ⬇️ Tải bản sao lưu (Backup)
-                          </button>
-                          <label className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 cursor-pointer">
-                              ⬆️ Khôi phục (Restore)
-                              <input type="file" className="hidden" accept=".json" onChange={(e) => {
-                                  if(e.target.files?.[0]) {
-                                      restoreBackup(e.target.files[0]).then(res => {
-                                          alert(res.message);
-                                          if(res.success) window.location.reload();
-                                      });
-                                  }
-                              }} />
-                          </label>
-                      </div>
-                      <div className="pt-2 border-t border-red-200">
-                          <p className="text-xs text-red-600 mb-2 font-bold">Vùng nguy hiểm: Xóa dữ liệu vĩnh viễn</p>
-                          <div className="flex flex-wrap gap-3">
-                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 text-sm">
-                                  Xóa tất cả Đơn hàng & Kho
-                              </button>
-                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 text-sm">
-                                  Xóa tất cả Sản phẩm
-                              </button>
-                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm font-bold">
-                                  Factory Reset (Toàn bộ)
-                              </button>
+                  <h4 className="font-bold text-gray-700 mb-4">Liên kết Mạng xã hội (Footer)</h4>
+                  {socialSettings && (
+                      <form onSubmit={handleSocialSettingsSubmit} className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Facebook URL</label>
+                              <input type="url" value={socialSettings.facebook} onChange={(e) => handleSocialSettingsChange('facebook', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
                           </div>
-                      </div>
-                  </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Instagram URL</label>
+                              <input type="url" value={socialSettings.instagram} onChange={(e) => handleSocialSettingsChange('instagram', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">TikTok URL</label>
+                              <input type="url" value={socialSettings.tiktok} onChange={(e) => handleSocialSettingsChange('tiktok', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700">Twitter/X URL</label>
+                              <input type="url" value={socialSettings.twitter} onChange={(e) => handleSocialSettingsChange('twitter', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                          <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded hover:bg-[#b89b31]">
+                              Cập nhật Liên kết
+                          </button>
+                      </form>
+                  )}
               </div>
-              )}
           </div>
           
            {settingsFeedback && (
