@@ -117,9 +117,14 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
     if (scope === 'ORDERS') {
         localStorage.removeItem(KEYS.orders);
         localStorage.removeItem(KEYS.transactions);
+        // Set explicitly to empty so app doesn't load defaults
+        localStorage.setItem(KEYS.orders, '[]');
+        localStorage.setItem(KEYS.transactions, '[]');
     } else if (scope === 'PRODUCTS') {
         localStorage.removeItem(KEYS.products);
         localStorage.removeItem(KEYS.transactions);
+        localStorage.setItem(KEYS.products, '[]');
+        localStorage.setItem(KEYS.transactions, '[]');
     } else if (scope === 'FULL') {
         // PRESERVE ESSENTIAL SETTINGS (Giữ lại cấu hình quan trọng)
         const adminSettings = localStorage.getItem(KEYS.adminSettings);
@@ -138,6 +143,12 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
         if (headerSettings) localStorage.setItem(KEYS.headerSettings, headerSettings);
         if (homeSettings) localStorage.setItem(KEYS.homeSettings, homeSettings);
         if (socialSettings) localStorage.setItem(KEYS.socialSettings, socialSettings);
+
+        // INITIALIZE EMPTY ARRAYS TO PREVENT DEMO DATA LOADING
+        localStorage.setItem(KEYS.products, '[]');
+        localStorage.setItem(KEYS.orders, '[]');
+        localStorage.setItem(KEYS.customers, '[]');
+        localStorage.setItem(KEYS.transactions, '[]');
 
         // Keep Auth session active
         sessionStorage.setItem('isAuthenticated', 'true');

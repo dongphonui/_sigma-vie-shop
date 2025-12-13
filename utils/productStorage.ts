@@ -41,7 +41,8 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
     
     // 1. Get current local data to preserve unsaved items
     const storedProducts = localStorage.getItem(STORAGE_KEY);
-    let localData: Product[] = storedProducts ? JSON.parse(storedProducts) : PRODUCTS;
+    // CHANGE: Default to empty array, NOT demo products
+    let localData: Product[] = storedProducts ? JSON.parse(storedProducts) : [];
 
     try {
         console.log("Đang ép buộc tải lại từ Server...");
@@ -56,7 +57,8 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
                 return merged.map(formatProduct);
             }
         }
-        throw new Error("Không lấy được dữ liệu mới từ Server");
+        // If server empty or fails, return what we have (empty or local)
+        return localData.map(formatProduct);
     } catch (e) {
         console.error("Lỗi khi ép buộc tải lại:", e);
         // Fallback to local
@@ -69,7 +71,6 @@ export const hardResetProducts = async (): Promise<Product[]> => {
     console.warn("SAFE HARD RESET TRIGGERED");
     
     // 1. CHECK SERVER HEALTH FIRST
-    // If server is down, ABORT immediately to save local data.
     const isOnline = await checkServerConnection();
     if (!isOnline) {
         const errorMsg = "KHÔNG THỂ KẾT NỐI SERVER. Hủy thao tác xóa cache để bảo vệ dữ liệu bạn vừa nhập.";
@@ -83,14 +84,12 @@ export const hardResetProducts = async (): Promise<Product[]> => {
         if (!success) {
              const confirm = window.confirm("Cảnh báo: Có lỗi xảy ra khi đồng bộ một số sản phẩm lên Server. Nếu bạn tiếp tục, dữ liệu chưa lưu sẽ bị MẤT. Bạn có chắc chắn muốn tiếp tục không?");
              if (!confirm) throw new Error("User cancelled reset due to sync failure.");
-        } else {
-            console.log("Đã hoàn tất sao lưu dữ liệu lên Server trước khi reset.");
         }
     } catch (syncError) {
         throw syncError; // Abort
     }
 
-    // 3. WIPE CACHE ONLY IF SERVER IS REACHABLE
+    // 3. WIPE CACHE
     localStorage.removeItem(STORAGE_KEY);
     hasLoadedFromDB = false;
 
@@ -104,11 +103,13 @@ export const hardResetProducts = async (): Promise<Product[]> => {
             hasLoadedFromDB = true;
             return dbProducts.map(formatProduct);
         } else {
-            throw new Error("Server connected but returned no data.");
+            // Server returned nothing or error -> Set empty
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            return [];
         }
     } catch (e) {
         console.error("Hard Reset Failed:", e);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([])); // CHANGE: Default to empty on error
         throw e;
     }
 };
@@ -144,11 +145,12 @@ export const getProducts = (): Product[] => {
       } catch (e) {
         console.error("LocalStorage corrupted, resetting.", e);
         localStorage.removeItem(STORAGE_KEY);
-        localData = PRODUCTS;
+        localData = []; // CHANGE: Default to empty
       }
     } else {
-      localData = PRODUCTS;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
+      // CHANGE: Do NOT load defaults. Start fresh.
+      localData = [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     }
 
     // 2. Load từ DB và Merge thông minh (Non-blocking background update)
@@ -169,7 +171,7 @@ export const getProducts = (): Product[] => {
 
   } catch (error) {
     console.error("Lỗi storage nghiêm trọng", error);
-    return PRODUCTS;
+    return []; // CHANGE: Return empty on error
   }
 };
 
