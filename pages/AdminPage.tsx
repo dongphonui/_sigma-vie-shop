@@ -52,6 +52,10 @@ const SearchIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 );
 
+const FilterIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+);
+
 const LayersIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
 );
@@ -1084,6 +1088,22 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  const handlePromoImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && homeSettings) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Add to array
+        const newUrls = [...homeSettings.promoImageUrls, reader.result as string];
+        handleHomePageSettingsChange('promoImageUrls', newUrls);
+      };
+      reader.onerror = () => {
+          setHomeFeedback('Lỗi: Không thể đọc file.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleHomePageSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (homeSettings) {
@@ -2066,38 +2086,54 @@ const AdminPage: React.FC = () => {
                        <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
                        <div className="space-y-3">
                            <div>
-                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
+                               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Hình ảnh Banner (URL hoặc Tải lên)</label>
                                {homeSettings.promoImageUrls.map((url, idx) => (
-                                   <div key={idx} className="flex gap-2 mb-2">
-                                       <input 
-                                            type="text" 
-                                            value={url} 
-                                            onChange={(e) => {
-                                                const newUrls = [...homeSettings.promoImageUrls];
-                                                newUrls[idx] = e.target.value;
-                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
-                                            }}
-                                            className="border rounded px-3 py-2 flex-1 text-sm" 
-                                        />
+                                   <div key={idx} className="flex gap-2 mb-2 items-center">
+                                       <div className="flex-1 flex items-center gap-2">
+                                            {url && (
+                                                <img src={url} alt="Mini preview" className="w-8 h-8 object-cover rounded border bg-white" />
+                                            )}
+                                            <input 
+                                                type="text" 
+                                                value={url} 
+                                                onChange={(e) => {
+                                                    const newUrls = [...homeSettings.promoImageUrls];
+                                                    newUrls[idx] = e.target.value;
+                                                    handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                                }}
+                                                className="border rounded px-3 py-2 flex-1 text-sm truncate" 
+                                                placeholder="https://... hoặc Data URL"
+                                            />
+                                       </div>
                                         <button 
                                             type="button" 
                                             onClick={() => {
                                                 const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
                                                 handleHomePageSettingsChange('promoImageUrls', newUrls);
                                             }}
-                                            className="text-red-500 text-xs hover:underline"
+                                            className="text-red-500 text-xs hover:bg-red-50 p-2 rounded"
+                                            title="Xóa ảnh"
                                         >
-                                            Xóa
+                                            <Trash2Icon className="w-4 h-4" />
                                         </button>
                                    </div>
                                ))}
-                               <button 
-                                    type="button" 
-                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
-                                    className="text-blue-600 text-sm hover:underline"
-                                >
-                                    + Thêm ảnh
-                                </button>
+                               
+                               <div className="flex gap-3 mt-3">
+                                   <button 
+                                        type="button" 
+                                        onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
+                                        className="text-blue-600 text-sm hover:underline flex items-center gap-1"
+                                    >
+                                        + Thêm URL
+                                    </button>
+                                    <span className="text-gray-300">|</span>
+                                    <label className="cursor-pointer text-blue-600 text-sm hover:underline flex items-center gap-1">
+                                        <ImagePlus className="w-4 h-4" />
+                                        <span>Tải ảnh từ máy</span>
+                                        <input type="file" className="hidden" accept="image/*" onChange={handlePromoImageUpload} />
+                                    </label>
+                               </div>
                            </div>
                            <div className="grid grid-cols-2 gap-4">
                                <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
