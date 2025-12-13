@@ -11,6 +11,7 @@ import AuthModal from './components/AuthModal';
 import CartDrawer from './components/CartDrawer';
 import { getCurrentCustomer } from './utils/customerStorage';
 import { getCart } from './utils/cartStorage';
+import { forceReloadOrders } from './utils/orderStorage';
 import type { Customer, CartItem } from './types';
 
 const App: React.FC = () => {
@@ -68,6 +69,7 @@ const App: React.FC = () => {
       if (pid) {
           console.log("Deep link detected for product:", pid);
           setInitialProductId(pid);
+          // Don't clear URL to avoid refresh issues on some mobile browsers
       }
 
       // Base route logic
@@ -79,7 +81,12 @@ const App: React.FC = () => {
     handleHashChange(); // Run on mount
     
     // Check for logged in customer on init
-    setCurrentUser(getCurrentCustomer());
+    const user = getCurrentCustomer();
+    setCurrentUser(user);
+    if (user) {
+        // Automatically sync orders on app start for cross-device consistency
+        forceReloadOrders().catch(e => console.error("Auto sync failed:", e));
+    }
     
     window.addEventListener('hashchange', handleHashChange);
     return () => {
@@ -152,6 +159,8 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (customer: Customer) => {
       setCurrentUser(customer);
+      // Sync orders immediately on login
+      forceReloadOrders().catch(e => console.error("Login sync failed:", e));
   };
 
   const handleOpenCart = () => {

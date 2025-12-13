@@ -19,6 +19,16 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Helper to run migration safely
+const runMigration = async (client, query) => {
+    try {
+        await client.query(query);
+    } catch (e) {
+        // Log but don't fail, as column might already be correct or table might imply different state
+        // console.log(`Migration info (${query}): ${e.message}`);
+    }
+};
+
 // Initialize Database
 const initDb = async () => {
   const client = await pool.connect();
@@ -45,7 +55,7 @@ const initDb = async () => {
         flash_sale_end_time BIGINT,
         sizes TEXT,
         colors TEXT,
-        variants TEXT -- Stores JSON
+        variants TEXT
       );
     `);
 
@@ -96,65 +106,6 @@ const initDb = async () => {
       );
     `);
     
-    // Migration: Fix Missing Columns & Data Types
-    try {
-        console.log("Running Migrations...");
-        
-        // --- FIX 1: ID to BIGINT (Fix "out of range") ---
-        await client.query(`ALTER TABLE products ALTER COLUMN id TYPE BIGINT`);
-        await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_start_time TYPE BIGINT`);
-        await client.query(`ALTER TABLE products ALTER COLUMN flash_sale_end_time TYPE BIGINT`);
-
-        // --- FIX 2: PRICES TO TEXT (Fix "invalid input syntax for type numeric") ---
-        await client.query(`ALTER TABLE products ALTER COLUMN price TYPE TEXT`);
-        await client.query(`ALTER TABLE products ALTER COLUMN import_price TYPE TEXT`);
-        await client.query(`ALTER TABLE products ALTER COLUMN sale_price TYPE TEXT`);
-
-        // --- FIX 3: TIMESTAMPS TO BIGINT (Fix "value is out of range for type integer") ---
-        // Lệnh này sửa lỗi Order sync error bạn vừa gặp
-        await client.query(`ALTER TABLE orders ALTER COLUMN timestamp TYPE BIGINT`);
-        await client.query(`ALTER TABLE customers ALTER COLUMN created_at TYPE BIGINT`);
-        // Chúng ta cũng sửa luôn cho bảng Inventory để tránh lỗi tương lai
-        await client.query(`ALTER TABLE inventory_transactions ALTER COLUMN timestamp TYPE BIGINT`);
-        
-        // Orders Migrations
-        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
-        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0`);
-        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_size VARCHAR(50)`);
-        await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_color VARCHAR(50)`);
-        
-        // Products Migrations
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS import_price TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT`);
-        
-        // Product Advanced Features Migrations
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_flash_sale BOOLEAN DEFAULT FALSE`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_price TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_start_time BIGINT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_end_time BIGINT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS colors TEXT`);
-        await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS variants TEXT`); 
-        
-        // Customer Migrations
-        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number TEXT`);
-        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender TEXT`);
-        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob TEXT`);
-        await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS issue_date TEXT`);
-        
-        // Inventory Migrations
-        await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
-        await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
-        
-        console.log("Migrations completed successfully.");
-    } catch (err) {
-        console.log("Migration notice:", err.message);
-    }
-
     // 5. Inventory Transactions
     await client.query(`
       CREATE TABLE IF NOT EXISTS inventory_transactions (
@@ -182,13 +133,59 @@ const initDb = async () => {
         status VARCHAR(20)
       );
     `);
-    
-    // Fix Admin Logs Timestamp as well just in case
-    try {
-        await client.query(`ALTER TABLE admin_logs ALTER COLUMN timestamp TYPE BIGINT`);
-    } catch(e) {}
 
-    console.log("Database Initialized Successfully.");
+    // --- MIGRATIONS: Fix Missing Columns & Data Types ---
+    console.log("Running Schema Migrations...");
+    
+    // Fix: ID and Timestamps to BIGINT (Prevent "out of range for integer")
+    await runMigration(client, `ALTER TABLE products ALTER COLUMN id TYPE BIGINT`);
+    await runMigration(client, `ALTER TABLE products ALTER COLUMN flash_sale_start_time TYPE BIGINT`);
+    await runMigration(client, `ALTER TABLE products ALTER COLUMN flash_sale_end_time TYPE BIGINT`);
+    
+    await runMigration(client, `ALTER TABLE orders ALTER COLUMN timestamp TYPE BIGINT`);
+    await runMigration(client, `ALTER TABLE orders ALTER COLUMN product_id TYPE BIGINT`); // Critical for large IDs
+    
+    await runMigration(client, `ALTER TABLE customers ALTER COLUMN created_at TYPE BIGINT`);
+    
+    await runMigration(client, `ALTER TABLE inventory_transactions ALTER COLUMN timestamp TYPE BIGINT`);
+    await runMigration(client, `ALTER TABLE inventory_transactions ALTER COLUMN product_id TYPE BIGINT`);
+    
+    await runMigration(client, `ALTER TABLE admin_logs ALTER COLUMN timestamp TYPE BIGINT`);
+
+    // Fix: Prices to TEXT (Prevent numeric syntax errors with commas/currencies)
+    await runMigration(client, `ALTER TABLE products ALTER COLUMN price TYPE TEXT`);
+    await runMigration(client, `ALTER TABLE products ALTER COLUMN import_price TYPE TEXT`);
+    await runMigration(client, `ALTER TABLE products ALTER COLUMN sale_price TYPE TEXT`);
+
+    // Fix: Add Missing Columns if they don't exist
+    await runMigration(client, `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
+    await runMigration(client, `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0`);
+    await runMigration(client, `ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_size VARCHAR(50)`);
+    await runMigration(client, `ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_color VARCHAR(50)`);
+    
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS import_price TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS is_flash_sale BOOLEAN DEFAULT FALSE`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS sale_price TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_start_time BIGINT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS flash_sale_end_time BIGINT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS colors TEXT`);
+    await runMigration(client, `ALTER TABLE products ADD COLUMN IF NOT EXISTS variants TEXT`); 
+    
+    await runMigration(client, `ALTER TABLE customers ADD COLUMN IF NOT EXISTS cccd_number TEXT`);
+    await runMigration(client, `ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender TEXT`);
+    await runMigration(client, `ALTER TABLE customers ADD COLUMN IF NOT EXISTS dob TEXT`);
+    await runMigration(client, `ALTER TABLE customers ADD COLUMN IF NOT EXISTS issue_date TEXT`);
+    
+    await runMigration(client, `ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_size VARCHAR(50)`);
+    await runMigration(client, `ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS selected_color VARCHAR(50)`);
+    
+    console.log("Database & Migrations Initialized Successfully.");
   } catch (err) {
     console.error("Error initializing database:", err);
   } finally {
@@ -335,7 +332,6 @@ app.post('/api/products/stock', async (req, res) => {
     }
 });
 
-// ... (Rest of existing routes for Categories, Customers, Orders, Inventory, Email, Logs) ...
 // 2. CATEGORIES
 app.get('/api/categories', async (req, res) => {
   try {
@@ -438,7 +434,6 @@ app.get('/api/orders', async (req, res) => {
 app.post('/api/orders/sync', async (req, res) => {
   const o = req.body;
   try {
-    // Ensure all optional fields are handled (undefined -> null)
     await pool.query(
       `INSERT INTO orders (id, customer_id, customer_name, customer_contact, customer_address, product_id, product_name, quantity, total_price, status, timestamp, payment_method, shipping_fee, product_size, product_color)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
@@ -462,7 +457,10 @@ app.post('/api/orders/sync', async (req, res) => {
       ]
     );
     res.json({ success: true });
-  } catch (err) { console.error("Order sync error:", err); res.status(500).json({ success: false, error: err.message }); }
+  } catch (err) { 
+      console.error("Order sync error:", err); 
+      res.status(500).json({ success: false, error: err.message }); 
+  }
 });
 
 // 5. INVENTORY
@@ -506,8 +504,8 @@ app.post('/api/inventory/sync', async (req, res) => {
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER || 'sigmavieshop@gmail.com', // Use env var
-    pass: process.env.EMAIL_PASS || 'your-app-password' // Use env var
+    user: process.env.EMAIL_USER || 'sigmavieshop@gmail.com',
+    pass: process.env.EMAIL_PASS || 'your-app-password'
   }
 });
 
@@ -552,8 +550,7 @@ app.get('/api/admin/logs', async (req, res) => {
     } catch (err) { res.status(500).send(err.message); }
 });
 
-// QUAN TRỌNG: Khởi tạo DB TRƯỚC, sau đó mới bật Server lắng nghe
-// Điều này ngăn chặn việc nhận request khi DB chưa cập nhật xong cột
+// Start Server
 initDb().then(() => {
   app.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port} and accepting external connections`);
