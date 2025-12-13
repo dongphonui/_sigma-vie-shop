@@ -951,17 +951,17 @@ const AdminPage: React.FC = () => {
 
   const handleBankSettingsSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Need 2FA if enabled (Check either global master setting or local staff setting)
+      // Determine if 2FA is active for the current user
       const isMaster2FA = currentUser?.role === 'MASTER' && isTotpEnabled();
-      const isStaff2FA = currentUser?.role === 'STAFF' && totpEnabled;
+      const isStaff2FA = currentUser?.role === 'STAFF' && totpEnabled; // totpEnabled state is synced for staff
 
       if (isMaster2FA || isStaff2FA) {
+          // If 2FA is enabled, require verification code
           setShowBankSecurityModal(true);
           setSecurityCode('');
       } else {
-          if(confirm('Cảnh báo: Bạn chưa bật bảo mật 2 lớp. Hành động này kém an toàn. Bạn có muốn tiếp tục lưu không?')) {
-              executeBankUpdate();
-          }
+          // STRICT POLICY: Block access if 2FA is disabled
+          alert('⚠️ BẢO MẬT: Bạn bắt buộc phải kích hoạt xác thực 2 lớp (Google Authenticator) trước khi thay đổi cấu hình thanh toán/ngân hàng.');
       }
   };
 
