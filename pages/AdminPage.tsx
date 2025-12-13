@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser } from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser, StoreSettings } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -22,7 +22,8 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, changeAdminPassword } from '../utils/apiClient';
+import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsStorage';
+import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, changeAdminPassword, checkServerConnection } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 
@@ -49,10 +50,6 @@ const BarChart2: React.FC<{className?: string}> = ({className}) => (
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-);
-
-const FilterIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
 );
 
 const LayersIcon: React.FC<{className?: string}> = ({className}) => (
@@ -125,11 +122,16 @@ const KeyIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
 );
 
+const StoreIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings' | 'staff'>('dashboard');
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [serverStatus, setServerStatus] = useState<boolean>(false);
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -201,6 +203,7 @@ const AdminPage: React.FC = () => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   
   // Password Change State
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
@@ -280,6 +283,15 @@ const AdminPage: React.FC = () => {
               permissions: ['ALL']
           });
       }
+      
+      // Check Server Status
+      const checkStatus = async () => {
+          const status = await checkServerConnection();
+          setServerStatus(status);
+      };
+      checkStatus();
+      const interval = setInterval(checkStatus, 30000); // Check every 30s
+      return () => clearInterval(interval);
   }, []);
 
   const hasPermission = (perm: string) => {
@@ -320,6 +332,7 @@ const AdminPage: React.FC = () => {
     }
     
     setBankSettings(getBankSettings());
+    setStoreSettings(getStoreSettings());
     
     // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
@@ -622,9 +635,9 @@ const AdminPage: React.FC = () => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
 
-      const storeName = 'Sigma Vie Store'; 
-      const storePhone = '0912.345.678';
-      const storeAddress = 'Hà Nội, Việt Nam';
+      const storeName = storeSettings?.name || 'Sigma Vie Store'; 
+      const storePhone = storeSettings?.phoneNumber || '0912.345.678';
+      const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
 
       const productUrl = `${window.location.origin}/?product=${order.productId}`;
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
@@ -954,6 +967,12 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  const handleStoreSettingsChange = (field: keyof StoreSettings, value: string) => {
+      if (storeSettings) {
+          setStoreSettings({ ...storeSettings, [field]: value });
+      }
+  };
+
   const executeBankUpdate = () => {
       if (bankSettings) {
           updateBankSettings(bankSettings);
@@ -975,6 +994,15 @@ const AdminPage: React.FC = () => {
       } else {
           // STRICT POLICY: Block access if 2FA is disabled
           alert('⚠️ BẢO MẬT: Bạn bắt buộc phải kích hoạt xác thực 2 lớp (Google Authenticator) trước khi thay đổi cấu hình thanh toán/ngân hàng.');
+      }
+  };
+
+  const handleStoreSettingsSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (storeSettings) {
+          updateStoreSettings(storeSettings);
+          setSettingsFeedback('Đã cập nhật thông tin cửa hàng thành công!');
+          setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
@@ -2315,13 +2343,13 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* Change Password Section */}
+              {/* Change Password Section - MOVED TO TOP */}
               <div className="border-b pb-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <KeyIcon className="w-5 h-5 text-gray-600" />
                       Đổi mật khẩu
                   </h4>
-                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-md bg-gray-50 p-4 rounded-lg border">
                       <div>
                           <input 
                               type="password" 
@@ -2352,15 +2380,165 @@ const AdminPage: React.FC = () => {
                               required
                           />
                       </div>
-                      <button type="submit" className="bg-gray-800 text-white px-4 py-2 rounded font-bold hover:bg-gray-700 transition-colors">
+                      <button type="submit" className="bg-gray-800 text-white px-4 py-2 rounded font-bold hover:bg-gray-700 transition-colors w-full">
                           Cập nhật mật khẩu
                       </button>
                   </form>
               </div>
 
-              {/* Email Management - Only Master can manage global emails */}
+              {/* Store Settings Section - NEW */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
+                      Thông tin Cửa hàng
+                  </h4>
+                  {storeSettings && (
+                      <form onSubmit={handleStoreSettingsSubmit} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Tên Cửa Hàng</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.name} 
+                                      onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2" 
+                                      required
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.phoneNumber} 
+                                      onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2" 
+                                      required
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                                  <input 
+                                      type="text" 
+                                      value={storeSettings.address} 
+                                      onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2" 
+                                      required
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-medium text-gray-700">Email liên hệ</label>
+                                  <input 
+                                      type="email" 
+                                      value={storeSettings.email || ''} 
+                                      onChange={(e) => handleStoreSettingsChange('email', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2" 
+                                  />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                              Lưu thông tin
+                          </button>
+                      </form>
+                  )}
+              </div>
+
+              {/* Bank Settings Section */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <CreditCardIcon className="w-5 h-5 text-gray-600" />
+                      Cấu hình Thanh toán (VietQR)
+                  </h4>
+                  {bankSettings && (
+                      <form onSubmit={handleBankSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Ngân hàng</label>
+                                  <select 
+                                      value={bankSettings.bankId} 
+                                      onChange={(e) => handleBankSettingsChange('bankId', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required
+                                  >
+                                      <option value="">-- Chọn ngân hàng --</option>
+                                      {VIET_QR_BANKS.map(bank => (
+                                          <option key={bank.id} value={bank.id}>{bank.name} ({bank.id})</option>
+                                      ))}
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Số tài khoản</label>
+                                  <input 
+                                      type="text" 
+                                      value={bankSettings.accountNumber} 
+                                      onChange={(e) => handleBankSettingsChange('accountNumber', e.target.value)} 
+                                      className="mt-1 w-full border rounded px-3 py-2"
+                                      required 
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-medium text-gray-700">Tên chủ tài khoản (Viết hoa không dấu)</label>
+                                  <input 
+                                      type="text" 
+                                      value={bankSettings.accountName} 
+                                      onChange={(e) => handleBankSettingsChange('accountName', e.target.value.toUpperCase())} 
+                                      className="mt-1 w-full border rounded px-3 py-2 uppercase"
+                                      required 
+                                  />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                              Lưu thông tin Ngân hàng
+                          </button>
+                      </form>
+                  )}
+              </div>
+
+              {/* Data Management Section (Backup/Reset) - RESTORED & PROMINENT */}
               {currentUser?.role === 'MASTER' && (
-              <div>
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-red-700 mb-4 flex items-center gap-2">
+                      <Trash2Icon className="w-5 h-5" />
+                      Quản lý Dữ liệu (Sao lưu & Khôi phục)
+                  </h4>
+                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg space-y-4">
+                      <div className="flex flex-wrap gap-3">
+                          <button onClick={downloadBackup} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 shadow-sm">
+                              ⬇️ Tải bản sao lưu (Backup)
+                          </button>
+                          <label className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 cursor-pointer shadow-sm">
+                              ⬆️ Khôi phục (Restore)
+                              <input type="file" className="hidden" accept=".json" onChange={(e) => {
+                                  if(e.target.files?.[0]) {
+                                      restoreBackup(e.target.files[0]).then(res => {
+                                          alert(res.message);
+                                          if(res.success) window.location.reload();
+                                      });
+                                  }
+                              }} />
+                          </label>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-red-200">
+                          <p className="text-xs text-red-600 mb-2 font-bold uppercase tracking-wide">Vùng nguy hiểm: Xóa dữ liệu vĩnh viễn</p>
+                          <div className="flex flex-wrap gap-3">
+                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-800 px-3 py-1.5 rounded hover:bg-red-200 text-sm font-medium border border-red-200">
+                                  Xóa tất cả Đơn hàng & Kho
+                              </button>
+                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-800 px-3 py-1.5 rounded hover:bg-red-200 text-sm font-medium border border-red-200">
+                                  Xóa tất cả Sản phẩm
+                              </button>
+                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 text-sm font-bold shadow">
+                                  Factory Reset (Toàn bộ)
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              )}
+
+              {/* Email Management - Only Master */}
+              {currentUser?.role === 'MASTER' && (
+              <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
                   <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP (Master).</p>
                   
@@ -2519,99 +2697,6 @@ const AdminPage: React.FC = () => {
                       </div>
                   )}
               </div>
-
-              {/* Bank Settings Section (NEW with Security) */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <CreditCardIcon className="w-5 h-5 text-gray-600" />
-                      Cấu hình Thanh toán (VietQR)
-                  </h4>
-                  {bankSettings && (
-                      <form onSubmit={handleBankSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Ngân hàng</label>
-                                  <select 
-                                      value={bankSettings.bankId} 
-                                      onChange={(e) => handleBankSettingsChange('bankId', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required
-                                  >
-                                      <option value="">-- Chọn ngân hàng --</option>
-                                      {VIET_QR_BANKS.map(bank => (
-                                          <option key={bank.id} value={bank.id}>{bank.name} ({bank.id})</option>
-                                      ))}
-                                  </select>
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Số tài khoản</label>
-                                  <input 
-                                      type="text" 
-                                      value={bankSettings.accountNumber} 
-                                      onChange={(e) => handleBankSettingsChange('accountNumber', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2"
-                                      required 
-                                  />
-                              </div>
-                              <div className="md:col-span-2">
-                                  <label className="block text-sm font-medium text-gray-700">Tên chủ tài khoản (Viết hoa không dấu)</label>
-                                  <input 
-                                      type="text" 
-                                      value={bankSettings.accountName} 
-                                      onChange={(e) => handleBankSettingsChange('accountName', e.target.value.toUpperCase())} 
-                                      className="mt-1 w-full border rounded px-3 py-2 uppercase"
-                                      required 
-                                  />
-                              </div>
-                          </div>
-                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
-                              Lưu thông tin Ngân hàng
-                          </button>
-                      </form>
-                  )}
-              </div>
-
-              {/* Data Management Section (Only Master) */}
-              {currentUser?.role === 'MASTER' && (
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-red-700 mb-4 flex items-center gap-2">
-                      <Trash2Icon className="w-5 h-5" />
-                      Quản lý Dữ liệu (Nguy hiểm)
-                  </h4>
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg space-y-4">
-                      <div className="flex flex-wrap gap-3">
-                          <button onClick={downloadBackup} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2">
-                              ⬇️ Tải bản sao lưu (Backup)
-                          </button>
-                          <label className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 cursor-pointer">
-                              ⬆️ Khôi phục (Restore)
-                              <input type="file" className="hidden" accept=".json" onChange={(e) => {
-                                  if(e.target.files?.[0]) {
-                                      restoreBackup(e.target.files[0]).then(res => {
-                                          alert(res.message);
-                                          if(res.success) window.location.reload();
-                                      });
-                                  }
-                              }} />
-                          </label>
-                      </div>
-                      <div className="pt-2 border-t border-red-200">
-                          <p className="text-xs text-red-600 mb-2 font-bold">Vùng nguy hiểm: Xóa dữ liệu vĩnh viễn</p>
-                          <div className="flex flex-wrap gap-3">
-                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 text-sm">
-                                  Xóa tất cả Đơn hàng & Kho
-                              </button>
-                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200 text-sm">
-                                  Xóa tất cả Sản phẩm
-                              </button>
-                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm font-bold">
-                                  Factory Reset (Toàn bộ)
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-              )}
           </div>
           
            {settingsFeedback && (
@@ -2787,6 +2872,12 @@ const AdminPage: React.FC = () => {
                  activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
             </h2>
             <div className="flex items-center gap-4">
+                {/* SERVER STATUS INDICATOR */}
+                <div className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold transition-colors ${serverStatus ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                    <div className={`w-2 h-2 rounded-full ${serverStatus ? 'bg-green-600 animate-pulse' : 'bg-red-600'}`}></div>
+                    {serverStatus ? 'Server Online' : 'Server Offline'}
+                </div>
+
                 <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
                 <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg uppercase" title={currentUser?.fullname}>
                     {currentUser?.username.charAt(0)}
