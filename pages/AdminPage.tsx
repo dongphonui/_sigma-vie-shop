@@ -888,6 +888,33 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  // NEW: Image Upload Handler for Promo Banners
+  const handlePromoImageUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file && homeSettings) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newUrls = [...homeSettings.promoImageUrls];
+        // Ensure array exists (migration safety)
+        if (!newUrls) {
+             handleHomePageSettingsChange('promoImageUrls', [reader.result as string]);
+             return;
+        }
+        
+        if (index === -1) {
+            newUrls.push(reader.result as string);
+        } else {
+            newUrls[index] = reader.result as string;
+        }
+        handleHomePageSettingsChange('promoImageUrls', newUrls);
+      };
+      reader.onerror = () => {
+          setHomeFeedback('Lỗi: Không thể đọc file ảnh.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleHomePageSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (homeSettings) {
@@ -944,6 +971,29 @@ const AdminPage: React.FC = () => {
       } else {
           setSettingsFeedback('Lỗi: Không thể gửi email. Vui lòng kiểm tra Log trên Render.');
       }
+      setTimeout(() => setSettingsFeedback(''), 5000);
+  };
+  
+  // MANUAL SYNC HANDLER (Updated to sync ALL data types)
+  const handleManualSync = async () => {
+      setSettingsFeedback('Đang đồng bộ dữ liệu lên Server...');
+      
+      try {
+          const results = await Promise.all([
+              syncAllLocalDataToServer(), // Sync Products
+              syncAllOrdersToServer(),    // Sync Orders (NEW)
+              syncAllTransactionsToServer() // Sync Inventory (NEW)
+          ]);
+          
+          if (results.every(r => r)) {
+              setSettingsFeedback('✅ Đồng bộ thành công tất cả dữ liệu (Sản phẩm, Đơn hàng, Kho).');
+          } else {
+              setSettingsFeedback('⚠️ Một số dữ liệu đồng bộ thất bại. Vui lòng thử lại.');
+          }
+      } catch (e) {
+          setSettingsFeedback('❌ Lỗi đồng bộ nghiêm trọng.');
+      }
+      
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
@@ -1875,40 +1925,55 @@ const AdminPage: React.FC = () => {
                        <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
                        <div className="space-y-3">
                            <div>
-                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
-                               {homeSettings.promoImageUrls.map((url, idx) => (
-                                   <div key={idx} className="flex gap-2 mb-2">
+                               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Danh sách Banner (Slideshow)</label>
+                               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-2">
+                                   {homeSettings.promoImageUrls.map((url, idx) => (
+                                       <div key={idx} className="relative group border rounded-lg overflow-hidden bg-gray-200 aspect-video shadow-sm">
+                                           <img src={url} alt={`Banner ${idx}`} className="w-full h-full object-cover" />
+                                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-sm">
+                                                <label className="cursor-pointer bg-white text-gray-800 p-2 rounded-full hover:bg-gray-100 shadow-lg transition-transform hover:scale-110" title="Thay đổi ảnh">
+                                                    <EditIcon className="w-4 h-4" />
+                                                    <input 
+                                                        type="file" 
+                                                        className="hidden" 
+                                                        accept="image/*" 
+                                                        onChange={(e) => handlePromoImageUpload(e, idx)} 
+                                                    />
+                                                </label>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => {
+                                                        const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
+                                                        handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                                    }}
+                                                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-lg transition-transform hover:scale-110"
+                                                    title="Xóa ảnh"
+                                                >
+                                                    <Trash2Icon className="w-4 h-4" />
+                                                </button>
+                                           </div>
+                                           <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                                               #{idx + 1}
+                                           </div>
+                                       </div>
+                                   ))}
+                                   
+                                   {/* Add New Button */}
+                                   <label className="border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-[#D4AF37] transition-all aspect-video bg-white">
+                                       <ImagePlus className="w-8 h-8 text-gray-400 mb-2" />
+                                       <span className="text-sm text-gray-500 font-medium">Thêm ảnh</span>
                                        <input 
-                                            type="text" 
-                                            value={url} 
-                                            onChange={(e) => {
-                                                const newUrls = [...homeSettings.promoImageUrls];
-                                                newUrls[idx] = e.target.value;
-                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
-                                            }}
-                                            className="border rounded px-3 py-2 flex-1 text-sm" 
-                                        />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => {
-                                                const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
-                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
-                                            }}
-                                            className="text-red-500 text-xs hover:underline"
-                                        >
-                                            Xóa
-                                        </button>
-                                   </div>
-                               ))}
-                               <button 
-                                    type="button" 
-                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
-                                    className="text-blue-600 text-sm hover:underline"
-                                >
-                                    + Thêm ảnh
-                                </button>
+                                            type="file" 
+                                            className="hidden" 
+                                            accept="image/*" 
+                                            onChange={(e) => handlePromoImageUpload(e, -1)} 
+                                       />
+                                   </label>
+                               </div>
+                               <p className="text-xs text-gray-400 italic text-center">Khuyên dùng kích thước: 800x600 hoặc tỷ lệ 4:3</p>
                            </div>
-                           <div className="grid grid-cols-2 gap-4">
+                           
+                           <div className="grid grid-cols-2 gap-4 mt-4">
                                <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
                                <input type="text" value={homeSettings.promoTitle2} onChange={(e) => handleHomePageSettingsChange('promoTitle2', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 2" />
                                <input type="text" value={homeSettings.promoTitleHighlight} onChange={(e) => handleHomePageSettingsChange('promoTitleHighlight', e.target.value)} className="border rounded px-3 py-2" placeholder="Từ khóa nổi bật" />
@@ -2414,16 +2479,39 @@ const AdminPage: React.FC = () => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 font-serif">
-                {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
-                 activeTab === 'products' ? 'Quản lý Sản phẩm' : 
-                 activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
-                 activeTab === 'inventory' ? 'Nhập xuất Kho' : 
-                 activeTab === 'customers' ? 'Danh sách Khách hàng' :
-                 activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
-                 activeTab === 'home' ? 'Cấu hình Trang chủ' :
-                 activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
-            </h2>
+            <div>
+                <h2 className="text-2xl font-bold text-gray-800 font-serif">
+                    {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
+                    activeTab === 'products' ? 'Quản lý Sản phẩm' : 
+                    activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
+                    activeTab === 'inventory' ? 'Nhập xuất Kho' : 
+                    activeTab === 'customers' ? 'Danh sách Khách hàng' :
+                    activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
+                    activeTab === 'home' ? 'Cấu hình Trang chủ' :
+                    activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
+                </h2>
+                
+                {/* SERVER STATUS BADGE */}
+                <div className="flex items-center gap-2 mt-2">
+                    <span className="text-sm font-medium text-gray-500">Trạng thái Server:</span>
+                    {serverStatus === 'checking' && (
+                        <span className="flex items-center gap-1 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                            <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div> Đang kiểm tra...
+                        </span>
+                    )}
+                    {serverStatus === 'online' && (
+                        <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold border border-green-200">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div> ONLINE
+                        </span>
+                    )}
+                    {serverStatus === 'offline' && (
+                        <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold border border-red-200" title="Chưa chạy lệnh: node backend/server.js">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div> OFFLINE (Chưa bật Server)
+                        </span>
+                    )}
+                </div>
+            </div>
+
             <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
                 <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
