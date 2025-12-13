@@ -121,11 +121,25 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
         localStorage.removeItem(KEYS.products);
         localStorage.removeItem(KEYS.transactions);
     } else if (scope === 'FULL') {
+        // PRESERVE ESSENTIAL SETTINGS (Giữ lại cấu hình quan trọng)
         const adminSettings = localStorage.getItem(KEYS.adminSettings);
+        const bankSettings = localStorage.getItem(KEYS.bankSettings);
+        const storeSettings = localStorage.getItem(KEYS.storeSettings);
+        const headerSettings = localStorage.getItem(KEYS.headerSettings);
+        const homeSettings = localStorage.getItem(KEYS.homeSettings);
+        const socialSettings = localStorage.getItem(KEYS.socialSettings);
+        
         localStorage.clear();
-        if (adminSettings) {
-            localStorage.setItem(KEYS.adminSettings, adminSettings);
-        }
+        
+        // RESTORE CONFIGS
+        if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
+        if (bankSettings) localStorage.setItem(KEYS.bankSettings, bankSettings);
+        if (storeSettings) localStorage.setItem(KEYS.storeSettings, storeSettings);
+        if (headerSettings) localStorage.setItem(KEYS.headerSettings, headerSettings);
+        if (homeSettings) localStorage.setItem(KEYS.homeSettings, homeSettings);
+        if (socialSettings) localStorage.setItem(KEYS.socialSettings, socialSettings);
+
+        // Keep Auth session active
         sessionStorage.setItem('isAuthenticated', 'true');
     }
 
