@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -1723,6 +1724,7 @@ const AdminPage: React.FC = () => {
                                 <th className="px-4 py-3">Phân loại</th>
                                 <th className="px-4 py-3">Loại</th>
                                 <th className="px-4 py-3">Số lượng</th>
+                                <th className="px-4 py-3">Tồn sau GD</th>
                                 <th className="px-4 py-3">Ghi chú</th>
                             </tr>
                         </thead>
@@ -1744,6 +1746,7 @@ const AdminPage: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 font-bold">{t.quantity}</td>
+                                    <td className="px-4 py-3 font-bold text-gray-800">{t.stockAfter !== undefined ? t.stockAfter : '-'}</td>
                                     <td className="px-4 py-3 italic text-gray-400">{t.note || '-'}</td>
                                 </tr>
                             ))}
