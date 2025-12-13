@@ -27,16 +27,21 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
     const loadOrders = async (force: boolean = false) => {
         if (!currentUser) return;
         
-        setIsLoading(true);
         if (force) {
-            await forceReloadOrders();
+            setIsLoading(true);
+            try {
+                // Ép buộc tải lại từ Server và ghi đè Local nếu Server có dữ liệu mới
+                await forceReloadOrders();
+            } finally {
+                setIsLoading(false);
+            }
         }
+        // Lấy dữ liệu đã được merge
         setOrders(getOrdersByCustomerId(currentUser.id));
-        setIsLoading(false);
     };
 
     useEffect(() => {
-        // Initial load (Force sync from server to ensure mobile matches PC)
+        // Initial load
         loadOrders(true);
 
         // Listen for background updates
@@ -70,11 +75,11 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                     <h1 className="text-3xl font-bold font-serif text-gray-900">Đơn hàng của tôi</h1>
                     <button 
                         onClick={() => loadOrders(true)} 
-                        className="text-sm text-[#00695C] flex items-center gap-1 hover:underline"
+                        className="text-sm bg-white border border-gray-300 px-4 py-2 rounded-lg shadow-sm text-[#00695C] flex items-center gap-2 hover:bg-gray-50 active:scale-95 transition-all"
                         disabled={isLoading}
                     >
                         <RefreshIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        {isLoading ? 'Đang cập nhật...' : 'Làm mới'}
+                        {isLoading ? 'Đang đồng bộ...' : 'Đồng bộ dữ liệu'}
                     </button>
                 </div>
                 

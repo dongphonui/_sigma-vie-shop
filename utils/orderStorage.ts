@@ -37,7 +37,7 @@ export const getOrders = (): Order[] => {
 
 // Hàm xử lý merge dữ liệu (Dùng chung)
 const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
-    // 1. Tạo Set các ID đã có trên Server
+    // 1. Tạo Set các ID đã có trên Server (Chuyển hết về string để so sánh an toàn)
     const serverIdSet = new Set(dbOrders.map((o: any) => String(o.id)));
     
     // 2. Tìm các đơn hàng chỉ có ở Local (Chưa được sync)
@@ -45,10 +45,12 @@ const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
     
     if (unsavedLocalOrders.length > 0) {
         console.log(`Phát hiện ${unsavedLocalOrders.length} đơn hàng chưa đồng bộ. Đang gửi lại...`);
+        // Gửi ngầm lên server
         unsavedLocalOrders.forEach(o => syncOrderToDB(o));
     }
 
-    // 3. Gộp lại: Ưu tiên dữ liệu Server + Dữ liệu Local chưa lưu
+    // 3. Gộp lại: Dữ liệu Server là gốc (Source of Truth) + Dữ liệu Local chưa lưu
+    // Nếu đơn hàng đã có trên Server, ta dùng dữ liệu từ Server để đảm bảo nhất quán
     const mergedOrders = [...dbOrders, ...unsavedLocalOrders];
     
     // 4. Sắp xếp theo thời gian mới nhất
@@ -63,29 +65,34 @@ const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
     return mergedOrders;
 };
 
-// --- NEW: FORCE RELOAD (Dùng cho MyOrdersPage để đồng bộ thiết bị mới) ---
+// --- FORCE RELOAD & SYNC (Dùng cho MyOrdersPage) ---
 export const forceReloadOrders = async (): Promise<Order[]> => {
     try {
-        console.log("Đang ép buộc tải lại đơn hàng từ Server...");
-        const dbOrders = await fetchOrdersFromDB();
+        console.log("Đang đồng bộ đơn hàng 2 chiều...");
         
-        // Lấy dữ liệu local hiện tại để không mất đơn hàng vừa tạo offline
+        // Bước 1: Lấy dữ liệu local hiện tại trước
         const stored = localStorage.getItem(STORAGE_KEY);
         const localData = stored ? JSON.parse(stored) : [];
 
+        // Bước 2: Tải mới nhất từ Server
+        const dbOrders = await fetchOrdersFromDB();
+        
         if (dbOrders && Array.isArray(dbOrders)) {
+            // Bước 3: Merge (Code merge sẽ tự động đẩy đơn local chưa có lên server)
             const merged = processAndMergeOrders(localData, dbOrders);
             hasLoadedFromDB = true;
             return merged;
+        } else {
+            console.warn("Không tải được dữ liệu từ Server hoặc Server trả về rỗng.");
+            return localData;
         }
-        return localData;
     } catch (e) {
         console.error("Lỗi force reload orders:", e);
         return getOrders(); // Fallback
     }
 };
 
-// Hàm đồng bộ thủ công (Gọi từ AdminPage)
+// Hàm đồng bộ thủ công (Gọi từ AdminPage hoặc nút Sync)
 export const syncAllOrdersToServer = async (): Promise<boolean> => {
     try {
         const orders = getOrders(); // Lấy từ Local (đã merge)
@@ -103,7 +110,8 @@ export const syncAllOrdersToServer = async (): Promise<boolean> => {
 
 export const getOrdersByCustomerId = (customerId: string): Order[] => {
     const orders = getOrders();
-    return orders.filter(o => o.customerId === customerId);
+    // Filter chính xác theo ID khách hàng
+    return orders.filter(o => String(o.customerId) === String(customerId));
 };
 
 const parsePrice = (priceStr: string): number => {

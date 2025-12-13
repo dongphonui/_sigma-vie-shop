@@ -33,7 +33,8 @@ export const checkServerConnection = async (): Promise<boolean> => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
         
-        const res = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
+        // Anti-cache param
+        const res = await fetch(`${API_BASE_URL}/health?t=${Date.now()}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         
         return res.ok;
@@ -44,11 +45,13 @@ export const checkServerConnection = async (): Promise<boolean> => {
 
 const fetchData = async (endpoint: string) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/${endpoint}`);
+    // Thêm timestamp (?t=...) để chặn Mobile Browser cache kết quả cũ
+    const antiCacheUrl = `${API_BASE_URL}/${endpoint}?t=${Date.now()}`;
+    const res = await fetch(antiCacheUrl);
     if (!res.ok) throw new Error('Server error');
     return await res.json();
   } catch (error) {
-    console.warn(`Không kết nối được DB (${endpoint}) tại ${API_BASE_URL}, dùng LocalStorage.`);
+    console.warn(`Không kết nối được DB (${endpoint}) tại ${API_BASE_URL}, dùng LocalStorage.`, error);
     return null;
   }
 };
