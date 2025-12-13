@@ -946,29 +946,6 @@ const AdminPage: React.FC = () => {
       }
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
-  
-  // MANUAL SYNC HANDLER (Updated to sync ALL data types)
-  const handleManualSync = async () => {
-      setSettingsFeedback('Đang đồng bộ dữ liệu lên Server...');
-      
-      try {
-          const results = await Promise.all([
-              syncAllLocalDataToServer(), // Sync Products
-              syncAllOrdersToServer(),    // Sync Orders (NEW)
-              syncAllTransactionsToServer() // Sync Inventory (NEW)
-          ]);
-          
-          if (results.every(r => r)) {
-              setSettingsFeedback('✅ Đồng bộ thành công tất cả dữ liệu (Sản phẩm, Đơn hàng, Kho).');
-          } else {
-              setSettingsFeedback('⚠️ Một số dữ liệu đồng bộ thất bại. Vui lòng thử lại.');
-          }
-      } catch (e) {
-          setSettingsFeedback('❌ Lỗi đồng bộ nghiêm trọng.');
-      }
-      
-      setTimeout(() => setSettingsFeedback(''), 5000);
-  };
 
   // --- RENDER FUNCTIONS IMPLEMENTATION ---
 
@@ -2062,21 +2039,12 @@ const AdminPage: React.FC = () => {
                       <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
                   
-                  <div className="flex items-center">
-                      <button 
-                          onClick={handleTestEmail}
-                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                      >
-                          📧 Gửi Email kiểm tra
-                      </button>
-                      
-                      <button 
-                          onClick={handleManualSync}
-                          className="text-sm text-green-600 hover:text-green-800 hover:underline flex items-center gap-1 ml-4"
-                      >
-                          🔄 Đồng bộ Server thủ công
-                      </button>
-                  </div>
+                  <button 
+                      onClick={handleTestEmail}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                  >
+                      📧 Gửi Email kiểm tra
+                  </button>
               </div>
 
               {/* Login Logs Section */}
@@ -2446,39 +2414,16 @@ const AdminPage: React.FC = () => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex justify-between items-center mb-8">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-800 font-serif">
-                    {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
-                    activeTab === 'products' ? 'Quản lý Sản phẩm' : 
-                    activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
-                    activeTab === 'inventory' ? 'Nhập xuất Kho' : 
-                    activeTab === 'customers' ? 'Danh sách Khách hàng' :
-                    activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
-                    activeTab === 'home' ? 'Cấu hình Trang chủ' :
-                    activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
-                </h2>
-                
-                {/* SERVER STATUS BADGE */}
-                <div className="flex items-center gap-2 mt-2">
-                    <span className="text-sm font-medium text-gray-500">Trạng thái Server:</span>
-                    {serverStatus === 'checking' && (
-                        <span className="flex items-center gap-1 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                            <div className="w-2 h-2 bg-gray-500 rounded-full animate-pulse"></div> Đang kiểm tra...
-                        </span>
-                    )}
-                    {serverStatus === 'online' && (
-                        <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold border border-green-200">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div> ONLINE
-                        </span>
-                    )}
-                    {serverStatus === 'offline' && (
-                        <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold border border-red-200" title="Chưa chạy lệnh: node backend/server.js">
-                            <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div> OFFLINE (Chưa bật Server)
-                        </span>
-                    )}
-                </div>
-            </div>
-
+            <h2 className="text-2xl font-bold text-gray-800 font-serif">
+                {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
+                 activeTab === 'products' ? 'Quản lý Sản phẩm' : 
+                 activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
+                 activeTab === 'inventory' ? 'Nhập xuất Kho' : 
+                 activeTab === 'customers' ? 'Danh sách Khách hàng' :
+                 activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
+                 activeTab === 'home' ? 'Cấu hình Trang chủ' :
+                 activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
+            </h2>
             <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
                 <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
