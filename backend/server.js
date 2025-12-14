@@ -11,7 +11,9 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors()); // Allow all origins (Important for LAN access)
-app.use(bodyParser.json({ limit: '10mb' }));
+// TĂNG GIỚI HẠN DUNG LƯỢNG LÊN 50MB ĐỂ CHỨA ẢNH LỚN
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Check Database Config
 if (!process.env.DATABASE_URL) {
@@ -178,6 +180,7 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
     const p = req.body;
+    console.log(`📥 Nhận yêu cầu lưu sản phẩm: ${p.name} (ID: ${p.id})`);
     try {
         await pool.query(
             `INSERT INTO products (id, name, stock, data, updated_at) 
@@ -186,8 +189,12 @@ app.post('/api/products', async (req, res) => {
              SET name = $2, stock = $3, data = $4, updated_at = $5`,
             [p.id, p.name, p.stock, p, Date.now()]
         );
+        console.log(`✅ Đã lưu sản phẩm thành công: ${p.name}`);
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error(`❌ Lỗi lưu sản phẩm ${p.name}:`, err.message);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 // Update Stock

@@ -229,7 +229,8 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
   syncProductToDB(newProduct).then(res => {
       if (!res || !res.success) {
           console.error("❌ LƯU SERVER THẤT BẠI. Dữ liệu chỉ nằm ở Local.", res);
-          alert("Cảnh báo: Không thể lưu sản phẩm lên Server (Lỗi mạng hoặc Server chưa chạy). Sản phẩm này sẽ mất nếu bạn xóa cache.");
+          // Alert user immediately about the failure
+          alert(`CẢNH BÁO LỖI SERVER:\n\nSản phẩm "${newProduct.name}" chỉ được lưu trên máy này và chưa lên Server.\n\nNguyên nhân: ${res?.message || 'Không xác định'}`);
       } else {
           console.log("✅ Đã lưu sản phẩm lên Server thành công.");
       }
@@ -246,7 +247,11 @@ export const updateProduct = (updatedProduct: Product): void => {
     products[index] = updatedProduct;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
-    syncProductToDB(updatedProduct); 
+    syncProductToDB(updatedProduct).then(res => {
+        if (!res || !res.success) {
+             alert(`CẢNH BÁO LỖI SERVER:\n\nCập nhật "${updatedProduct.name}" thất bại trên Server.\n\nNguyên nhân: ${res?.message || 'Không xác định'}`);
+        }
+    });
   }
 };
 

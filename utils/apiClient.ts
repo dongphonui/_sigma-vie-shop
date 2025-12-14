@@ -47,13 +47,27 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
         });
         
         if (!res.ok) {
-            return { success: false, message: `Server error: ${res.status} ${res.statusText}` };
+            let errorText = res.statusText;
+            try {
+                // Try to parse JSON error message from server
+                const errJson = await res.json();
+                if (errJson && errJson.error) errorText = errJson.error;
+            } catch (e) { 
+                // Ignore parsing error, stick to statusText
+            }
+            
+            // Special handling for Payload Too Large
+            if (res.status === 413) {
+                return { success: false, message: `Lỗi: Ảnh hoặc dữ liệu quá lớn (Giới hạn Server). Vui lòng nén ảnh.` };
+            }
+
+            return { success: false, message: `Server error (${res.status}): ${errorText}` };
         }
         
         return await res.json();
     } catch (e) {
         console.error(`Error syncing ${endpoint} to ${API_BASE_URL}:`, e);
-        return { success: false, message: 'Lỗi kết nối mạng hoặc Server chưa chạy.' };
+        return { success: false, message: `Lỗi mạng (Network Error): Không thể kết nối tới ${API_BASE_URL}. Kiểm tra xem Server đã bật chưa?` };
     }
 };
 
