@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser, StoreSettings } from '../types';
-import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
+import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct, forceReloadProducts } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
@@ -130,12 +130,17 @@ const StoreIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
 );
 
+const RefreshIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+);
+
 
 const AdminPage: React.FC = () => {
   // General State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings' | 'staff'>('dashboard');
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [serverStatus, setServerStatus] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -380,6 +385,13 @@ const AdminPage: React.FC = () => {
     refreshStaff();
   }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard, refreshStaff]);
 
+  // Listener for auto-refresh from backend updates
+  useEffect(() => {
+      const handleProductUpdate = () => refreshProducts();
+      window.addEventListener('sigma_vie_products_update', handleProductUpdate);
+      return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
+  }, [refreshProducts]);
+
   // Re-calculate dashboard when transactions or products change
   useEffect(() => {
       if (activeTab === 'dashboard') {
@@ -585,6 +597,16 @@ const AdminPage: React.FC = () => {
       setProductFeedback(`Đã xóa sản phẩm "${productName}".`);
       setTimeout(() => setProductFeedback(''), 3000);
     }
+  };
+
+  const handleForceRefreshProducts = async () => {
+      setIsRefreshing(true);
+      try {
+          await forceReloadProducts();
+          refreshProducts();
+      } finally {
+          setTimeout(() => setIsRefreshing(false), 500);
+      }
   };
 
   // ... [Other Handlers: Category, Order, Customer, Inventory] ...
@@ -1249,7 +1271,15 @@ const AdminPage: React.FC = () => {
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
         {/* Toggle Category Manager */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+             <button 
+                onClick={handleForceRefreshProducts}
+                disabled={isRefreshing}
+                className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50 flex items-center gap-2 disabled:opacity-50"
+            >
+                <div className={`w-4 h-4 rounded-full border-2 border-[#00695C] border-t-transparent ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Đang đồng bộ...' : 'Đồng bộ dữ liệu'}
+            </button>
              <button 
                 onClick={() => setIsManagingCategories(!isManagingCategories)}
                 className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50"
@@ -2425,7 +2455,7 @@ const AdminPage: React.FC = () => {
               {/* Store Settings Section - NEW */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
+                      <StoreIcon className="w-5 h-5 text-gray-600" />
                       Thông tin Cửa hàng
                   </h4>
                   {storeSettings && (
