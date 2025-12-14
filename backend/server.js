@@ -50,63 +50,66 @@ const transporter = nodemailer.createTransport({
 const initDb = async () => {
   const client = await pool.connect();
   try {
-    // Products Table
+    console.log("🛠️ Kiểm tra và cập nhật cấu trúc Database...");
+
+    // 1. Products Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS products (
         id BIGINT PRIMARY KEY,
         name TEXT,
-        stock INTEGER DEFAULT 0,
-        data JSONB,
-        updated_at BIGINT
+        stock INTEGER DEFAULT 0
       );
     `);
+    // Self-healing: Add missing columns if table existed but was old
+    await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS data JSONB;`);
+    await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at BIGINT;`);
 
-    // Categories Table
+    // 2. Categories Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS categories (
         id TEXT PRIMARY KEY,
-        name TEXT,
-        data JSONB
+        name TEXT
       );
     `);
+    await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS data JSONB;`);
 
-    // Customers Table
+    // 3. Customers Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
         name TEXT,
         phone TEXT,
-        email TEXT,
-        data JSONB,
-        created_at BIGINT
+        email TEXT
       );
     `);
+    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS data JSONB;`);
+    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_at BIGINT;`);
 
-    // Orders Table
+    // 4. Orders Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id TEXT PRIMARY KEY,
         customer_id TEXT,
         total_price NUMERIC,
         status TEXT,
-        timestamp BIGINT,
-        data JSONB
+        timestamp BIGINT
       );
     `);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS data JSONB;`);
 
-    // Inventory Transactions
+    // 5. Inventory Transactions
     await client.query(`
       CREATE TABLE IF NOT EXISTS inventory_transactions (
         id TEXT PRIMARY KEY,
         product_id BIGINT,
         type TEXT,
         quantity INTEGER,
-        timestamp BIGINT,
-        data JSONB
+        timestamp BIGINT
       );
     `);
+    await client.query(`ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS data JSONB;`);
 
-    // Admin Logs
+    // 6. Admin Logs
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_logs (
         id SERIAL PRIMARY KEY,
@@ -119,7 +122,7 @@ const initDb = async () => {
       );
     `);
 
-    // Admin Users (Sub-admins)
+    // 7. Admin Users (Sub-admins)
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id TEXT PRIMARY KEY,
@@ -128,17 +131,14 @@ const initDb = async () => {
         fullname TEXT,
         role TEXT, 
         permissions JSONB,
-        created_at BIGINT,
-        totp_secret TEXT,
-        is_totp_enabled BOOLEAN DEFAULT FALSE
+        created_at BIGINT
       );
     `);
-    
-    // Ensure new columns exist
+    // Add columns specifically for existing tables
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
 
-    // Settings Table (Generic) - Added for Shipping
+    // 8. Settings Table (Generic)
     await client.query(`
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
@@ -156,7 +156,7 @@ const initDb = async () => {
         console.log('✅ Default admin user created.');
     }
 
-    console.log('✅ Database schema initialized');
+    console.log('✅ Database schema initialized and updated successfully.');
   } catch (err) {
     console.error('❌ Error initializing database:', err);
   } finally {
@@ -173,7 +173,8 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: Date.no
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
-        const products = result.rows.map(row => row.data);
+        // Filter out null data if schema was just fixed but rows were empty
+        const products = result.rows.map(row => row.data).filter(p => p !== null);
         res.json(products);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -204,8 +205,8 @@ app.post('/api/products/stock', async (req, res) => {
         const result = await pool.query('SELECT data FROM products WHERE id = $1', [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
         
-        let product = result.rows[0].data;
-        let newStock = product.stock + quantityChange;
+        let product = result.rows[0].data || {}; // Handle null data
+        let newStock = (product.stock || 0) + quantityChange;
 
         if (size || color) {
             if (!product.variants) product.variants = [];
@@ -244,7 +245,7 @@ app.delete('/api/products/:id', async (req, res) => {
 app.get('/api/categories', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM categories');
-        res.json(result.rows.map(row => row.data));
+        res.json(result.rows.map(row => row.data).filter(d => d));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -264,7 +265,7 @@ app.post('/api/categories', async (req, res) => {
 app.get('/api/customers', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
-        res.json(result.rows.map(row => row.data));
+        res.json(result.rows.map(row => row.data).filter(d => d));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -303,7 +304,7 @@ app.delete('/api/customers/:id', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
-        res.json(result.rows.map(row => row.data));
+        res.json(result.rows.map(row => row.data).filter(d => d));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -324,7 +325,7 @@ app.post('/api/orders', async (req, res) => {
 app.get('/api/inventory', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM inventory_transactions ORDER BY timestamp DESC LIMIT 500');
-        res.json(result.rows.map(row => row.data));
+        res.json(result.rows.map(row => row.data).filter(d => d));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
