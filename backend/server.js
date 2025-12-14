@@ -1,4 +1,5 @@
 
+// ... (existing code imports) ...
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -10,24 +11,21 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors()); // Allow all origins (Important for LAN access)
-// TĂNG GIỚI HẠN DUNG LƯỢNG LÊN 50MB ĐỂ CHỨA ẢNH LỚN
+app.use(cors()); 
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// Check Database Config
+// ... (DB Connection) ...
 if (!process.env.DATABASE_URL) {
     console.error("❌ FATAL ERROR: DATABASE_URL is missing in .env file.");
     process.exit(1);
 }
 
-// Database Connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Test DB Connection on Start
 pool.connect((err, client, release) => {
     if (err) {
         console.error('❌ Database connection error:', err.stack);
@@ -37,7 +35,6 @@ pool.connect((err, client, release) => {
     }
 });
 
-// Email Transporter
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -60,9 +57,28 @@ const initDb = async () => {
         stock INTEGER DEFAULT 0
       );
     `);
-    // Self-healing: Add missing columns if table existed but was old
+    
+    // --- SELF HEALING FIXES ---
+    // Fix: Ensure 'data' column exists
     await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS data JSONB;`);
     await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at BIGINT;`);
+    
+    // Fix: Handle legacy 'sku' column causing NOT NULL violations
+    try {
+        // Check if SKU column exists
+        const checkSku = await client.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='products' AND column_name='sku';
+        `);
+        if (checkSku.rows.length > 0) {
+            console.log("🔧 Found 'sku' column. Removing NOT NULL constraint to prevent errors...");
+            await client.query(`ALTER TABLE products ALTER COLUMN sku DROP NOT NULL;`);
+        }
+    } catch (e) {
+        console.warn("⚠️ Could not modify sku column (safe to ignore if not present):", e.message);
+    }
+    // ---------------------------
 
     // 2. Categories Table
     await client.query(`
@@ -122,7 +138,7 @@ const initDb = async () => {
       );
     `);
 
-    // 7. Admin Users (Sub-admins)
+    // 7. Admin Users
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id TEXT PRIMARY KEY,
@@ -134,11 +150,10 @@ const initDb = async () => {
         created_at BIGINT
       );
     `);
-    // Add columns specifically for existing tables
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
 
-    // 8. Settings Table (Generic)
+    // 8. Settings Table
     await client.query(`
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
@@ -146,7 +161,7 @@ const initDb = async () => {
       );
     `);
 
-    // Create Default Master Admin if not exists
+    // Create Default Master Admin
     const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
     if (checkAdmin.rows.length === 0) {
         await client.query(`
@@ -173,7 +188,6 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: Date.no
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
-        // Filter out null data if schema was just fixed but rows were empty
         const products = result.rows.map(row => row.data).filter(p => p !== null);
         res.json(products);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -182,6 +196,11 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
     const p = req.body;
     console.log(`📥 Nhận yêu cầu lưu sản phẩm: ${p.name} (ID: ${p.id})`);
+    
+    // Attempt to handle SKU explicitly if the column exists in the payload, 
+    // BUT since we rely on the DB constraints being relaxed, we stick to the standard query
+    // which puts everything in 'data'. 
+    
     try {
         await pool.query(
             `INSERT INTO products (id, name, stock, data, updated_at) 
@@ -194,7 +213,12 @@ app.post('/api/products', async (req, res) => {
         res.json({ success: true });
     } catch (err) { 
         console.error(`❌ Lỗi lưu sản phẩm ${p.name}:`, err.message);
-        res.status(500).json({ error: err.message }); 
+        // Specifically catch the SKU error to give a hint
+        if (err.message.includes('sku') && err.message.includes('not-null')) {
+             res.status(500).json({ error: "Lỗi cơ sở dữ liệu: Cột 'sku' đang bắt buộc. Hãy khởi động lại Server để tự động sửa lỗi này." });
+        } else {
+             res.status(500).json({ error: err.message }); 
+        }
     }
 });
 
@@ -205,7 +229,7 @@ app.post('/api/products/stock', async (req, res) => {
         const result = await pool.query('SELECT data FROM products WHERE id = $1', [id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
         
-        let product = result.rows[0].data || {}; // Handle null data
+        let product = result.rows[0].data || {}; 
         let newStock = (product.stock || 0) + quantityChange;
 
         if (size || color) {
@@ -368,7 +392,6 @@ app.post('/api/settings/shipping', async (req, res) => {
 
 // 7. ADMIN & SUB-ADMINS
 
-// Login Check
 app.post('/api/admin/login-auth', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -376,8 +399,6 @@ app.post('/api/admin/login-auth', async (req, res) => {
         
         if (result.rows.length > 0) {
             const user = result.rows[0];
-            
-            // Log successful login
             const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
             await pool.query(
                 `INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) 
@@ -548,7 +569,6 @@ app.post('/api/admin/reset', async (req, res) => {
     }
 });
 
-// Initialize DB and Start Server
 initDb().then(() => {
     app.listen(port, '0.0.0.0', () => {
         console.log(`✅ Server is running on port ${port} (Accessible via LAN)`);
