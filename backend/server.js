@@ -10,13 +10,29 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors()); // Allow all origins (Important for LAN access)
 app.use(bodyParser.json({ limit: '10mb' }));
+
+// Check Database Config
+if (!process.env.DATABASE_URL) {
+    console.error("❌ FATAL ERROR: DATABASE_URL is missing in .env file.");
+    process.exit(1);
+}
 
 // Database Connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Test DB Connection on Start
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error('❌ Database connection error:', err.stack);
+    } else {
+        console.log('✅ Connected to Database successfully');
+        release();
+    }
 });
 
 // Email Transporter
@@ -102,7 +118,6 @@ const initDb = async () => {
     `);
 
     // Admin Users (Sub-admins)
-    // Added: totp_secret and is_totp_enabled for 2FA support
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id TEXT PRIMARY KEY,
@@ -117,9 +132,17 @@ const initDb = async () => {
       );
     `);
     
-    // Ensure new columns exist for existing installations
+    // Ensure new columns exist
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
+
+    // Settings Table (Generic) - Added for Shipping
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value JSONB
+      );
+    `);
 
     // Create Default Master Admin if not exists
     const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
@@ -128,12 +151,12 @@ const initDb = async () => {
             INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
         `, ['admin_master', 'admin', 'admin', 'Master Admin', 'MASTER', JSON.stringify(['ALL']), Date.now()]);
-        console.log('Default admin user created.');
+        console.log('✅ Default admin user created.');
     }
 
-    console.log('Database initialized successfully');
+    console.log('✅ Database schema initialized');
   } catch (err) {
-    console.error('Error initializing database:', err);
+    console.error('❌ Error initializing database:', err);
   } finally {
     client.release();
   }
@@ -142,7 +165,7 @@ const initDb = async () => {
 // --- API ROUTES ---
 
 // Health Check
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: Date.now() }));
 
 // 1. PRODUCTS
 app.get('/api/products', async (req, res) => {
@@ -189,6 +212,7 @@ app.post('/api/products/stock', async (req, res) => {
             } else if (quantityChange > 0) {
                 product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
             }
+            // Recalculate total
             newStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
         }
 
@@ -225,13 +249,6 @@ app.post('/api/categories', async (req, res) => {
              ON CONFLICT (id) DO UPDATE SET name = $2, data = $3`,
             [c.id, c.name, c]
         );
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/categories/:id', async (req, res) => {
-    try {
-        await pool.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -317,19 +334,42 @@ app.post('/api/inventory', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 6. ADMIN & SUB-ADMINS
+// 6. SHIPPING & SETTINGS
+app.get('/api/settings/shipping', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT value FROM app_settings WHERE key = 'shipping'");
+        if (result.rows.length > 0) {
+            res.json(result.rows[0].value);
+        } else {
+            res.json({}); // Return empty if not found
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/shipping', async (req, res) => {
+    const settings = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO app_settings (key, value) VALUES ('shipping', $1) 
+             ON CONFLICT (key) DO UPDATE SET value = $1`,
+            [settings]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 7. ADMIN & SUB-ADMINS
 
 // Login Check
 app.post('/api/admin/login-auth', async (req, res) => {
     const { username, password } = req.body;
     try {
-        // Query both master and staff
         const result = await pool.query('SELECT * FROM admin_users WHERE username = $1 AND password = $2', [username, password]);
         
         if (result.rows.length > 0) {
             const user = result.rows[0];
             
-            // Log successful login (Password stage)
+            // Log successful login
             const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
             await pool.query(
                 `INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) 
@@ -346,7 +386,7 @@ app.post('/api/admin/login-auth', async (req, res) => {
                     role: user.role,
                     permissions: user.permissions,
                     is_totp_enabled: user.is_totp_enabled,
-                    totp_secret: user.totp_secret // Send secret to frontend for verification context
+                    totp_secret: user.totp_secret
                 }
             });
         } else {
@@ -355,15 +395,11 @@ app.post('/api/admin/login-auth', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Change Password
 app.post('/api/admin/change-password', async (req, res) => {
     const { id, oldPassword, newPassword } = req.body;
     try {
-        // Verify old password
         const result = await pool.query('SELECT * FROM admin_users WHERE id = $1 AND password = $2', [id, oldPassword]);
-        
         if (result.rows.length > 0) {
-            // Update to new password
             await pool.query('UPDATE admin_users SET password = $1 WHERE id = $2', [newPassword, id]);
             res.json({ success: true, message: 'Đổi mật khẩu thành công' });
         } else {
@@ -372,7 +408,6 @@ app.post('/api/admin/change-password', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Get Admin Users
 app.get('/api/admin/users', async (req, res) => {
     try {
         const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at, is_totp_enabled FROM admin_users ORDER BY created_at DESC');
@@ -380,7 +415,6 @@ app.get('/api/admin/users', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Create Admin User
 app.post('/api/admin/users', async (req, res) => {
     const { username, password, fullname, permissions } = req.body;
     try {
@@ -400,12 +434,10 @@ app.post('/api/admin/users', async (req, res) => {
     }
 });
 
-// Update Admin User
 app.put('/api/admin/users/:id', async (req, res) => {
     const { password, fullname, permissions, totp_secret, is_totp_enabled } = req.body;
     const { id } = req.params;
     try {
-        // Build dynamic query
         let query = 'UPDATE admin_users SET ';
         const values = [];
         let idx = 1;
@@ -416,7 +448,7 @@ app.put('/api/admin/users/:id', async (req, res) => {
         if (totp_secret !== undefined) { query += `totp_secret=$${idx++}, `; values.push(totp_secret); }
         if (is_totp_enabled !== undefined) { query += `is_totp_enabled=$${idx++}, `; values.push(is_totp_enabled); }
 
-        query = query.slice(0, -2); // Remove last comma
+        query = query.slice(0, -2);
         query += ` WHERE id=$${idx}`;
         values.push(id);
 
@@ -425,7 +457,6 @@ app.put('/api/admin/users/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Delete Admin User
 app.delete('/api/admin/users/:id', async (req, res) => {
     try {
         await pool.query("DELETE FROM admin_users WHERE id = $1 AND role != 'MASTER'", [req.params.id]);
@@ -433,9 +464,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Logger (Keep existing)
 app.post('/api/admin/login', async (req, res) => {
-    // This is for the generic log endpoint used by frontend for OTP/Other methods
     const { method, status, username } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try {
@@ -475,12 +504,11 @@ app.post('/api/admin/email', async (req, res) => {
         });
         res.json({ success: true });
     } catch (err) {
-        console.error("Email error:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// 7. FACTORY RESET
+// 8. FACTORY RESET
 app.post('/api/admin/reset', async (req, res) => {
     const { scope } = req.body; 
     const client = await pool.connect();
@@ -499,8 +527,7 @@ app.post('/api/admin/reset', async (req, res) => {
             await client.query('TRUNCATE TABLE orders');
             await client.query('TRUNCATE TABLE inventory_transactions');
             await client.query('TRUNCATE TABLE admin_logs');
-            // NOTE: We do NOT truncate admin_users to prevent locking everyone out.
-            // Only 'admin' Master is recreated in initDb if missing.
+            await client.query('TRUNCATE TABLE app_settings');
         }
         await client.query('COMMIT');
         res.json({ success: true, message: `Reset scope ${scope} successful.` });
@@ -515,7 +542,7 @@ app.post('/api/admin/reset', async (req, res) => {
 
 // Initialize DB and Start Server
 initDb().then(() => {
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
+    app.listen(port, '0.0.0.0', () => {
+        console.log(`✅ Server is running on port ${port} (Accessible via LAN)`);
     });
 });
