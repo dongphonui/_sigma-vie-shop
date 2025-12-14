@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser, StoreSettings } from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser, StoreSettings, ShippingSettings } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct, forceReloadProducts } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -23,6 +23,7 @@ import { getSocialSettings, updateSocialSettings } from '../utils/socialSettings
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
 import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsStorage';
+import { getShippingSettings, updateShippingSettings } from '../utils/shippingSettingsStorage';
 import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, changeAdminPassword, checkServerConnection } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
 import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
@@ -213,6 +214,7 @@ const AdminPage: React.FC = () => {
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   
   // Password Change State
   const [currentPasswordInput, setCurrentPasswordInput] = useState('');
@@ -342,6 +344,7 @@ const AdminPage: React.FC = () => {
     
     setBankSettings(getBankSettings());
     setStoreSettings(getStoreSettings());
+    setShippingSettings(getShippingSettings());
     
     // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
@@ -996,6 +999,22 @@ const AdminPage: React.FC = () => {
   const handleStoreSettingsChange = (field: keyof StoreSettings, value: string) => {
       if (storeSettings) {
           setStoreSettings({ ...storeSettings, [field]: value });
+      }
+  };
+
+  // --- Shipping Settings Handlers (NEW) ---
+  const handleShippingSettingsChange = (field: keyof ShippingSettings, value: any) => {
+      if (shippingSettings) {
+          setShippingSettings({ ...shippingSettings, [field]: value });
+      }
+  };
+
+  const handleShippingSettingsSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (shippingSettings) {
+          updateShippingSettings(shippingSettings);
+          setSettingsFeedback('Đã cập nhật phí vận chuyển!');
+          setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
@@ -2554,6 +2573,52 @@ const AdminPage: React.FC = () => {
                           </div>
                           <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
                               Lưu thông tin Ngân hàng
+                          </button>
+                      </form>
+                  )}
+              </div>
+
+              {/* Shipping Settings Section - NEWLY RESTORED */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <TruckIcon className="w-5 h-5 text-gray-600" />
+                      Cấu hình Phí vận chuyển
+                  </h4>
+                  {shippingSettings && (
+                      <form onSubmit={handleShippingSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                          <div className="flex items-center gap-2 mb-2">
+                              <input 
+                                  type="checkbox" 
+                                  checked={shippingSettings.enabled} 
+                                  onChange={(e) => handleShippingSettingsChange('enabled', e.target.checked)} 
+                                  className="w-4 h-4 text-[#D4AF37] rounded focus:ring-[#D4AF37]"
+                              />
+                              <label className="text-sm font-medium text-gray-700">Bật tính phí vận chuyển</label>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Phí cơ bản (VNĐ)</label>
+                                  <input 
+                                      type="number" 
+                                      value={shippingSettings.baseFee} 
+                                      onChange={(e) => handleShippingSettingsChange('baseFee', parseInt(e.target.value))} 
+                                      className="mt-1 w-full border rounded px-3 py-2" 
+                                      disabled={!shippingSettings.enabled}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Miễn phí ship cho đơn từ (VNĐ)</label>
+                                  <input 
+                                      type="number" 
+                                      value={shippingSettings.freeShipThreshold} 
+                                      onChange={(e) => handleShippingSettingsChange('freeShipThreshold', parseInt(e.target.value))} 
+                                      className="mt-1 w-full border rounded px-3 py-2" 
+                                      disabled={!shippingSettings.enabled}
+                                  />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                              Lưu cấu hình Vận chuyển
                           </button>
                       </form>
                   )}
