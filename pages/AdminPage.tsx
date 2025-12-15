@@ -778,27 +778,13 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const handleAboutSubmit = async (e: React.FormEvent) => {
+  const handleAboutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (aboutContent && aboutSettings) {
-        setAboutFeedback('Đang lưu...');
-        
-        // Update both concurrently
-        const results = await Promise.all([
-            updateAboutPageContent(aboutContent),
-            updateAboutPageSettings(aboutSettings)
-        ]);
-        
-        const success = results.every(r => r.success);
-        
-        if (success) {
-            setAboutFeedback('✅ Đã cập nhật trang Giới thiệu thành công trên Server!');
-        } else {
-            const errorMsg = results.find(r => !r.success)?.message || 'Lỗi không xác định';
-            setAboutFeedback(`⚠️ Đã lưu trên máy này nhưng LỖI SERVER: ${errorMsg}.`);
-        }
-        
-        setTimeout(() => setAboutFeedback(''), 5000);
+      updateAboutPageContent(aboutContent);
+      updateAboutPageSettings(aboutSettings);
+      setAboutFeedback('Đã lưu cài đặt trang Giới thiệu thành công!');
+      setTimeout(() => setAboutFeedback(''), 3000);
     }
   };
   
@@ -1253,7 +1239,6 @@ const AdminPage: React.FC = () => {
 
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
-        {/* ... (Keep existing Product Manager content) ... */}
         {/* Toggle Category Manager */}
         <div className="flex justify-end">
              <button 
@@ -1562,7 +1547,6 @@ const AdminPage: React.FC = () => {
 
   const renderOrderManager = () => (
       <div className="space-y-6 animate-fade-in-up">
-          {/* ... (Keep existing Order Manager content) ... */}
            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
               <div className="relative">
                   <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -1710,7 +1694,6 @@ const AdminPage: React.FC = () => {
 
   const renderInventoryManager = () => (
       <div className="space-y-6 animate-fade-in-up">
-          {/* ... (Keep existing Inventory Manager content) ... */}
            <div className="flex border-b border-gray-200 mb-6">
                 <button 
                     onClick={() => setInventoryView('stock')}
@@ -1907,7 +1890,6 @@ const AdminPage: React.FC = () => {
 
   const renderCustomerManager = () => (
       <div className="space-y-6 animate-fade-in-up">
-          {/* ... (Keep existing Customer Manager content) ... */}
           <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-between">
               <div className="relative">
                   <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -2072,7 +2054,6 @@ const AdminPage: React.FC = () => {
 
   const renderHomePageSettings = () => (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
-           {/* ... (Keep existing Home Page Settings content) ... */}
            {homeSettings ? (
                <form onSubmit={handleHomePageSubmit} className="space-y-6">
                    <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Trang Chủ</h3>
@@ -2178,7 +2159,6 @@ const AdminPage: React.FC = () => {
 
   const renderHeaderSettings = () => (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
-           {/* ... (Keep existing Header Settings content) ... */}
            {headerSettings ? (
                 <form onSubmit={handleHeaderSubmit} className="space-y-6">
                     <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Header & Logo</h3>
