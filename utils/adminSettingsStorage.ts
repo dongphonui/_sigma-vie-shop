@@ -163,8 +163,16 @@ export const verifyTotpToken = (token: string, secretOverride?: string): boolean
     });
 
     // validate returns the delta (0 for current, -1 for prev, 1 for next) or null if invalid
-    // Tăng window lên 6 (khoảng +/- 3 phút) để tránh lỗi lệch giờ
-    const delta = totp.validate({ token: cleanToken, window: 6 });
+    // CHANGE: Increased window to 20 (approx +/- 10 minutes) to prevent lockout due to time drift
+    const delta = totp.validate({ token: cleanToken, window: 20 });
+    
+    // Debug log to help troubleshooting
+    if (delta === null) {
+        console.warn("TOTP Verification Failed. Token:", cleanToken);
+    } else {
+        console.log("TOTP Verification Success. Delta:", delta);
+    }
+
     return delta !== null;
 };
 
