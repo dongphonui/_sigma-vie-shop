@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, StoreSettings, ShippingSettings, AdminUser } from '../types';
-import { getProducts, addProduct, deleteProduct, updateProduct, updateProductStock } from '../utils/productStorage';
+import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
@@ -24,38 +24,116 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs, changeAdminPassword, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, syncShippingSettingsToDB, fetchShippingSettingsFromDB } from '../utils/apiClient';
+import { sendEmail, fetchAdminLoginLogs, changeAdminPassword, syncShippingSettingsToDB, fetchShippingSettingsFromDB, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../utils/apiClient';
 import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 import { VIET_QR_BANKS } from '../utils/constants';
 
 // --- ICONS ---
-const Icons = {
-    ImagePlus: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12H3"/><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>,
-    Trash2: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
-    Edit: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-    Package: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>,
-    BarChart2: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>,
-    Search: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-    Layers: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
-    Lightning: ({className, style}: {className?: string, style?: React.CSSProperties}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className} style={style}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>,
-    ClipboardList: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>,
-    Users: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-    ChevronLeft: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 18l-6-6 6-6"/></svg>,
-    ChevronRight: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 18l6-6-6-6"/></svg>,
-    Check: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
-    Truck: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>,
-    XCircle: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
-    ShieldCheck: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>,
-    Activity: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>,
-    CreditCard: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>,
-    DollarSign: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>,
-    Printer: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>,
-    Database: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>,
-    Save: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
-    RotateCcw: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>,
-    Lock: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>,
-    User: ({className}: {className?: string}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-};
+const ImagePlus: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12H3"/><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+);
+
+const Trash2Icon: React.FC<{className?: string}> = ({className}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+);
+
+const EditIcon: React.FC<{className?: string}> = ({className}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+);
+
+const PackageIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+);
+
+const BarChart2: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+);
+
+const SearchIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+);
+
+const FilterIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+);
+
+const LayersIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+);
+
+const LightningIcon: React.FC<{className?: string, style?: React.CSSProperties}> = ({className, style}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className} style={style}>
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+
+const ClipboardListIcon: React.FC<{className?: string}> = ({className}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
+);
+
+const UserIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+);
+
+const UsersIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+);
+
+const ChevronLeftIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 18l-6-6 6-6"/></svg>
+);
+
+const ChevronRightIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 18l6-6-6-6"/></svg>
+);
+
+const CheckIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
+);
+
+const TruckIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+);
+
+const XCircleIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+);
+
+const ShieldCheckIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+);
+
+const ActivityIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+);
+
+const CreditCardIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+);
+
+const DollarSignIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+);
+
+const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+);
+
+const LockIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+);
+
+const DatabaseIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+);
+
+const SaveIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+);
+
+const RotateCcwIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+);
 
 // DEFINE PERMISSION GROUPS
 const PERMISSION_GROUPS = [
@@ -163,7 +241,7 @@ const AdminPage: React.FC = () => {
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(getStoreSettings());
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings>(getShippingSettings());
   
-  // Password Change State (Self)
+  // Password Change State
   const [passwordData, setPasswordData] = useState({ old: '', new: '', confirm: '' });
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   
@@ -225,7 +303,6 @@ const AdminPage: React.FC = () => {
   const refreshSettings = useCallback(() => {
     setAdminEmails(getAdminEmails());
     setSocialSettings(getSocialSettings());
-    // Only load local TOTP status if using Legacy Master (no currentAdminUser or Master with no DB)
     setTotpEnabled(isTotpEnabled());
     setBankSettings(getBankSettings());
     setStoreSettings(getStoreSettings());
@@ -264,7 +341,6 @@ const AdminPage: React.FC = () => {
     refreshDashboard();
   }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard]);
 
-  // Re-calculate dashboard when transactions or products change
   useEffect(() => {
       if (activeTab === 'dashboard') {
           refreshDashboard();
@@ -288,16 +364,216 @@ const AdminPage: React.FC = () => {
       return currentAdminUser.permissions.includes(perm) || currentAdminUser.permissions.includes('ALL');
   };
 
+  // --- Settings Handlers (New) ---
+  const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!currentAdminUser) return;
+      if (passwordData.new !== passwordData.confirm) {
+          setSettingsFeedback('Mật khẩu xác nhận không khớp.');
+          return;
+      }
+      const res = await changeAdminPassword({
+          id: currentAdminUser.id,
+          oldPassword: passwordData.old,
+          newPassword: passwordData.new
+      });
+      if (res && res.success) {
+          setSettingsFeedback('Đổi mật khẩu thành công!');
+          setPasswordData({ old: '', new: '', confirm: '' });
+          setShowPasswordForm(false);
+      } else {
+          setSettingsFeedback(res?.message || 'Đổi mật khẩu thất bại.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleShippingSettingsChange = (field: keyof ShippingSettings, value: any) => {
+      setShippingSettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleShippingSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      updateShippingSettings(shippingSettings);
+      syncShippingSettingsToDB(shippingSettings);
+      setSettingsFeedback('Đã lưu cấu hình vận chuyển!');
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  // --- Sub-Admin Handlers ---
+  const handleSaveAdminUser = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const { username, password, fullname, permissions } = adminUserForm;
+      if (!username || !fullname) {
+          setSettingsFeedback('Vui lòng nhập Username và Họ tên.');
+          return;
+      }
+
+      if (isEditingAdmin) {
+          const res = await updateAdminUser(isEditingAdmin, {
+              password: password || undefined,
+              fullname,
+              permissions
+          });
+          if (res && res.success) {
+              setSettingsFeedback('Cập nhật nhân viên thành công.');
+              setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+              setIsEditingAdmin(null);
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback(res?.message || 'Lỗi cập nhật.');
+          }
+      } else {
+          if (!password) {
+              setSettingsFeedback('Vui lòng nhập mật khẩu cho nhân viên mới.');
+              return;
+          }
+          const res = await createAdminUser({
+              username, password, fullname, permissions
+          });
+          if (res && res.success) {
+              setSettingsFeedback('Thêm nhân viên thành công.');
+              setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback(res?.message || 'Lỗi thêm mới.');
+          }
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const prepareEditAdmin = (user: AdminUser) => {
+      setIsEditingAdmin(user.id);
+      setAdminUserForm({
+          username: user.username,
+          password: '',
+          fullname: user.fullname,
+          permissions: user.permissions
+      });
+  };
+
+  const handleDeleteAdminUser = async (id: string) => {
+      if(confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
+          const res = await deleteAdminUser(id);
+          if (res && res.success) {
+              setSettingsFeedback('Đã xóa nhân viên.');
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback('Lỗi xóa nhân viên.');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const togglePermission = (perm: string) => {
+      setAdminUserForm(prev => {
+          const perms = prev.permissions.includes(perm)
+              ? prev.permissions.filter(p => p !== perm)
+              : [...prev.permissions, perm];
+          return { ...prev, permissions: perms };
+      });
+  };
+
+  // --- Data Tools Handlers ---
+  const handleBackup = () => {
+      downloadBackup();
+      setSettingsFeedback('Đã tải xuống file backup.');
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file && confirm('Khôi phục sẽ ghi đè toàn bộ dữ liệu hiện tại. Bạn có chắc chắn?')) {
+          const res = await restoreBackup(file);
+          setSettingsFeedback(res.message);
+          if(res.success) setTimeout(() => window.location.reload(), 1500);
+      }
+  };
+
+  const handleFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
+      if (confirm(`CẢNH BÁO: Bạn sắp XÓA TOÀN BỘ ${scope}. Hành động này không thể hoàn tác!`)) {
+          const res = await performFactoryReset(scope);
+          setSettingsFeedback(res.message);
+          if(res.success) setTimeout(() => window.location.reload(), 2000);
+      }
+  };
+
+  // --- 2FA Handlers ---
+  const handleStartTotpSetup = () => {
+      const secret = generateTotpSecret();
+      setTempTotpSecret(secret);
+      setTempTotpUri(getTotpUri(secret, currentAdminUser ? `${currentAdminUser.username}@SigmaVie` : undefined));
+      setShowTotpSetup(true);
+      setVerificationCode('');
+  };
+
+  const handleVerifyAndEnableTotp = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const cleanCode = verificationCode.replace(/\s/g, '');
+
+      if (verifyTempTotpToken(cleanCode, tempTotpSecret)) {
+          if (currentAdminUser) {
+              const res = await updateAdminUser(currentAdminUser.id, {
+                  totp_secret: tempTotpSecret,
+                  is_totp_enabled: true
+              });
+              if (res && res.success) {
+                  const updatedUser = { ...currentAdminUser, is_totp_enabled: true };
+                  setCurrentAdminUser(updatedUser);
+                  sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
+                  setShowTotpSetup(false);
+                  setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công!');
+              } else {
+                  setSettingsFeedback('❌ Lỗi lưu cấu hình lên Server.');
+              }
+          } else {
+              enableTotp(tempTotpSecret);
+              refreshSettings();
+              setShowTotpSetup(false);
+              setSettingsFeedback('✅ Đã bật bảo mật 2 lớp (Local)!');
+          }
+      } else {
+          setSettingsFeedback('❌ Mã xác nhận không đúng.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 6000);
+  };
+
+  const handleDisableTotp = async () => {
+      if (window.confirm('Tắt bảo mật 2 lớp?')) {
+          if (currentAdminUser) {
+              const res = await updateAdminUser(currentAdminUser.id, { is_totp_enabled: false });
+              if (res && res.success) {
+                  const updatedUser = { ...currentAdminUser, is_totp_enabled: false };
+                  setCurrentAdminUser(updatedUser);
+                  sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
+                  setSettingsFeedback('Đã tắt bảo mật 2 lớp.');
+              }
+          } else {
+              disableTotp();
+              refreshSettings();
+              setSettingsFeedback('Đã tắt bảo mật 2 lớp (Local).');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const handleResetUser2FA = async (userId: string, username: string) => {
+      if (window.confirm(`Reset 2FA cho ${username}?`)) {
+          const res = await updateAdminUser(userId, { is_totp_enabled: false });
+          if (res && res.success) {
+              setSettingsFeedback(`Đã tắt 2FA cho ${username}.`);
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  // --- Other Handlers (Product, Category, etc. - kept as provided) ---
+  
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProductImage(reader.result as string);
-      };
-      reader.onerror = () => {
-          setProductFeedback('Lỗi: Không thể đọc file. Vui lòng thử lại.');
-      };
+      reader.onloadend = () => setNewProductImage(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -339,268 +615,250 @@ const AdminPage: React.FC = () => {
   const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName || !newProductPrice || !newProductDescription || !newProductImage) {
-      setProductFeedback('Vui lòng điền đầy đủ tất cả các trường và tải lên hình ảnh.');
+      setProductFeedback('Vui lòng điền đầy đủ tất cả các trường.');
       return;
     }
     const commonData = {
       name: newProductName, price: newProductPrice, importPrice: newProductImportPrice || '0₫', description: newProductDescription,
-      imageUrl: newProductImage || '', sku: newProductSku || `GEN-${Date.now()}`, brand: newProductBrand || 'Sigma Vie',
-      category: newProductCategory || (categories[0]?.name || 'Chung'), status: newProductStatus,
+      imageUrl: newProductImage, sku: newProductSku || `GEN-${Date.now()}`, brand: newProductBrand || 'Sigma Vie',
+      category: newProductCategory || (categories.length > 0 ? categories[0].name : 'Chung'), status: newProductStatus,
       isFlashSale: newProductIsFlashSale, salePrice: newProductSalePrice,
       flashSaleStartTime: newProductFlashSaleStartTime ? new Date(newProductFlashSaleStartTime).getTime() : undefined,
       flashSaleEndTime: newProductFlashSaleEndTime ? new Date(newProductFlashSaleEndTime).getTime() : undefined,
-      sizes: newProductSizes ? newProductSizes.split(',').map(s=>s.trim()).filter(s=>s) : [],
-      colors: newProductColors ? newProductColors.split(',').map(s=>s.trim()).filter(s=>s) : []
+      sizes: newProductSizes ? newProductSizes.split(',').map(s => s.trim()).filter(s => s) : [],
+      colors: newProductColors ? newProductColors.split(',').map(s => s.trim()).filter(s => s) : []
     };
-    if (editingProduct) updateProduct({ ...editingProduct, ...commonData, stock: editingProduct.stock });
-    else addProduct({ ...commonData, stock: 0 });
+
+    if (editingProduct) {
+        updateProduct({ ...editingProduct, ...commonData, stock: editingProduct.stock });
+        setProductFeedback('Cập nhật sản phẩm thành công!');
+    } else {
+        addProduct({ ...commonData, stock: 0 });
+        setProductFeedback('Thêm sản phẩm thành công!');
+    }
     refreshProducts(); handleCancelProductEdit();
-    setProductFeedback('Đã lưu sản phẩm.');
     setTimeout(() => setProductFeedback(''), 3000);
   };
-
-  const handleDeleteProduct = (id: number, name: string) => { 
-      if(confirm(`Xóa sản phẩm ${name}?`)) { 
-          deleteProduct(id); 
-          refreshProducts(); 
-          setProductFeedback('Đã xóa sản phẩm.');
-          setTimeout(() => setProductFeedback(''), 3000);
-      }
+  
+  const handleDeleteProduct = (productId: number, productName: string) => {
+    if (window.confirm(`Xóa sản phẩm "${productName}"?`)) {
+      deleteProduct(productId);
+      setProducts(currentProducts => currentProducts.filter(p => p.id !== productId));
+      if (editingProduct?.id === productId) handleCancelProductEdit();
+      setProductFeedback(`Đã xóa sản phẩm.`);
+      setTimeout(() => setProductFeedback(''), 3000);
+    }
   };
 
-  // Category Handlers
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName) {
-        if (editingCategory) {
-            updateCategory({ id: editingCategory.id, name: newCategoryName, description: newCategoryDesc });
-            setProductFeedback('Đã cập nhật danh mục.');
-        } else {
-            addCategory({ name: newCategoryName, description: newCategoryDesc });
-            setProductFeedback('Thêm danh mục thành công.');
-        }
-        setNewCategoryName(''); setNewCategoryDesc(''); setEditingCategory(null);
-        refreshCategories();
-        setTimeout(() => setProductFeedback(''), 3000);
+        if (editingCategory) updateCategory({ id: editingCategory.id, name: newCategoryName, description: newCategoryDesc });
+        else addCategory({ name: newCategoryName, description: newCategoryDesc });
+        setNewCategoryName(''); setNewCategoryDesc(''); setEditingCategory(null); refreshCategories();
     }
   };
-  const handleEditCategory = (category: Category) => {
-      setEditingCategory(category); setNewCategoryName(category.name); setNewCategoryDesc(category.description || '');
-  };
-  const handleCancelEdit = () => {
-      setEditingCategory(null); setNewCategoryName(''); setNewCategoryDesc('');
-  }
-  const handleDeleteCategory = (id: string, name: string) => {
-      if (window.confirm(`Bạn có chắc muốn xóa danh mục "${name}"?`)) {
-          deleteCategory(id); refreshCategories();
-      }
+  const handleEditCategory = (c: Category) => { setEditingCategory(c); setNewCategoryName(c.name); setNewCategoryDesc(c.description || ''); };
+  const handleDeleteCategory = (id: string) => { if(confirm('Xóa danh mục?')) { deleteCategory(id); refreshCategories(); }};
+  const handleCancelEdit = () => { setEditingCategory(null); setNewCategoryName(''); setNewCategoryDesc(''); };
+
+  const handleOrderStatusChange = (orderId: string, newStatus: Order['status']) => {
+      updateOrderStatus(orderId, newStatus); refreshOrders(); refreshProducts(); refreshInventory();
   };
 
-  // Order Handlers
-  const handleOrderStatusChange = (orderId: string, newStatus: Order['status']) => {
-      updateOrderStatus(orderId, newStatus);
-      refreshOrders(); refreshProducts(); refreshInventory();
-  };
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
-      // ... simplified print logic
-      printWindow.document.write(`<html><body><h1>Order #${order.id}</h1><p>Customer: ${order.customerName}</p></body></html>`);
+      
+      const storeName = 'Sigma Vie Store'; 
+      const storePhone = '0912.345.678';
+      const storeAddress = 'Hà Nội, Việt Nam';
+
+      const productUrl = `${window.location.origin}/?product=${order.productId}`;
+      
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
+
+      const shippingFee = order.shippingFee || 0;
+      const subtotal = order.totalPrice - shippingFee;
+
+      const html = `
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+            <meta charset="UTF-8">
+            <title>Hóa đơn ${order.id}</title>
+            <style>
+                body { font-family: 'Times New Roman', sans-serif; padding: 20px; color: #000; }
+                .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                .header h1 { margin: 0; font-size: 24px; font-weight: bold; }
+                .header p { margin: 5px 0; font-size: 14px; }
+                .info-section { margin-bottom: 20px; display: flex; justify-content: space-between; }
+                .box { border: 1px solid #000; padding: 10px; width: 48%; }
+                .box h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+                .order-details { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                .order-details th, .order-details td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 14px; }
+                .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
+                .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
+                .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
+                
+                @media print {
+                    @page { margin: 0.5cm; }
+                    body { margin: 0; }
+                    .box { width: 45%; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>${storeName.toUpperCase()}</h1>
+                <p>Phiếu Giao Hàng / Hóa Đơn</p>
+                <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
+            </div>
+
+            <div class="info-section">
+                <div class="box">
+                    <h3>NGƯỜI GỬI</h3>
+                    <p><strong>${storeName}</strong></p>
+                    <p>SĐT: ${storePhone}</p>
+                    <p>Đ/C: ${storeAddress}</p>
+                </div>
+                <div class="box">
+                    <h3>NGƯỜI NHẬN</h3>
+                    <p><strong>${order.customerName}</strong></p>
+                    <p>SĐT: <strong>${order.customerContact}</strong></p>
+                    <p>Đ/C: ${order.customerAddress}</p>
+                </div>
+            </div>
+
+            <table class="order-details">
+                <thead>
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>Phân loại</th>
+                        <th>SL</th>
+                        <th>Đơn giá</th>
+                        <th>Thành tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>${order.productName}</td>
+                        <td>
+                            ${order.productSize ? `Size: ${order.productSize}` : ''} 
+                            ${order.productColor ? ` | Màu: ${order.productColor}` : ''}
+                            ${!order.productSize && !order.productColor ? '-' : ''}
+                        </td>
+                        <td>${order.quantity}</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
+                        <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="total-section">
+                <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
+                <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
+                <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
+                ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
+            </div>
+
+            <div class="qr-section">
+                <p>Quét mã để mua thêm sản phẩm này:</p>
+                <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
+            </div>
+
+            <div class="footer">
+                <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
+                <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
+            </div>
+        </body>
+        </html>
+      `;
+      printWindow.document.write(html);
       printWindow.document.close();
-      printWindow.print();
+      setTimeout(() => {
+          printWindow.print();
+      }, 500);
   };
 
-  // Customer Handlers
-  const handleEditCustomer = (c: Customer) => {
-      setEditingCustomer(c); setEditCustName(c.fullName); setEditCustEmail(c.email||''); setEditCustPhone(c.phoneNumber||''); setEditCustAddress(c.address||''); setIsEditingCustomer(true);
-  };
-  const handleDeleteCustomer = (id: string, name: string) => {
-      if(confirm(`Xóa khách hàng ${name}?`)) { deleteCustomer(id); refreshCustomers(); }
-  };
-  const handleSaveCustomer = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(editingCustomer) {
-          updateCustomer({ ...editingCustomer, fullName: editCustName, email: editCustEmail, phoneNumber: editCustPhone, address: editCustAddress });
-          setIsEditingCustomer(false); setEditingCustomer(null); refreshCustomers();
-      }
-  };
+  const handleEditCustomer = (c: Customer) => { setEditingCustomer(c); setEditCustName(c.fullName); setEditCustEmail(c.email||''); setEditCustPhone(c.phoneNumber||''); setEditCustAddress(c.address||''); setIsEditingCustomer(true); };
+  const handleDeleteCustomer = (id: string) => { if(confirm('Xóa khách hàng?')) { deleteCustomer(id); refreshCustomers(); }};
+  const handleSaveCustomer = (e: React.FormEvent) => { e.preventDefault(); if(editingCustomer) { updateCustomer({ ...editingCustomer, fullName: editCustName, email: editCustEmail, phoneNumber: editCustPhone, address: editCustAddress }); setIsEditingCustomer(false); refreshCustomers(); }};
 
-  // Inventory Handler
   const handleInventorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductForInventory || !inventoryQuantity) return;
     const pid = parseInt(selectedProductForInventory);
     const qty = parseInt(inventoryQuantity);
     const success = updateProductStock(pid, inventoryType === 'IMPORT' ? qty : -qty, inventorySize, inventoryColor);
-    if(success) {
-        addTransaction({ productId: pid, productName: 'Updated', type: inventoryType, quantity: qty, selectedSize: inventorySize, selectedColor: inventoryColor, note: inventoryNote });
+    if (success) {
+        addTransaction({ productId: pid, productName: 'Updated', type: inventoryType, quantity: qty, note: inventoryNote, selectedSize: inventorySize, selectedColor: inventoryColor });
         refreshProducts(); refreshInventory(); setInventoryFeedback('Thành công'); setInventoryQuantity('');
-    } else {
-        setInventoryFeedback('Lỗi: Tồn kho không đủ hoặc lỗi cập nhật.');
-    }
+    } else setInventoryFeedback('Lỗi cập nhật kho.');
     setTimeout(() => setInventoryFeedback(''), 3000);
   };
-
-  // About/Home/Header Handlers
-  const handleAboutContentChange = (f: keyof AboutPageContent, v: string) => aboutContent && setAboutContent({...aboutContent, [f]: v});
-  const handleAboutSettingsChange = (f: keyof AboutPageSettings, v: string) => aboutSettings && setAboutSettings({...aboutSettings, [f]: v});
-  const handleAboutImageUpload = (e: any, f: keyof AboutPageContent) => { /* logic */ };
-  const handleAboutSubmit = (e: any) => { e.preventDefault(); if(aboutContent && aboutSettings) { updateAboutPageContent(aboutContent); updateAboutPageSettings(aboutSettings); setAboutFeedback('Đã lưu'); }};
-  const handleHomePageSettingsChange = (f: keyof HomePageSettings, v: any) => homeSettings && setHomeSettings({...homeSettings, [f]: v});
-  const handleHomePageSubmit = (e: any) => { e.preventDefault(); if(homeSettings) { updateHomePageSettings(homeSettings); setHomeFeedback('Đã lưu'); }};
-  const handleHeaderSettingsChange = (f: keyof HeaderSettings, v: string) => headerSettings && setHeaderSettings({...headerSettings, [f]: v});
-  const handleHeaderLogoUpload = (e: any) => { /* logic */ };
-  const handleHeaderSubmit = (e: any) => { e.preventDefault(); if(headerSettings) { updateHeaderSettings(headerSettings); setHeaderFeedback('Đã lưu'); }};
-
-  // Settings Handlers
-  const handleChangePassword = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!currentAdminUser) return;
-      if (passwordData.new !== passwordData.confirm) { setSettingsFeedback('Mật khẩu xác nhận không khớp.'); return; }
-      const res = await changeAdminPassword({ id: currentAdminUser.id, oldPassword: passwordData.old, newPassword: passwordData.new });
-      setSettingsFeedback(res?.success ? 'Đổi mật khẩu thành công!' : res?.message || 'Thất bại.');
-      if(res?.success) { setPasswordData({ old: '', new: '', confirm: '' }); setShowPasswordForm(false); }
-      setTimeout(() => setSettingsFeedback(''), 3000);
+  
+  const handleAboutContentChange = (f: keyof AboutPageContent, v: string) => aboutContent && setAboutContent({ ...aboutContent, [f]: v });
+  const handleAboutSettingsChange = (f: keyof AboutPageSettings, v: string) => aboutSettings && setAboutSettings({ ...aboutSettings, [f]: v });
+  const handleAboutSubmit = (e: React.FormEvent) => { e.preventDefault(); if(aboutContent && aboutSettings) { updateAboutPageContent(aboutContent); updateAboutPageSettings(aboutSettings); setAboutFeedback('Đã lưu'); setTimeout(() => setAboutFeedback(''), 3000); }};
+  
+  const handleAboutImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: keyof AboutPageContent) => {
+    const file = e.target.files?.[0];
+    if (file && aboutContent) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAboutContent({ ...aboutContent, [field]: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleShippingSettingsChange = (field: keyof ShippingSettings, value: any) => setShippingSettings(prev => ({ ...prev, [field]: value }));
-  const handleShippingSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      updateShippingSettings(shippingSettings);
-      syncShippingSettingsToDB(shippingSettings);
-      setSettingsFeedback('Đã lưu cấu hình vận chuyển!');
-      setTimeout(() => setSettingsFeedback(''), 3000);
+  const handleHomePageSettingsChange = (f: keyof HomePageSettings, v: any) => homeSettings && setHomeSettings({ ...homeSettings, [f]: v });
+  const handleHomePageSubmit = (e: React.FormEvent) => { e.preventDefault(); if(homeSettings) { updateHomePageSettings(homeSettings); setHomeFeedback('Đã lưu'); setTimeout(() => setHomeFeedback(''), 3000); }};
+  const handleHeaderSettingsChange = (f: keyof HeaderSettings, v: string) => headerSettings && setHeaderSettings({ ...headerSettings, [f]: v });
+  const handleHeaderSubmit = (e: React.FormEvent) => { e.preventDefault(); if(headerSettings) { updateHeaderSettings(headerSettings); setHeaderFeedback('Đã lưu'); setTimeout(() => setHeaderFeedback(''), 3000); }};
+  
+  const handleHeaderLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && headerSettings) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setHeaderSettings({ ...headerSettings, logoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
   };
-
-  const handleCreateAdminUser = async (e: React.FormEvent) => {
-      e.preventDefault();
-      const res = await createAdminUser({ ...adminUserForm, permissions: adminUserForm.permissions.length > 0 ? adminUserForm.permissions : ['dashboard'] });
-      setSettingsFeedback(res?.success ? 'Tạo nhân viên thành công.' : res?.message || 'Lỗi.');
-      if(res?.success) { setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] }); fetchAdminUsers().then(u => setAdminUsers(u||[])); }
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  const handleUpdateAdminUser = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!isEditingAdmin) return;
-      const res = await updateAdminUser(isEditingAdmin, { fullname: adminUserForm.fullname, permissions: adminUserForm.permissions, password: adminUserForm.password || undefined });
-      setSettingsFeedback(res?.success ? 'Cập nhật thành công.' : res?.message || 'Lỗi.');
-      if(res?.success) { setIsEditingAdmin(null); setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] }); fetchAdminUsers().then(u => setAdminUsers(u||[])); }
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  const prepareEditAdmin = (user: AdminUser) => { setIsEditingAdmin(user.id); setAdminUserForm({ username: user.username, password: '', fullname: user.fullname, permissions: user.permissions }); };
-  const handleDeleteAdminUser = async (id: string) => { if(confirm('Xóa?')) { await deleteAdminUser(id); fetchAdminUsers().then(u => setAdminUsers(u||[])); }};
-  const togglePermission = (perm: string) => {
-      setAdminUserForm(prev => {
-          const perms = prev.permissions.includes(perm) ? prev.permissions.filter(p => p !== perm) : [...prev.permissions, perm];
-          return { ...prev, permissions: perms };
-      });
-  };
-
-  const handleBackup = () => { downloadBackup(); setSettingsFeedback('Đã tải backup.'); setTimeout(() => setSettingsFeedback(''), 3000); };
-  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file && confirm('Khôi phục sẽ ghi đè dữ liệu?')) {
-          const res = await restoreBackup(file);
-          setSettingsFeedback(res.message);
-          if(res.success) setTimeout(() => window.location.reload(), 1500);
-      }
-  };
-  const handleFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
-      if (confirm(`RESET ${scope}?`)) {
-          const res = await performFactoryReset(scope);
-          setSettingsFeedback(res.message);
-          if(res.success) setTimeout(() => window.location.reload(), 2000);
-      }
-  };
-
-  const handleStartTotpSetup = () => { const s = generateTotpSecret(); setTempTotpSecret(s); setTempTotpUri(getTotpUri(s, currentAdminUser?.username)); setShowTotpSetup(true); setVerificationCode(''); };
-  const handleVerifyAndEnableTotp = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (verifyTempTotpToken(verificationCode.replace(/\s/g, ''), tempTotpSecret)) {
-          if (currentAdminUser) {
-              await updateAdminUser(currentAdminUser.id, { totp_secret: tempTotpSecret, is_totp_enabled: true });
-              const updated = { ...currentAdminUser, is_totp_enabled: true };
-              setCurrentAdminUser(updated); sessionStorage.setItem('adminUser', JSON.stringify(updated));
-          } else { enableTotp(tempTotpSecret); }
-          setShowTotpSetup(false); setSettingsFeedback('2FA Enabled');
-      } else { setSettingsFeedback('Code invalid'); }
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-  const handleDisableTotp = async () => {
-      if (confirm('Disable 2FA?')) {
-          if (currentAdminUser) {
-              await updateAdminUser(currentAdminUser.id, { is_totp_enabled: false });
-              const updated = { ...currentAdminUser, is_totp_enabled: false };
-              setCurrentAdminUser(updated); sessionStorage.setItem('adminUser', JSON.stringify(updated));
-          } else { disableTotp(); }
-          setSettingsFeedback('2FA Disabled');
-      }
-  };
-  const handleResetUser2FA = async (uid: string, uname: string) => { if(confirm(`Reset 2FA for ${uname}?`)) { await updateAdminUser(uid, { is_totp_enabled: false }); fetchAdminUsers().then(u => setAdminUsers(u||[])); }};
 
   const handleAddEmail = (e: React.FormEvent) => { e.preventDefault(); addAdminEmail(newAdminEmail); setNewAdminEmail(''); refreshSettings(); };
   const handleRemoveEmail = (e: string) => { removeAdminEmail(e); refreshSettings(); };
-  const handleTestEmail = async () => { const res = await sendEmail(getPrimaryAdminEmail(), 'Test', 'Test Content'); setSettingsFeedback(res?.success ? 'Email sent' : 'Failed'); setTimeout(() => setSettingsFeedback(''), 3000); };
+  const handleTestEmail = async () => { await sendEmail(getPrimaryAdminEmail(), 'Test', 'Test Content'); setSettingsFeedback('Đã gửi email test'); setTimeout(() => setSettingsFeedback(''), 3000); };
   
-  const handleBankSettingsChange = (f: keyof BankSettings, v: string) => bankSettings && setBankSettings({...bankSettings, [f]: v});
-  const handleBankSettingsSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(isTotpEnabled()) { setShowBankSecurityModal(true); setSecurityCode(''); } else { if(confirm('Save without 2FA?')) executeBankUpdate(); }
-  };
-  const executeBankUpdate = () => { if(bankSettings) { updateBankSettings(bankSettings); setSettingsFeedback('Bank info updated'); setTimeout(() => setSettingsFeedback(''), 3000); }};
-  const handleVerifyBankUpdate = (e: React.FormEvent) => { e.preventDefault(); if(verifyTotpToken(securityCode)) { executeBankUpdate(); setShowBankSecurityModal(false); } else { alert('Invalid code'); }};
+  const handleBankSettingsChange = (f: keyof BankSettings, v: string) => bankSettings && setBankSettings({ ...bankSettings, [f]: v });
+  const handleBankSettingsSubmit = (e: React.FormEvent) => { e.preventDefault(); if(isTotpEnabled()) { setShowBankSecurityModal(true); setSecurityCode(''); } else if(confirm('Lưu không 2FA?')) { updateBankSettings(bankSettings!); setSettingsFeedback('Đã lưu NH'); }};
+  const handleVerifyBankUpdate = (e: React.FormEvent) => { e.preventDefault(); if(verifyTotpToken(securityCode)) { updateBankSettings(bankSettings!); setShowBankSecurityModal(false); setSettingsFeedback('Đã lưu NH'); } else alert('Sai mã'); };
   
-  const handleSocialSettingsChange = (f: keyof SocialSettings, v: string) => socialSettings && setSocialSettings({...socialSettings, [f]: v});
-  const handleSocialSettingsSubmit = (e: React.FormEvent) => { e.preventDefault(); if(socialSettings) { updateSocialSettings(socialSettings); setSettingsFeedback('Social links updated'); setTimeout(() => setSettingsFeedback(''), 3000); }};
+  const handleSocialSettingsChange = (f: keyof SocialSettings, v: string) => socialSettings && setSocialSettings({ ...socialSettings, [f]: v });
+  const handleSocialSettingsSubmit = (e: React.FormEvent) => { e.preventDefault(); if(socialSettings) { updateSocialSettings(socialSettings); setSettingsFeedback('Đã lưu MXH'); }};
 
-  // --- RENDERERS ---
-
-  const renderDashboard = () => (
+  const renderDashboard = () => ( /* Kept as provided */
       <div className="space-y-6 animate-fade-in-up">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
-                  <p className="text-sm font-bold text-gray-500 uppercase">Doanh thu hôm nay</p>
+                  <p className="text-gray-500 text-sm font-medium uppercase">Doanh thu hôm nay</p>
                   <p className="text-2xl font-bold text-gray-800">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(dashboardData?.totalRevenueToday || 0)}</p>
               </div>
-              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
-                  <p className="text-sm font-bold text-gray-500 uppercase">Đơn hàng mới</p>
-                  <p className="text-2xl font-bold text-gray-800">{orders.filter(o => o.status === 'PENDING').length}</p>
-              </div>
-               <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
-                  <p className="text-sm font-bold text-gray-500 uppercase">Tổng sản phẩm</p>
-                  <p className="text-2xl font-bold text-gray-800">{products.length}</p>
-              </div>
-               <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500">
-                  <p className="text-sm font-bold text-gray-500 uppercase">Sắp hết hàng</p>
-                  <p className="text-2xl font-bold text-gray-800">{dashboardData?.lowStockProducts.length || 0}</p>
-              </div>
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500"><p className="text-gray-500 text-sm font-medium uppercase">Đơn hàng mới</p><p className="text-2xl font-bold text-gray-800">{orders.filter(o => o.status === 'PENDING').length}</p></div>
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500"><p className="text-gray-500 text-sm font-medium uppercase">Tổng sản phẩm</p><p className="text-2xl font-bold text-gray-800">{products.length}</p></div>
+              <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-red-500"><p className="text-gray-500 text-sm font-medium uppercase">Sắp hết hàng</p><p className="text-2xl font-bold text-gray-800">{dashboardData?.lowStockProducts.length || 0}</p></div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-md h-80">
-                  <h3 className="font-bold mb-4">Doanh số 7 ngày qua</h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={dashboardData?.dailySales}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <RechartsTooltip formatter={(v) => new Intl.NumberFormat('vi-VN').format(v as number)} />
-                          <Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2} />
-                      </AreaChart>
-                  </ResponsiveContainer>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Doanh số 7 ngày qua</h3>
+                  <ResponsiveContainer width="100%" height="100%"><AreaChart data={dashboardData?.dailySales}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis/><RechartsTooltip/><Area type="monotone" dataKey="revenue" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.2}/></AreaChart></ResponsiveContainer>
               </div>
                <div className="bg-white p-6 rounded-lg shadow-md h-80">
-                  <h3 className="font-bold mb-4">Tồn kho</h3>
-                   <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={dashboardData?.stockData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <RechartsTooltip />
-                          <Bar dataKey="value" fill="#00695C" />
-                      </BarChart>
-                  </ResponsiveContainer>
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Tồn kho</h3>
+                   <ResponsiveContainer width="100%" height="100%"><BarChart data={dashboardData?.stockData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name"/><YAxis/><RechartsTooltip/><Bar dataKey="value" fill="#00695C"/></BarChart></ResponsiveContainer>
               </div>
           </div>
       </div>
@@ -608,66 +866,295 @@ const AdminPage: React.FC = () => {
 
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
+        {/* Toggle Category Manager */}
         <div className="flex justify-end">
-             <button onClick={() => setIsManagingCategories(!isManagingCategories)} className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50">
-                {isManagingCategories ? 'Quay lại Sản phẩm' : 'Quản lý Danh mục'}
+             <button 
+                onClick={() => setIsManagingCategories(!isManagingCategories)}
+                className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50"
+            >
+                {isManagingCategories ? 'Quay lại Quản lý Sản phẩm' : 'Quản lý Danh mục'}
             </button>
         </div>
+
         {isManagingCategories ? (
             <div className="bg-white p-6 rounded-lg shadow-md">
-                 <h3 className="text-lg font-bold mb-4">Danh mục</h3>
+                 <h3 className="text-lg font-bold text-gray-800 mb-4">Quản lý Danh mục</h3>
                  <form onSubmit={handleSaveCategory} className="mb-6 flex gap-4">
-                     <input type="text" placeholder="Tên" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="border rounded px-3 py-2 flex-1" required />
-                     <input type="text" placeholder="Mô tả" value={newCategoryDesc} onChange={(e) => setNewCategoryDesc(e.target.value)} className="border rounded px-3 py-2 flex-1" />
-                     <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">{editingCategory ? 'Cập nhật' : 'Thêm'}</button>
-                     {editingCategory && <button type="button" onClick={handleCancelEdit} className="bg-gray-300 px-4 py-2 rounded">Hủy</button>}
+                     <input 
+                        type="text" 
+                        placeholder="Tên danh mục" 
+                        value={newCategoryName} 
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="border rounded px-3 py-2 flex-1"
+                        required
+                     />
+                     <input 
+                        type="text" 
+                        placeholder="Mô tả" 
+                        value={newCategoryDesc} 
+                        onChange={(e) => setNewCategoryDesc(e.target.value)}
+                        className="border rounded px-3 py-2 flex-1"
+                     />
+                     <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                         {editingCategory ? 'Cập nhật' : 'Thêm mới'}
+                     </button>
+                     {editingCategory && (
+                         <button type="button" onClick={handleCancelEdit} className="bg-gray-300 text-gray-700 px-4 py-2 rounded">Hủy</button>
+                     )}
                  </form>
-                 <ul>
-                    {categories.map(c => (
-                        <li key={c.id} className="flex justify-between items-center border-b py-2">
-                            <span>{c.name} ({c.id})</span>
-                            <div>
-                                <button onClick={() => handleEditCategory(c)} className="text-blue-600 mr-2">Sửa</button>
-                                <button onClick={() => handleDeleteCategory(c.id, c.name)} className="text-red-600">Xóa</button>
-                            </div>
-                        </li>
-                    ))}
-                 </ul>
+
+                 <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm text-left text-gray-500">
+                        <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                            <tr>
+                                <th className="px-4 py-3">ID</th>
+                                <th className="px-4 py-3">Tên</th>
+                                <th className="px-4 py-3">Mô tả</th>
+                                <th className="px-4 py-3 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {categories.map((cat) => (
+                                <tr key={cat.id} className="border-b hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-mono">{cat.id}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-800">{cat.name}</td>
+                                    <td className="px-4 py-3">{cat.description}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <button onClick={() => handleEditCategory(cat)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                        <button onClick={() => handleDeleteCategory(cat.id, cat.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                 </div>
             </div>
         ) : (
             <>
+                {/* Product List & Form */}
                 <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-                    <input type="text" placeholder="Tìm kiếm..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} className="border rounded px-3 py-2 w-64" />
-                    <button onClick={() => { if(isAddingProduct) handleCancelProductEdit(); else { resetProductForm(); setEditingProduct(null); setIsAddingProduct(true); } }} className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">
-                        {isAddingProduct ? 'Hủy' : 'Thêm sản phẩm'}
+                    <div className="flex gap-4">
+                        <div className="relative">
+                            <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                            <input 
+                                type="text" 
+                                placeholder="Tìm kiếm..." 
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                                className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-64"
+                            />
+                        </div>
+                        <select 
+                            value={filterStatus} 
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="border rounded-md px-3 py-2"
+                        >
+                            <option value="all">Tất cả trạng thái</option>
+                            <option value="active">Đang bán</option>
+                            <option value="draft">Nháp</option>
+                            <option value="archived">Lưu trữ</option>
+                        </select>
+                    </div>
+                    <button 
+                        onClick={() => { 
+                            if (isAddingProduct) {
+                                handleCancelProductEdit();
+                            } else {
+                                resetProductForm();
+                                setEditingProduct(null);
+                                setIsAddingProduct(true);
+                            }
+                        }}
+                        className="bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[#b89b31]"
+                    >
+                        {isAddingProduct ? 'Quay lại danh sách' : 'Thêm sản phẩm'}
                     </button>
                 </div>
+
                 {isAddingProduct ? (
                     <div className="bg-white p-6 rounded-lg shadow-md">
-                        <form onSubmit={handleProductSubmit} className="space-y-4">
-                            <input type="text" placeholder="Tên sản phẩm" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full border rounded px-3 py-2" required />
-                            <input type="text" placeholder="Giá bán" value={newProductPrice} onChange={(e) => setNewProductPrice(e.target.value)} className="w-full border rounded px-3 py-2" required />
-                            <textarea placeholder="Mô tả" value={newProductDescription} onChange={(e) => setNewProductDescription(e.target.value)} className="w-full border rounded px-3 py-2" />
-                            <div className="flex items-center gap-4">
-                                <input type="file" onChange={handleProductImageUpload} />
-                                {newProductImage && <img src={newProductImage} alt="Preview" className="h-16 w-16 object-cover" />}
+                        <h3 className="text-lg font-bold text-gray-800 mb-6">{editingProduct ? 'Chỉnh sửa Sản phẩm' : 'Thêm Sản phẩm Mới'}</h3>
+                        <form onSubmit={handleProductSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên sản phẩm *</label>
+                                    <input type="text" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+                                    <input type="text" value={newProductSku} onChange={(e) => setNewProductSku(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Tự động tạo nếu để trống" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá bán *</label>
+                                    <input type="text" value={newProductPrice} onChange={(e) => setNewProductPrice(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Giá nhập (Vốn)</label>
+                                    <input type="text" value={newProductImportPrice} onChange={(e) => setNewProductImportPrice(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
+                                    <select value={newProductCategory} onChange={(e) => setNewProductCategory(e.target.value)} className="w-full border rounded px-3 py-2">
+                                        <option value="">-- Chọn danh mục --</option>
+                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Thương hiệu</label>
+                                    <input type="text" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước (Size)</label>
+                                        <input 
+                                            type="text" 
+                                            value={newProductSizes} 
+                                            onChange={(e) => setNewProductSizes(e.target.value)} 
+                                            className="w-full border rounded px-3 py-2" 
+                                            placeholder="S, M, L (cách nhau bởi dấu phẩy)" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc (Color)</label>
+                                        <input 
+                                            type="text" 
+                                            value={newProductColors} 
+                                            onChange={(e) => setNewProductColors(e.target.value)} 
+                                            className="w-full border rounded px-3 py-2" 
+                                            placeholder="Đen, Trắng, Đỏ (cách nhau bởi dấu phẩy)" 
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                                    <select value={newProductStatus} onChange={(e) => setNewProductStatus(e.target.value as any)} className="w-full border rounded px-3 py-2">
+                                        <option value="active">Đang bán</option>
+                                        <option value="draft">Nháp</option>
+                                        <option value="archived">Lưu trữ</option>
+                                    </select>
+                                </div>
                             </div>
-                            <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold">{editingProduct ? 'Lưu' : 'Tạo'}</button>
+                            
+                            {/* FLASH SALE SETTINGS */}
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                                <label className="flex items-center gap-2 mb-4 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={newProductIsFlashSale} 
+                                        onChange={(e) => setNewProductIsFlashSale(e.target.checked)} 
+                                        className="w-4 h-4 text-red-600 rounded"
+                                    />
+                                    <span className="font-bold text-red-700 flex items-center gap-1"><LightningIcon className="w-4 h-4"/> Bật Flash Sale</span>
+                                </label>
+                                {newProductIsFlashSale && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Giá khuyến mãi *</label>
+                                            <input type="text" value={newProductSalePrice} onChange={(e) => setNewProductSalePrice(e.target.value)} className="w-full border rounded px-3 py-2 border-red-300" placeholder="VD: 1,500,000đ" required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian bắt đầu</label>
+                                            <input type="datetime-local" value={newProductFlashSaleStartTime} onChange={(e) => setNewProductFlashSaleStartTime(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian kết thúc</label>
+                                            <input type="datetime-local" value={newProductFlashSaleEndTime} onChange={(e) => setNewProductFlashSaleEndTime(e.target.value)} className="w-full border rounded px-3 py-2" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                                <textarea rows={4} value={newProductDescription} onChange={(e) => setNewProductDescription(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Hình ảnh sản phẩm *</label>
+                                <div className="flex items-center gap-4">
+                                    <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded inline-flex items-center">
+                                        <ImagePlus className="w-4 h-4 mr-2" />
+                                        <span>Chọn ảnh</span>
+                                        <input id="image-upload" type="file" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
+                                    </label>
+                                    {newProductImage && (
+                                        <img src={newProductImage} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t">
+                                <button type="button" onClick={handleCancelProductEdit} className="bg-gray-200 text-gray-700 px-6 py-2 rounded font-medium hover:bg-gray-300">Hủy</button>
+                                <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold hover:bg-[#b89b31]">{editingProduct ? 'Lưu thay đổi' : 'Tạo sản phẩm'}</button>
+                            </div>
                         </form>
                     </div>
                 ) : (
                     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-100"><tr><th className="px-4 py-3 text-left">Tên</th><th className="px-4 py-3 text-left">Giá</th><th className="px-4 py-3 text-left">Kho</th><th className="px-4 py-3 text-right">Thao tác</th></tr></thead>
-                            <tbody>
-                                {products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).map(p => (
-                                    <tr key={p.id} className="border-b">
-                                        <td className="px-4 py-3">{p.name}</td>
-                                        <td className="px-4 py-3">{p.price}</td>
-                                        <td className="px-4 py-3">{p.stock}</td>
+                        <table className="min-w-full text-sm text-left text-gray-500">
+                            <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                                <tr>
+                                    <th className="px-4 py-3">Sản phẩm</th>
+                                    <th className="px-4 py-3">Giá</th>
+                                    <th className="px-4 py-3">Tồn kho</th>
+                                    <th className="px-4 py-3">Danh mục</th>
+                                    <th className="px-4 py-3">Trạng thái</th>
+                                    <th className="px-4 py-3 text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {products
+                                    .filter(p => 
+                                        (filterStatus === 'all' || p.status === filterStatus) &&
+                                        (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
+                                    )
+                                    .map((product) => (
+                                    <tr key={product.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <img src={product.imageUrl} alt={product.name} className="w-10 h-10 object-cover rounded" />
+                                                <div>
+                                                    <p className="font-medium text-gray-900">{product.name}</p>
+                                                    <p className="text-xs text-gray-500">{product.sku}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {product.isFlashSale ? (
+                                                <div>
+                                                    <span className="text-red-600 font-bold block">{product.salePrice}</span>
+                                                    <span className="text-xs text-gray-400 line-through">{product.price}</span>
+                                                </div>
+                                            ) : (
+                                                product.price
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {product.sizes?.length || product.colors?.length ? (
+                                                <div className="text-xs">
+                                                    <span className="font-bold text-[#00695C]">Tổng: {product.stock}</span>
+                                                    <div className="text-gray-500 mt-1">
+                                                        {product.sizes?.length > 0 && <span>{product.sizes.length} Size</span>}
+                                                        {product.sizes?.length > 0 && product.colors?.length > 0 && <span>, </span>}
+                                                        {product.colors?.length > 0 && <span>{product.colors.length} Màu</span>}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${product.stock < 5 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                                    {product.stock}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3">{product.category}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold 
+                                                ${product.status === 'active' ? 'bg-green-100 text-green-700' : 
+                                                  product.status === 'draft' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                {product.status === 'active' ? 'Đang bán' : product.status === 'draft' ? 'Nháp' : 'Lưu trữ'}
+                                            </span>
+                                            {product.isFlashSale && <span className="ml-1 text-xs text-red-500 font-bold">⚡</span>}
+                                        </td>
                                         <td className="px-4 py-3 text-right">
-                                            <button onClick={() => handleEditProduct(p)} className="text-blue-600 mr-2">Sửa</button>
-                                            <button onClick={() => handleDeleteProduct(p.id, p.name)} className="text-red-600">Xóa</button>
+                                            <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                            <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
                                         </td>
                                     </tr>
                                 ))}
@@ -677,135 +1164,667 @@ const AdminPage: React.FC = () => {
                 )}
             </>
         )}
-        {productFeedback && <div className="text-center text-green-600 font-bold">{productFeedback}</div>}
+        {productFeedback && (
+             <div className={`mt-4 p-3 rounded text-center font-medium animate-pulse ${productFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 {productFeedback}
+             </div>
+        )}
     </div>
   );
 
   const renderOrderManager = () => (
       <div className="space-y-6 animate-fade-in-up">
            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-              <input type="text" placeholder="Tìm đơn hàng..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} className="border rounded px-3 py-2 w-64" />
-              <select value={orderFilterStatus} onChange={(e) => setOrderFilterStatus(e.target.value)} className="border rounded px-3 py-2">
-                  <option value="all">Tất cả</option>
+              <div className="relative">
+                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input 
+                      type="text" 
+                      placeholder="Tìm mã đơn, tên KH..." 
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-64"
+                  />
+              </div>
+              <select 
+                  value={orderFilterStatus} 
+                  onChange={(e) => setOrderFilterStatus(e.target.value)}
+                  className="border rounded-md px-3 py-2"
+              >
+                  <option value="all">Tất cả trạng thái</option>
                   <option value="PENDING">Chờ xử lý</option>
                   <option value="CONFIRMED">Đã xác nhận</option>
+                  <option value="SHIPPED">Đã giao hàng</option>
+                  <option value="CANCELLED">Đã hủy</option>
               </select>
           </div>
+
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <table className="min-w-full text-sm">
-                  <thead className="bg-gray-100"><tr><th className="px-4 py-3 text-left">Mã</th><th className="px-4 py-3 text-left">Khách</th><th className="px-4 py-3 text-left">Tổng</th><th className="px-4 py-3 text-left">Trạng thái</th><th className="px-4 py-3 text-center">Thao tác</th></tr></thead>
-                  <tbody>
-                      {orders.filter(o => o.status === orderFilterStatus || orderFilterStatus === 'all').map(o => (
-                          <tr key={o.id} className="border-b">
-                              <td className="px-4 py-3">{o.id}</td>
-                              <td className="px-4 py-3">{o.customerName}</td>
-                              <td className="px-4 py-3">{new Intl.NumberFormat('vi-VN').format(o.totalPrice)}đ</td>
-                              <td className="px-4 py-3">{o.status}</td>
-                              <td className="px-4 py-3 text-center">
-                                  {o.status === 'PENDING' && <button onClick={() => handleOrderStatusChange(o.id, 'CONFIRMED')} className="text-green-600 mr-2">Xác nhận</button>}
-                                  <button onClick={() => handlePrintOrder(o)} className="text-gray-600"><Icons.Printer className="w-4 h-4" /></button>
+              <table className="min-w-full text-sm text-left text-gray-500">
+                  <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                      <tr>
+                          <th className="px-4 py-3">Mã Đơn</th>
+                          <th className="px-4 py-3">Khách hàng</th>
+                          <th className="px-4 py-3">Sản phẩm</th>
+                          <th className="px-4 py-3">Tổng tiền</th>
+                          <th className="px-4 py-3">Thanh toán</th>
+                          <th className="px-4 py-3">Trạng thái</th>
+                          <th className="px-4 py-3 text-center">Thao tác</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                      {orders
+                          .filter(order => 
+                              (orderFilterStatus === 'all' || order.status === orderFilterStatus) &&
+                              (order.id.toLowerCase().includes(orderSearch.toLowerCase()) || order.customerName.toLowerCase().includes(orderSearch.toLowerCase()))
+                          )
+                          .sort((a, b) => b.timestamp - a.timestamp)
+                          .slice((orderCurrentPage - 1) * ordersPerPage, orderCurrentPage * ordersPerPage)
+                          .map((order) => (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-mono text-xs">{order.id}</td>
+                              <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900">{order.customerName}</div>
+                                  <div className="text-xs text-gray-400">{order.customerContact}</div>
                               </td>
+                              <td className="px-4 py-3">
+                                  <div>{order.productName}</div>
+                                  <div className="text-xs text-gray-400">
+                                    x{order.quantity}
+                                    {order.productSize && ` | Size: ${order.productSize}`}
+                                    {order.productColor && ` | Màu: ${order.productColor}`}
+                                  </div>
+                              </td>
+                              <td className="px-4 py-3 font-bold text-gray-800">
+                                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice)}
+                              </td>
+                              <td className="px-4 py-3">
+                                  {order.paymentMethod === 'BANK_TRANSFER' ? (
+                                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200 font-bold">Chuyển khoản</span>
+                                  ) : (
+                                      <span className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded border font-bold">COD</span>
+                                  )}
+                              </td>
+                              <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 rounded text-xs font-bold 
+                                      ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
+                                        order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' : 
+                                        order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                      {order.status === 'PENDING' ? 'Chờ xử lý' : 
+                                       order.status === 'CONFIRMED' ? 'Đã xác nhận' : 
+                                       order.status === 'SHIPPED' ? 'Đã giao' : 'Đã hủy'}
+                                  </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                     <div className="flex items-center justify-center gap-2">
+                                        <button
+                                            onClick={() => handlePrintOrder(order)}
+                                            title="In hóa đơn"
+                                            className="p-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                                        >
+                                            <PrinterIcon className="w-4 h-4" />
+                                        </button>
+                                        {order.status === 'PENDING' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'CONFIRMED')}
+                                                title="Xác nhận đơn hàng"
+                                                className="p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                                            >
+                                                <CheckIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {order.status === 'CONFIRMED' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'SHIPPED')}
+                                                title="Giao hàng"
+                                                className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                                            >
+                                                <TruckIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {order.status !== 'CANCELLED' && order.status !== 'SHIPPED' && (
+                                            <button 
+                                                onClick={() => handleOrderStatusChange(order.id, 'CANCELLED')}
+                                                title="Hủy đơn hàng"
+                                                className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                                            >
+                                                <XCircleIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                     </div>
+                                </td>
                           </tr>
                       ))}
                   </tbody>
               </table>
+              {/* Pagination (Simple) */}
+              <div className="p-4 border-t flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Trang {orderCurrentPage}</span>
+                  <div className="flex gap-2">
+                      <button 
+                          disabled={orderCurrentPage === 1}
+                          onClick={() => setOrderCurrentPage(c => c - 1)}
+                          className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50"
+                      >
+                          <ChevronLeftIcon className="w-4 h-4"/>
+                      </button>
+                      <button 
+                          onClick={() => setOrderCurrentPage(c => c + 1)}
+                          className="px-3 py-1 border rounded hover:bg-gray-100"
+                      >
+                          <ChevronRightIcon className="w-4 h-4"/>
+                      </button>
+                  </div>
+              </div>
           </div>
       </div>
   );
 
   const renderInventoryManager = () => (
-      <div className="space-y-6">
-           <div className="bg-white p-6 rounded-lg shadow-md">
-               <h3 className="font-bold mb-4">Nhập/Xuất Kho</h3>
-               <form onSubmit={handleInventorySubmit} className="space-y-4">
-                   <select value={selectedProductForInventory} onChange={(e) => setSelectedProductForInventory(e.target.value)} className="w-full border rounded px-3 py-2">
-                       <option value="">Chọn sản phẩm</option>
-                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                   </select>
-                   <input type="number" value={inventoryQuantity} onChange={(e) => setInventoryQuantity(e.target.value)} placeholder="Số lượng" className="w-full border rounded px-3 py-2" />
-                   <select value={inventoryType} onChange={(e) => setInventoryType(e.target.value as any)} className="w-full border rounded px-3 py-2">
-                       <option value="IMPORT">Nhập</option>
-                       <option value="EXPORT">Xuất</option>
-                   </select>
-                   <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">Thực hiện</button>
-               </form>
-               {inventoryFeedback && <p className="text-center mt-2">{inventoryFeedback}</p>}
+      <div className="space-y-6 animate-fade-in-up">
+           <div className="flex border-b border-gray-200 mb-6">
+                <button 
+                    onClick={() => setInventoryView('stock')}
+                    className={`px-6 py-3 font-medium transition-colors border-b-2 ${inventoryView === 'stock' ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    Nhập/Xuất Kho
+                </button>
+                <button 
+                    onClick={() => setInventoryView('history')}
+                    className={`px-6 py-3 font-medium transition-colors border-b-2 ${inventoryView === 'history' ? 'border-[#D4AF37] text-[#D4AF37]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    Lịch sử Giao dịch
+                </button>
            </div>
+
+           {inventoryView === 'stock' ? (
+                <div className="bg-white p-6 rounded-lg shadow-md max-w-2xl">
+                    <h3 className="text-lg font-bold text-gray-800 mb-6">Điều chỉnh Tồn kho</h3>
+                    <form onSubmit={handleInventorySubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Chọn sản phẩm</label>
+                            <select 
+                                value={selectedProductForInventory} 
+                                onChange={(e) => {
+                                    setSelectedProductForInventory(e.target.value);
+                                    setInventorySize('');
+                                    setInventoryColor('');
+                                }}
+                                className="w-full border rounded px-3 py-2"
+                                required
+                            >
+                                <option value="">-- Chọn sản phẩm --</option>
+                                {products.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} (Hiện có: {p.stock})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Dynamic Size/Color Selectors */}
+                        {selectedProductForInventory && (() => {
+                            const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
+                            if (!p) return null;
+                            return (
+                                <div className="grid grid-cols-2 gap-4">
+                                    {p.sizes && p.sizes.length > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước</label>
+                                            <select 
+                                                value={inventorySize} 
+                                                onChange={(e) => setInventorySize(e.target.value)} 
+                                                className="w-full border rounded px-3 py-2"
+                                                required
+                                            >
+                                                <option value="">-- Chọn Size --</option>
+                                                {p.sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {p.colors && p.colors.length > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc</label>
+                                            <select 
+                                                value={inventoryColor} 
+                                                onChange={(e) => setInventoryColor(e.target.value)} 
+                                                className="w-full border rounded px-3 py-2"
+                                                required
+                                            >
+                                                <option value="">-- Chọn Màu --</option>
+                                                {p.colors.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Loại giao dịch</label>
+                                <select 
+                                    value={inventoryType} 
+                                    onChange={(e) => setInventoryType(e.target.value as any)}
+                                    className="w-full border rounded px-3 py-2"
+                                >
+                                    <option value="IMPORT">Nhập kho (+)</option>
+                                    <option value="EXPORT">Xuất kho (-)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    value={inventoryQuantity}
+                                    onChange={(e) => setInventoryQuantity(e.target.value)}
+                                    className="w-full border rounded px-3 py-2"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                            <textarea 
+                                value={inventoryNote} 
+                                onChange={(e) => setInventoryNote(e.target.value)}
+                                className="w-full border rounded px-3 py-2"
+                                rows={2}
+                            />
+                        </div>
+                        
+                        {/* Stock Display Helper */}
+                        {selectedProductForInventory && (
+                             <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                                 {(() => {
+                                     const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
+                                     if (!p) return null;
+                                     
+                                     let stockDisplay = p.stock;
+                                     let label = 'Tổng tồn kho';
+                                     
+                                     if (inventorySize || inventoryColor) {
+                                         const v = p.variants?.find(v => 
+                                            (v.size === inventorySize || (!v.size && !inventorySize)) && 
+                                            (v.color === inventoryColor || (!v.color && !inventoryColor))
+                                         );
+                                         stockDisplay = v ? v.stock : 0;
+                                         label = `Tồn kho chi tiết`;
+                                     }
+                                     
+                                     return <span><strong>{label}:</strong> {stockDisplay}</span>;
+                                 })()}
+                             </div>
+                        )}
+
+                        <button type="submit" className="w-full bg-[#00695C] text-white py-2 rounded font-bold hover:bg-[#004d40]">
+                            Thực hiện
+                        </button>
+                        {inventoryFeedback && (
+                             <div className={`mt-2 text-center text-sm font-medium ${inventoryFeedback.includes('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                                 {inventoryFeedback}
+                             </div>
+                        )}
+                    </form>
+                </div>
+           ) : (
+                <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                     <div className="p-4 border-b">
+                         <input 
+                            type="text" 
+                            placeholder="Tìm kiếm giao dịch..." 
+                            value={inventorySearch}
+                            onChange={(e) => setInventorySearch(e.target.value)}
+                            className="border rounded px-3 py-2 w-full max-w-sm"
+                         />
+                     </div>
+                     <table className="min-w-full text-sm text-left text-gray-500">
+                        <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                            <tr>
+                                <th className="px-4 py-3">Thời gian</th>
+                                <th className="px-4 py-3">Sản phẩm</th>
+                                <th className="px-4 py-3">Phân loại</th>
+                                <th className="px-4 py-3">Loại</th>
+                                <th className="px-4 py-3">Số lượng</th>
+                                <th className="px-4 py-3">Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {transactions
+                                .filter(t => t.productName.toLowerCase().includes(inventorySearch.toLowerCase()) || t.note?.toLowerCase().includes(inventorySearch.toLowerCase()))
+                                .map((t) => (
+                                <tr key={t.id} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900">{t.productName}</td>
+                                    <td className="px-4 py-3">
+                                        {t.selectedSize && <span className="mr-2 text-xs bg-gray-100 px-1 rounded">Size: {t.selectedSize}</span>}
+                                        {t.selectedColor && <span className="text-xs bg-gray-100 px-1 rounded">Màu: {t.selectedColor}</span>}
+                                        {!t.selectedSize && !t.selectedColor && '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'IMPORT' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                                            {t.type === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-bold">{t.quantity}</td>
+                                    <td className="px-4 py-3 italic text-gray-400">{t.note || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                     </table>
+                </div>
+           )}
       </div>
   );
 
   const renderCustomerManager = () => (
-      <div className="space-y-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-              <input type="text" placeholder="Tìm khách..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} className="border rounded px-3 py-2 w-full" />
+      <div className="space-y-6 animate-fade-in-up">
+          <div className="bg-white p-4 rounded-lg shadow-sm flex items-center justify-between">
+              <div className="relative">
+                  <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                  <input 
+                      type="text" 
+                      placeholder="Tìm khách hàng..." 
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-64"
+                  />
+              </div>
           </div>
+
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-               <table className="min-w-full text-sm">
-                  <thead className="bg-gray-100"><tr><th className="px-4 py-3 text-left">Tên</th><th className="px-4 py-3 text-left">SĐT</th><th className="px-4 py-3 text-right">Thao tác</th></tr></thead>
-                  <tbody>
-                      {customers.filter(c => c.fullName.includes(customerSearch)).map(c => (
-                          <tr key={c.id} className="border-b">
-                              <td className="px-4 py-3">{c.fullName}</td>
-                              <td className="px-4 py-3">{c.phoneNumber}</td>
+               <table className="min-w-full text-sm text-left text-gray-500">
+                  <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
+                      <tr>
+                          <th className="px-4 py-3">ID</th>
+                          <th className="px-4 py-3">Họ tên</th>
+                          <th className="px-4 py-3">Email</th>
+                          <th className="px-4 py-3">SĐT</th>
+                          <th className="px-4 py-3">Ngày tham gia</th>
+                          <th className="px-4 py-3 text-right">Thao tác</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                      {customers
+                        .filter(c => 
+                            c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
+                            c.email?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                            c.phoneNumber?.includes(customerSearch)
+                        )
+                        .map((c) => (
+                          <tr key={c.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-mono text-xs">{c.id}</td>
+                              <td className="px-4 py-3 font-medium text-gray-900">{c.fullName}</td>
+                              <td className="px-4 py-3">{c.email || '-'}</td>
+                              <td className="px-4 py-3">{c.phoneNumber || '-'}</td>
+                              <td className="px-4 py-3">{new Date(c.createdAt).toLocaleDateString('vi-VN')}</td>
                               <td className="px-4 py-3 text-right">
-                                  <button onClick={() => handleEditCustomer(c)} className="text-blue-600 mr-2">Sửa</button>
-                                  <button onClick={() => handleDeleteCustomer(c.id, c.fullName)} className="text-red-600">Xóa</button>
+                                  <button onClick={() => handleEditCustomer(c)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                  <button onClick={() => handleDeleteCustomer(c.id, c.fullName)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
                               </td>
                           </tr>
                       ))}
                   </tbody>
                </table>
           </div>
+
           {isEditingCustomer && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-                  <div className="bg-white p-6 rounded w-full max-w-md">
-                      <h3 className="font-bold mb-4">Sửa Khách hàng</h3>
-                      <input value={editCustName} onChange={e => setEditCustName(e.target.value)} className="w-full border rounded px-3 py-2 mb-2" />
-                      <input value={editCustPhone} onChange={e => setEditCustPhone(e.target.value)} className="w-full border rounded px-3 py-2 mb-2" />
-                      <div className="flex justify-end gap-2">
-                          <button onClick={() => setIsEditingCustomer(false)} className="bg-gray-200 px-4 py-2 rounded">Hủy</button>
-                          <button onClick={handleSaveCustomer} className="bg-[#D4AF37] text-white px-4 py-2 rounded">Lưu</button>
-                      </div>
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white p-6 rounded-lg w-full max-w-md animate-fade-in-up">
+                      <h3 className="text-lg font-bold mb-4">Sửa thông tin Khách hàng</h3>
+                      <form onSubmit={handleSaveCustomer} className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium mb-1">Họ tên</label>
+                              <input type="text" value={editCustName} onChange={(e) => setEditCustName(e.target.value)} className="w-full border rounded px-3 py-2" required />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium mb-1">Email</label>
+                              <input type="email" value={editCustEmail} onChange={(e) => setEditCustEmail(e.target.value)} className="w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium mb-1">Số điện thoại</label>
+                              <input type="tel" value={editCustPhone} onChange={(e) => setEditCustPhone(e.target.value)} className="w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium mb-1">Địa chỉ</label>
+                              <input type="text" value={editCustAddress} onChange={(e) => setEditCustAddress(e.target.value)} className="w-full border rounded px-3 py-2" />
+                          </div>
+                          <div className="flex justify-end gap-2 mt-6">
+                              <button type="button" onClick={() => { setIsEditingCustomer(false); setEditingCustomer(null); }} className="bg-gray-200 text-gray-700 px-4 py-2 rounded">Hủy</button>
+                              <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">Lưu</button>
+                          </div>
+                      </form>
                   </div>
               </div>
           )}
+           {customerFeedback && (
+             <div className="fixed bottom-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow-lg animate-fade-in-up">
+                 {customerFeedback}
+             </div>
+           )}
       </div>
   );
 
   const renderAboutPageEditor = () => (
-    <div className="bg-white p-6 rounded-lg shadow-md">
+    <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
         {aboutContent && aboutSettings ? (
-            <form onSubmit={handleAboutSubmit} className="space-y-4">
-                <input type="text" value={aboutContent.heroTitle} onChange={(e) => handleAboutContentChange('heroTitle', e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Title" />
-                <textarea value={aboutContent.welcomeText} onChange={(e) => handleAboutContentChange('welcomeText', e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Text" />
-                <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded">Lưu</button>
-                {aboutFeedback && <p className="text-center text-green-600">{aboutFeedback}</p>}
+            <form onSubmit={handleAboutSubmit} className="space-y-6">
+                {/* Hero Section */}
+                <div className="border-b pb-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Hero (Đầu trang)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề chính</label>
+                            <input type="text" value={aboutContent.heroTitle} onChange={(e) => handleAboutContentChange('heroTitle', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phụ đề</label>
+                            <input type="text" value={aboutContent.heroSubtitle} onChange={(e) => handleAboutContentChange('heroSubtitle', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                         <div className="col-span-2">
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Hình ảnh nền Hero</label>
+                             <div className="flex items-center gap-4">
+                                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded inline-flex items-center">
+                                    <ImagePlus className="w-4 h-4 mr-2" />
+                                    <span>Tải ảnh lên</span>
+                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAboutImageUpload(e, 'heroImageUrl')} />
+                                </label>
+                                <img src={aboutContent.heroImageUrl} alt="Hero" className="h-20 w-32 object-cover rounded border" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Welcome Section */}
+                <div className="border-b pb-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Chào mừng</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề</label>
+                            <input type="text" value={aboutContent.welcomeHeadline} onChange={(e) => handleAboutContentChange('welcomeHeadline', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nội dung</label>
+                            <textarea rows={3} value={aboutContent.welcomeText} onChange={(e) => handleAboutContentChange('welcomeText', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Styling Settings */}
+                <div className="border-b pb-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Cài đặt Giao diện</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu tiêu đề</label>
+                            <input type="color" value={aboutSettings.headingColor} onChange={(e) => handleAboutSettingsChange('headingColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Font tiêu đề</label>
+                            <select value={aboutSettings.headingFont} onChange={(e) => handleAboutSettingsChange('headingFont', e.target.value)} className="w-full border rounded px-3 py-2">
+                                <option value="Playfair Display">Playfair Display (Serif)</option>
+                                <option value="Poppins">Poppins (Sans-serif)</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Màu nút bấm</label>
+                            <input type="color" value={aboutSettings.buttonBgColor} onChange={(e) => handleAboutSettingsChange('buttonBgColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" className="w-full bg-[#D4AF37] text-white py-3 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu Hình Trang</button>
+                 {aboutFeedback && (
+                     <div className="mt-4 text-center text-green-600 font-medium animate-pulse">{aboutFeedback}</div>
+                 )}
             </form>
-        ) : <p>Loading...</p>}
+        ) : <p>Đang tải dữ liệu...</p>}
     </div>
   );
 
   const renderHomePageSettings = () => (
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
            {homeSettings ? (
-               <form onSubmit={handleHomePageSubmit} className="space-y-4">
-                   <input type="text" value={homeSettings.headlineText} onChange={(e) => handleHomePageSettingsChange('headlineText', e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Headline" />
-                   <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded">Lưu</button>
-                   {homeFeedback && <p className="text-center text-green-600">{homeFeedback}</p>}
+               <form onSubmit={handleHomePageSubmit} className="space-y-6">
+                   <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Trang Chủ</h3>
+                   
+                   {/* Hero Headline */}
+                   <div className="border p-4 rounded-lg bg-gray-50">
+                       <h4 className="font-bold text-gray-700 mb-3">Tiêu đề chính (Headline)</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <input type="text" value={homeSettings.headlineText} onChange={(e) => handleHomePageSettingsChange('headlineText', e.target.value)} className="border rounded px-3 py-2" placeholder="Nội dung tiêu đề" />
+                           <input type="color" value={homeSettings.headlineColor} onChange={(e) => handleHomePageSettingsChange('headlineColor', e.target.value)} className="w-full h-10 p-1 border rounded" title="Màu chữ" />
+                           <select value={homeSettings.headlineFont} onChange={(e) => handleHomePageSettingsChange('headlineFont', e.target.value)} className="border rounded px-3 py-2">
+                               <option value="Playfair Display">Playfair Display</option>
+                               <option value="Poppins">Poppins</option>
+                           </select>
+                            <input type="text" value={homeSettings.headlineSize} onChange={(e) => handleHomePageSettingsChange('headlineSize', e.target.value)} className="border rounded px-3 py-2" placeholder="Kích thước (VD: 3rem)" />
+                       </div>
+                   </div>
+
+                   {/* Promotion Section */}
+                   <div className="border p-4 rounded-lg bg-gray-50">
+                       <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
+                       <div className="space-y-3">
+                           <div>
+                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
+                               {homeSettings.promoImageUrls.map((url, idx) => (
+                                   <div key={idx} className="flex gap-2 mb-2">
+                                       <input 
+                                            type="text" 
+                                            value={url} 
+                                            onChange={(e) => {
+                                                const newUrls = [...homeSettings.promoImageUrls];
+                                                newUrls[idx] = e.target.value;
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }}
+                                            className="border rounded px-3 py-2 flex-1 text-sm" 
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }}
+                                            className="text-red-500 text-xs hover:underline"
+                                        >
+                                            Xóa
+                                        </button>
+                                   </div>
+                               ))}
+                               <button 
+                                    type="button" 
+                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
+                                    className="text-blue-600 text-sm hover:underline"
+                                >
+                                    + Thêm ảnh
+                                </button>
+                           </div>
+                           <div className="grid grid-cols-2 gap-4">
+                               <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
+                               <input type="text" value={homeSettings.promoTitle2} onChange={(e) => handleHomePageSettingsChange('promoTitle2', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 2" />
+                               <input type="text" value={homeSettings.promoTitleHighlight} onChange={(e) => handleHomePageSettingsChange('promoTitleHighlight', e.target.value)} className="border rounded px-3 py-2" placeholder="Từ khóa nổi bật" />
+                               <input type="color" value={homeSettings.promoBackgroundColor} onChange={(e) => handleHomePageSettingsChange('promoBackgroundColor', e.target.value)} className="w-full h-10 p-1 border rounded" title="Màu nền" />
+                           </div>
+                       </div>
+                   </div>
+
+                   {/* Flash Sale Section */}
+                    <div className="border p-4 rounded-lg bg-gray-50">
+                       <h4 className="font-bold text-gray-700 mb-3">Banner Flash Sale</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <input type="text" value={homeSettings.flashSaleTitleText} onChange={(e) => handleHomePageSettingsChange('flashSaleTitleText', e.target.value)} className="border rounded px-3 py-2" placeholder="Tiêu đề Flash Sale" />
+                            <div className="flex gap-2">
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-500 block">Màu bắt đầu (Gradient)</label>
+                                    <input type="color" value={homeSettings.flashSaleBgColorStart} onChange={(e) => handleHomePageSettingsChange('flashSaleBgColorStart', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-gray-500 block">Màu kết thúc</label>
+                                    <input type="color" value={homeSettings.flashSaleBgColorEnd} onChange={(e) => handleHomePageSettingsChange('flashSaleBgColorEnd', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                   <button type="submit" className="w-full bg-[#D4AF37] text-white py-3 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu Hình Trang Chủ</button>
+                   {homeFeedback && <p className="text-center text-green-600 mt-2 font-medium">{homeFeedback}</p>}
                </form>
-           ) : <p>Loading...</p>}
+           ) : <p>Đang tải...</p>}
       </div>
   );
 
   const renderHeaderSettings = () => (
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
            {headerSettings ? (
-                <form onSubmit={handleHeaderSubmit} className="space-y-4">
-                    <input type="text" value={headerSettings.brandName} onChange={(e) => handleHeaderSettingsChange('brandName', e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Brand Name" />
-                    <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded">Lưu</button>
-                    {headerFeedback && <p className="text-center text-green-600">{headerFeedback}</p>}
+                <form onSubmit={handleHeaderSubmit} className="space-y-6">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Header & Logo</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Tên thương hiệu (Brand Name)</label>
+                             <input type="text" value={headerSettings.brandName} onChange={(e) => handleHeaderSettingsChange('brandName', e.target.value)} className="w-full border rounded px-3 py-2" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu thương hiệu</label>
+                             <input type="color" value={headerSettings.brandColor} onChange={(e) => handleHeaderSettingsChange('brandColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                        <div className="col-span-2">
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Logo (Hình ảnh)</label>
+                             <div className="flex items-center gap-4">
+                                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded inline-flex items-center">
+                                    <ImagePlus className="w-4 h-4 mr-2" />
+                                    <span>Tải Logo lên</span>
+                                    <input type="file" className="hidden" accept="image/*" onChange={handleHeaderLogoUpload} />
+                                </label>
+                                {headerSettings.logoUrl && (
+                                    <img src={headerSettings.logoUrl} alt="Logo Preview" className="h-12 object-contain border rounded p-1 bg-gray-50" />
+                                )}
+                            </div>
+                        </div>
+                        
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu nền Header</label>
+                             <input type="text" value={headerSettings.brandBackgroundColor} onChange={(e) => handleHeaderSettingsChange('brandBackgroundColor', e.target.value)} className="w-full border rounded px-3 py-2" placeholder="VD: rgba(255, 255, 255, 0.9)" />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Font chữ Menu</label>
+                             <select value={headerSettings.navFont} onChange={(e) => handleHeaderSettingsChange('navFont', e.target.value)} className="w-full border rounded px-3 py-2">
+                                <option value="Poppins">Poppins</option>
+                                <option value="Playfair Display">Playfair Display</option>
+                             </select>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu chữ Menu</label>
+                             <input type="color" value={headerSettings.navColor} onChange={(e) => handleHeaderSettingsChange('navColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                         <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu Hover Menu</label>
+                             <input type="color" value={headerSettings.navHoverColor} onChange={(e) => handleHeaderSettingsChange('navHoverColor', e.target.value)} className="w-full h-10 p-1 border rounded" />
+                        </div>
+                    </div>
+
+                    <button type="submit" className="w-full bg-[#D4AF37] text-white py-3 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu Hình Header</button>
+                    {headerFeedback && <p className="text-center text-green-600 mt-2 font-medium">{headerFeedback}</p>}
                 </form>
-           ) : <p>Loading...</p>}
+           ) : <p>Đang tải...</p>}
       </div>
   );
 
@@ -814,11 +1833,9 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* 1. PASSWORD CHANGE (SELF) */}
+              {/* 1. PASSWORD CHANGE (SELF) - NEW FEATURE */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <Icons.Lock className="w-5 h-5" /> Đổi mật khẩu
-                  </h4>
+                  <h4 className="font-bold text-gray-700 mb-4">Đổi mật khẩu</h4>
                   {!showPasswordForm ? (
                       <button onClick={() => setShowPasswordForm(true)} className="text-blue-600 hover:underline text-sm">Thay đổi mật khẩu đăng nhập của bạn</button>
                   ) : (
@@ -834,11 +1851,9 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* 2. SHIPPING FEES */}
+              {/* 2. SHIPPING FEES - NEW FEATURE */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <Icons.Truck className="w-5 h-5" /> Phí vận chuyển
-                  </h4>
+                  <h4 className="font-bold text-gray-700 mb-4">Phí vận chuyển</h4>
                   <form onSubmit={handleShippingSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                           <label className="block text-xs font-bold text-gray-500 mb-1">Phí cơ bản</label>
@@ -860,13 +1875,11 @@ const AdminPage: React.FC = () => {
                   </form>
               </div>
 
-              {/* 3. SUB-ADMIN MANAGEMENT */}
+              {/* 3. SUB-ADMIN MANAGEMENT - UPGRADED with Granular Permissions */}
               {currentAdminUser?.role === 'MASTER' && (
                   <div className="border-t pt-6">
-                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                          <Icons.Users className="w-5 h-5" /> Quản lý Phân quyền (Sub-Admin)
-                      </h4>
-                      <form onSubmit={isEditingAdmin ? handleUpdateAdminUser : handleCreateAdminUser} className="bg-gray-50 p-4 rounded-lg border mb-4">
+                      <h4 className="font-bold text-gray-700 mb-4">Quản lý Phân quyền (Sub-Admin)</h4>
+                      <form onSubmit={handleSaveAdminUser} className="bg-gray-50 p-4 rounded-lg border mb-4">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                               <input type="text" placeholder="Username" value={adminUserForm.username} onChange={e => setAdminUserForm({...adminUserForm, username: e.target.value})} className="border rounded px-3 py-2" disabled={!!isEditingAdmin} required />
                               <input type="text" placeholder="Họ tên" value={adminUserForm.fullname} onChange={e => setAdminUserForm({...adminUserForm, fullname: e.target.value})} className="border rounded px-3 py-2" required />
@@ -929,24 +1942,22 @@ const AdminPage: React.FC = () => {
                   </div>
               )}
 
-              {/* 4. DATA MANAGEMENT (BACKUP/RESTORE) */}
+              {/* 4. DATA MANAGEMENT (BACKUP/RESTORE) - NEW FEATURE */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <Icons.Database className="w-5 h-5" /> Quản lý Dữ liệu
-                  </h4>
+                  <h4 className="font-bold text-gray-700 mb-4">Quản lý Dữ liệu</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="p-4 border rounded bg-blue-50 text-center">
                           <h5 className="font-bold text-blue-800 mb-2">Sao lưu (Backup)</h5>
                           <p className="text-xs text-blue-600 mb-3">Tải xuống toàn bộ dữ liệu (Sản phẩm, Đơn hàng, Cấu hình...)</p>
                           <button onClick={handleBackup} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold w-full hover:bg-blue-700 flex items-center justify-center gap-2">
-                              <Icons.Save className="w-4 h-4" /> Tải về máy
+                              Tải về máy
                           </button>
                       </div>
                       <div className="p-4 border rounded bg-green-50 text-center">
                           <h5 className="font-bold text-green-800 mb-2">Khôi phục (Restore)</h5>
                           <p className="text-xs text-green-600 mb-3">Tải lên file backup (.json) để khôi phục dữ liệu.</p>
                           <label className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold w-full hover:bg-green-700 flex items-center justify-center gap-2 cursor-pointer">
-                              <Icons.RotateCcw className="w-4 h-4" /> Chọn File
+                              Chọn File
                               <input type="file" className="hidden" accept=".json" onChange={handleRestore} />
                           </label>
                       </div>
@@ -961,36 +1972,52 @@ const AdminPage: React.FC = () => {
                   </div>
               </div>
 
-              {/* 5. LOGS (WITH USER COLUMN) */}
+              {/* Email Management */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
+                  <ul className="mb-4 space-y-2">
+                      {adminEmails.map((email, idx) => (
+                          <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
+                              <span className="text-gray-700">{email}</span>
+                              <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-sm hover:underline">Xóa</button>
+                          </li>
+                      ))}
+                  </ul>
+                  <form onSubmit={handleAddEmail} className="flex gap-2 mb-4">
+                      <input type="email" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} placeholder="Email..." className="flex-1 border rounded px-3 py-2" required />
+                      <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
+                  </form>
+                  <button onClick={handleTestEmail} className="text-sm text-blue-600 hover:underline">📧 Gửi Email kiểm tra</button>
+              </div>
+
+              {/* Login Logs Section - UPDATED with User column */}
               <div className="border-t pt-6">
                   <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-bold text-gray-700 flex items-center gap-2">
-                          <Icons.Activity className="w-5 h-5" /> Nhật ký hoạt động
-                      </h4>
+                      <h4 className="font-bold text-gray-700 flex items-center gap-2">Nhật ký đăng nhập</h4>
                       <button onClick={() => fetchAdminLoginLogs().then(logs => logs && setAdminLogs(logs))} className="text-blue-600 text-sm hover:underline">Làm mới</button>
                   </div>
-                  <div className="border rounded overflow-hidden max-h-60 overflow-y-auto">
-                      <table className="min-w-full text-xs text-left">
-                          <thead className="bg-gray-100 font-bold sticky top-0">
+                  <div className="bg-gray-50 border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+                      <table className="min-w-full text-xs text-left text-gray-600">
+                          <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">
                               <tr>
-                                  <th className="px-4 py-2">Thời gian</th>
-                                  <th className="px-4 py-2">Người dùng</th>
-                                  <th className="px-4 py-2">Hành động</th>
-                                  <th className="px-4 py-2">IP</th>
-                                  <th className="px-4 py-2">Trạng thái</th>
+                                  <th className="px-3 py-2">Thời gian</th>
+                                  <th className="px-3 py-2">Người dùng</th> {/* NEW COLUMN */}
+                                  <th className="px-3 py-2">Phương thức</th>
+                                  <th className="px-3 py-2">IP</th>
+                                  <th className="px-3 py-2">Trạng thái</th>
                               </tr>
                           </thead>
-                          <tbody className="divide-y">
-                              {adminLogs.map(log => (
-                                  <tr key={log.id} className="hover:bg-gray-50">
-                                      <td className="px-4 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
-                                      <td className="px-4 py-2 font-bold text-gray-800">{log.username}</td>
-                                      <td className="px-4 py-2">{log.method === 'GOOGLE_AUTH' ? 'Đăng nhập (2FA)' : 'Đăng nhập (Password)'}</td>
-                                      <td className="px-4 py-2 font-mono text-gray-500">{log.ip_address}</td>
-                                      <td className="px-4 py-2">
-                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.status === 'SUCCESS' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                              {log.status}
-                                          </span>
+                          <tbody className="divide-y divide-gray-200">
+                              {adminLogs.map((log) => (
+                                  <tr key={log.id} className="hover:bg-white">
+                                      <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
+                                      <td className="px-3 py-2 font-bold text-gray-800">{log.username}</td> {/* NEW COLUMN */}
+                                      <td className="px-3 py-2">
+                                          {log.method === 'GOOGLE_AUTH' ? <span className="text-purple-600 font-bold">2FA App</span> : <span className="text-blue-600">Password/Email</span>}
+                                      </td>
+                                      <td className="px-3 py-2 font-mono">{log.ip_address || 'Unknown'}</td>
+                                      <td className="px-3 py-2">
+                                          {log.status === 'SUCCESS' ? <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">Thành công</span> : <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">Thất bại</span>}
                                       </td>
                                   </tr>
                               ))}
@@ -999,50 +2026,107 @@ const AdminPage: React.FC = () => {
                   </div>
               </div>
 
-              {/* 6. 2FA (PERSONAL) */}
+              {/* 2FA Setup */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <Icons.ShieldCheck className="w-5 h-5" /> Bảo mật 2 lớp (Của bạn)
-                  </h4>
+                  <h4 className="font-bold text-gray-700 mb-4">Bảo mật 2 lớp (Của Bạn)</h4>
                   {(currentAdminUser ? currentAdminUser.is_totp_enabled : totpEnabled) ? (
-                      <div className="bg-green-50 border border-green-200 p-4 rounded flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-green-700 font-bold">
-                              <Icons.Check className="w-5 h-5" /> Đã kích hoạt bảo mật
-                          </div>
-                          <button onClick={handleDisableTotp} className="text-red-600 text-sm hover:underline font-bold">Tắt</button>
+                      <div className="bg-green-50 border border-green-200 p-4 rounded-lg flex justify-between items-center">
+                          <span className="text-green-700 font-bold flex items-center gap-2"><CheckIcon className="w-4 h-4"/> Đã kích hoạt</span>
+                          <button onClick={handleDisableTotp} className="text-red-600 hover:underline text-sm">Tắt</button>
                       </div>
                   ) : (
-                      <div className="bg-gray-50 border p-4 rounded">
+                      <div className="bg-gray-50 border p-4 rounded-lg">
                           {!showTotpSetup ? (
-                              <button onClick={handleStartTotpSetup} className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">Kích hoạt ngay</button>
+                              <button onClick={handleStartTotpSetup} className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">Thiết lập ngay</button>
                           ) : (
-                              <div className="flex flex-col md:flex-row gap-6 animate-fade-in-up">
-                                  <div className="bg-white p-2 border rounded inline-block">
-                                      <QRCodeSVG value={tempTotpUri} size={140} />
-                                  </div>
-                                  <div className="space-y-3">
-                                      <p className="text-sm">Quét mã QR bằng Google Authenticator và nhập mã 6 số:</p>
-                                      <form onSubmit={handleVerifyAndEnableTotp} className="flex gap-2">
-                                          <input type="text" className="border rounded px-3 py-2 w-32 text-center tracking-widest font-bold" maxLength={6} value={verificationCode} onChange={e => setVerificationCode(e.target.value)} required />
-                                          <button className="bg-[#00695C] text-white px-4 py-2 rounded font-bold">Xác nhận</button>
-                                      </form>
-                                      <button onClick={() => setShowTotpSetup(false)} className="text-sm text-gray-500 hover:underline">Hủy</button>
+                              <div className="space-y-4">
+                                  <div className="flex gap-6">
+                                      <div className="bg-white p-2 rounded border"><QRCodeSVG value={tempTotpUri} size={150} /></div>
+                                      <div className="flex-1 text-sm text-gray-600">
+                                          <p>1. Tải Google Authenticator.</p>
+                                          <p>2. Quét mã QR.</p>
+                                          <p>3. Nhập mã 6 số:</p>
+                                          <form onSubmit={handleVerifyAndEnableTotp} className="mt-2 flex gap-2">
+                                              <input type="text" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} className="border rounded px-3 py-2 w-32 tracking-widest text-center" maxLength={6} required />
+                                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold">Kích hoạt</button>
+                                          </form>
+                                          <button onClick={() => setShowTotpSetup(false)} className="text-gray-500 hover:underline mt-2">Hủy</button>
+                                      </div>
                                   </div>
                               </div>
                           )}
                       </div>
                   )}
               </div>
+
+              {/* Bank Settings */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4">Cấu hình Thanh toán (VietQR)</h4>
+                  {bankSettings && (
+                      <form onSubmit={handleBankSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Ngân hàng</label>
+                                  <select value={bankSettings.bankId} onChange={(e) => handleBankSettingsChange('bankId', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" required>
+                                      <option value="">-- Chọn --</option>
+                                      {VIET_QR_BANKS.map(bank => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Số tài khoản</label>
+                                  <input type="text" value={bankSettings.accountNumber} onChange={(e) => handleBankSettingsChange('accountNumber', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" required />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-sm font-medium text-gray-700">Tên chủ tài khoản</label>
+                                  <input type="text" value={bankSettings.accountName} onChange={(e) => handleBankSettingsChange('accountName', e.target.value.toUpperCase())} className="mt-1 w-full border rounded px-3 py-2 uppercase" required />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu thông tin</button>
+                      </form>
+                  )}
+              </div>
+
+              {/* Social Media */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4">Mạng xã hội</h4>
+                  {socialSettings && (
+                      <form onSubmit={handleSocialSettingsSubmit} className="space-y-4">
+                          <input type="url" placeholder="Facebook URL" value={socialSettings.facebook} onChange={(e) => handleSocialSettingsChange('facebook', e.target.value)} className="w-full border rounded px-3 py-2" />
+                          <input type="url" placeholder="Instagram URL" value={socialSettings.instagram} onChange={(e) => handleSocialSettingsChange('instagram', e.target.value)} className="w-full border rounded px-3 py-2" />
+                          <input type="url" placeholder="TikTok URL" value={socialSettings.tiktok} onChange={(e) => handleSocialSettingsChange('tiktok', e.target.value)} className="w-full border rounded px-3 py-2" />
+                          <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded">Cập nhật</button>
+                      </form>
+                  )}
+              </div>
           </div>
-          {settingsFeedback && (
-              <div className={`mt-6 p-3 rounded text-center font-bold animate-pulse ${settingsFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{settingsFeedback}</div>
-          )}
+          
+           {settingsFeedback && (
+                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                     {settingsFeedback}
+                 </div>
+            )}
+
+            {/* Bank Security Modal */}
+            {showBankSecurityModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 animate-fade-in-up">
+                        <h3 className="text-lg font-bold text-gray-800 text-center mb-4">Xác thực 2FA</h3>
+                        <form onSubmit={handleVerifyBankUpdate}>
+                            <input type="text" placeholder="Nhập mã 6 số" value={securityCode} onChange={(e) => setSecurityCode(e.target.value)} className="w-full text-center text-xl tracking-widest font-mono border rounded px-3 py-3 mb-4" maxLength={6} autoFocus required />
+                            <div className="flex gap-3">
+                                <button type="button" onClick={() => { setShowBankSecurityModal(false); setSecurityCode(''); }} className="flex-1 py-2 border rounded">Hủy</button>
+                                <button type="submit" className="flex-1 py-2 bg-[#D4AF37] text-white rounded font-bold">Xác nhận</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
       </div>
   );
 
   const renderContent = () => {
     switch(activeTab) {
-      case 'dashboard': return renderDashboard(); 
+      case 'dashboard': return renderDashboard();
       case 'products': return renderProductManager();
       case 'orders': return renderOrderManager();
       case 'inventory': return renderInventoryManager();
@@ -1051,7 +2135,7 @@ const AdminPage: React.FC = () => {
       case 'home': return renderHomePageSettings();
       case 'header': return renderHeaderSettings();
       case 'settings': return renderSettings();
-      default: return null;
+      default: return renderDashboard();
     }
   };
 
@@ -1060,7 +2144,7 @@ const AdminPage: React.FC = () => {
       <aside className="bg-[#111827] text-white w-full md:w-64 flex-shrink-0">
         <div className="p-6 border-b border-gray-700 flex items-center gap-3">
           <div className="bg-[#D4AF37] p-2 rounded-lg">
-             <Icons.BarChart2 className="w-6 h-6 text-white" />
+             <BarChart2 className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
         </div>
@@ -1070,7 +2154,7 @@ const AdminPage: React.FC = () => {
                 onClick={() => setActiveTab('dashboard')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
               >
-                <Icons.BarChart2 className="w-5 h-5" /> Tổng quan
+                <BarChart2 className="w-5 h-5" /> Tổng quan
               </button>
            )}
            {hasPermission('products') && (
@@ -1078,7 +2162,7 @@ const AdminPage: React.FC = () => {
                 onClick={() => setActiveTab('products')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
               >
-                <Icons.Package className="w-5 h-5" /> Sản phẩm
+                <PackageIcon className="w-5 h-5" /> Sản phẩm
               </button>
            )}
            {hasPermission('orders') && (
@@ -1086,7 +2170,7 @@ const AdminPage: React.FC = () => {
                 onClick={() => setActiveTab('orders')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
               >
-                <Icons.ClipboardList className="w-5 h-5" /> Đơn hàng
+                <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
               </button>
            )}
            {hasPermission('inventory') && (
@@ -1094,7 +2178,7 @@ const AdminPage: React.FC = () => {
                 onClick={() => setActiveTab('inventory')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
               >
-                <Icons.BarChart2 className="w-5 h-5" /> Kho hàng
+                <BarChart2 className="w-5 h-5" /> Kho hàng
               </button>
            )}
            {hasPermission('customers') && (
@@ -1102,7 +2186,7 @@ const AdminPage: React.FC = () => {
                 onClick={() => setActiveTab('customers')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
               >
-                <Icons.Users className="w-5 h-5" /> Khách hàng
+                <UsersIcon className="w-5 h-5" /> Khách hàng
               </button>
            )}
           
@@ -1113,7 +2197,7 @@ const AdminPage: React.FC = () => {
                     onClick={() => setActiveTab('home')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                 >
-                    <Icons.Edit className="w-5 h-5" /> Trang chủ
+                    <EditIcon className="w-5 h-5" /> Trang chủ
                 </button>
             )}
             {hasPermission('header') && (
@@ -1121,7 +2205,7 @@ const AdminPage: React.FC = () => {
                     onClick={() => setActiveTab('header')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                 >
-                    <Icons.Layers className="w-5 h-5" /> Header/Menu
+                    <LayersIcon className="w-5 h-5" /> Header/Menu
                 </button>
             )}
             {hasPermission('about') && (
@@ -1129,7 +2213,7 @@ const AdminPage: React.FC = () => {
                     onClick={() => setActiveTab('about')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                 >
-                    <Icons.Edit className="w-5 h-5" /> Giới thiệu
+                    <EditIcon className="w-5 h-5" /> Giới thiệu
                 </button>
             )}
             {hasPermission('settings') && (
@@ -1137,7 +2221,7 @@ const AdminPage: React.FC = () => {
                     onClick={() => setActiveTab('settings')}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                 >
-                    <Icons.User className="w-5 h-5" /> Cài đặt chung
+                    <UserIcon className="w-5 h-5" /> Cài đặt chung
                 </button>
             )}
           </div>
