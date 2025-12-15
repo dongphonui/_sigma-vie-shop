@@ -14,7 +14,7 @@ interface HomeProps {
   currentUser: Customer | null;
   cartItemCount?: number;
   onOpenCart?: () => void;
-  initialProductId?: string | null; // NEW Prop for Deep Linking
+  initialProductId?: string | null; 
 }
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
@@ -101,10 +101,11 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
+    
+    // Load Settings
     setSettings(getHomePageSettings());
 
     // 2. FORCE RELOAD from Server to ensure mobile is up to date
-    // This is crucial for mobile users who might keep the tab open
     forceReloadProducts().then(() => {
         console.log("Forced reload complete via Home mount");
     });
@@ -115,12 +116,11 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         if (found) {
             setSelectedProduct(found);
         } else {
-            // Not found locally yet, set loading state and wait for DB update
             setIsLookingForProduct(true);
         }
     }
 
-    // Listener for async updates (DB fetch results)
+    // LISTENER: Update Products when DB changes
     const handleProductUpdate = () => {
         const updated = getProducts();
         setProducts(updated);
@@ -141,9 +141,20 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         }
     };
     
+    // LISTENER: Update Settings when Server response arrives (Real-time sync)
+    const handleSettingsUpdate = () => {
+        console.log("UI received settings update event");
+        setSettings(getHomePageSettings());
+    };
+    
     window.addEventListener('sigma_vie_products_update', handleProductUpdate);
-    return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
-  }, [initialProductId]); // Re-run if ID changes
+    window.addEventListener('sigma_vie_home_settings_update', handleSettingsUpdate);
+    
+    return () => {
+        window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
+        window.removeEventListener('sigma_vie_home_settings_update', handleSettingsUpdate);
+    };
+  }, [initialProductId]); 
 
   // Flash Sale Logic
   useEffect(() => {

@@ -3,6 +3,7 @@ import type { HomePageSettings } from '../types';
 import { fetchHomePageSettingsFromDB, syncHomePageSettingsToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_home_page_settings';
+const EVENT_KEY = 'sigma_vie_home_settings_update'; // Key sự kiện update
 let hasLoadedFromDB = false;
 
 const DEFAULT_SETTINGS: HomePageSettings = {
@@ -75,41 +76,50 @@ export const getHomePageSettings = (): HomePageSettings => {
 
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Migration: If promoImageUrls doesn't exist but promoImageUrl does, create array
+      // Migration logic
       if (!parsed.promoImageUrls) {
           parsed.promoImageUrls = parsed.promoImageUrl ? [parsed.promoImageUrl] : [];
       }
-      // Merge with default to ensure new fields exist if loading old data
       localData = { ...DEFAULT_SETTINGS, ...parsed };
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
     }
 
     // --- BACKGROUND SYNC FROM SERVER ---
-    if (!hasLoadedFromDB) {
-        hasLoadedFromDB = true;
-        fetchHomePageSettingsFromDB().then(dbSettings => {
-            if (dbSettings && Object.keys(dbSettings).length > 0) {
-                // Ensure array migration for DB data too
-                if (!dbSettings.promoImageUrls && dbSettings.promoImageUrl) {
-                    dbSettings.promoImageUrls = [dbSettings.promoImageUrl];
-                }
-                const merged = { ...DEFAULT_SETTINGS, ...dbSettings };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-                // Optional: Dispatch event if needed, but react state usually updates on next render/nav
+    // Luôn luôn gọi server để check update mỗi khi load trang (không chỉ lần đầu)
+    // Để đảm bảo máy khác luôn nhận được dữ liệu mới nhất
+    fetchHomePageSettingsFromDB().then(dbSettings => {
+        if (dbSettings && Object.keys(dbSettings).length > 0) {
+            // Ensure array migration for DB data too
+            if (!dbSettings.promoImageUrls && dbSettings.promoImageUrl) {
+                dbSettings.promoImageUrls = [dbSettings.promoImageUrl];
             }
-        }).catch(err => console.error("Error loading home settings:", err));
-    }
+            const merged = { ...DEFAULT_SETTINGS, ...dbSettings };
+            
+            // Check changes before dispatching to avoid loops if needed, 
+            // but simple overwrite is safer for consistency here
+            const currentStr = localStorage.getItem(STORAGE_KEY);
+            const newStr = JSON.stringify(merged);
+            
+            if (currentStr !== newStr) {
+                localStorage.setItem(STORAGE_KEY, newStr);
+                // QUAN TRỌNG: Bắn sự kiện để giao diện tự vẽ lại
+                window.dispatchEvent(new Event(EVENT_KEY));
+                console.log("Home settings updated from server & UI refreshed.");
+            }
+        }
+    }).catch(err => console.error("Error checking home settings:", err));
 
     return localData;
   } catch (error) {
-    console.error("Failed to parse home page settings from localStorage", error);
+    console.error("Failed to parse home page settings", error);
     return DEFAULT_SETTINGS;
   }
 };
 
 export const updateHomePageSettings = (settings: HomePageSettings): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  window.dispatchEvent(new Event(EVENT_KEY)); // Update local UI immediately
   
   // Sync to Server
   syncHomePageSettingsToDB(settings).then(res => {
