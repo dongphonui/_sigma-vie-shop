@@ -6,10 +6,8 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
   console.log('Bắt đầu yêu cầu gửi OTP...');
   
   const adminEmails = getAdminEmails();
-  if (adminEmails.length === 0) {
-    console.error('Không tìm thấy email quản trị nào.');
-    return { success: false };
-  }
+  // Ensure we have at least one email, fallback to a default if absolutely necessary to prevent crash
+  const primaryEmail = adminEmails.length > 0 ? adminEmails[0] : 'admin@sigmavie.com';
 
   // Tạo OTP ngẫu nhiên
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -18,7 +16,6 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
   // Lưu OTP vào session storage để trang OTP có thể xác thực
   sessionStorage.setItem('otpVerification', JSON.stringify({ otp, expiry }));
   
-  const primaryEmail = adminEmails[0];
   const subject = 'Mã xác thực đăng nhập Sigma Vie';
   const html = `
     <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; max-width: 500px;">
@@ -47,8 +44,8 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
       console.warn('Gửi email thất bại, chuyển sang chế độ hiển thị trực tiếp (Fallback).', error);
       // Fallback: Hiển thị OTP qua Alert nếu gửi mail lỗi
       setTimeout(() => {
-          alert(`⚠️ KHÔNG GỬI ĐƯỢC EMAIL (Lỗi kết nối)\n\nMÃ OTP ĐĂNG NHẬP CỦA BẠN LÀ: ${otp}\n\nVui lòng kiểm tra lại cấu hình SMTP trên Server.`);
-      }, 100);
+          alert(`⚠️ CHẾ ĐỘ OTP MÀN HÌNH (Do gửi Email thất bại)\n\nMÃ OTP ĐĂNG NHẬP CỦA BẠN LÀ: ${otp}\n\nHãy nhập mã này để tiếp tục.`);
+      }, 500);
   }
 
   return { success: true };

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAdminEmails, verifyTotpToken, verifyTempTotpToken } from '../utils/adminSettingsStorage';
 import { recordAdminLogin } from '../utils/apiClient';
+import { sendOtpRequest } from '../utils/api';
 import type { AdminUser } from '../types';
 
 const AdminOTPPage: React.FC = () => {
@@ -36,19 +37,23 @@ const AdminOTPPage: React.FC = () => {
     }
 
     // 3. Nếu dùng Email thì check session
+    checkEmailOtpSession();
+  }, []);
+
+  const checkEmailOtpSession = () => {
     const otpDataString = sessionStorage.getItem('otpVerification');
     if (!otpDataString) {
-      setError("Không tìm thấy yêu cầu xác thực. Vui lòng đăng nhập lại.");
+      if (authMethod === 'EMAIL') setError("Không tìm thấy yêu cầu xác thực. Vui lòng thử lại.");
       return;
     }
     const otpData = JSON.parse(otpDataString);
     if (Date.now() > otpData.expiry) {
-        setError('Mã OTP đã hết hạn. Vui lòng thử đăng nhập lại.');
+        setError('Mã OTP đã hết hạn. Vui lòng gửi lại mã.');
         sessionStorage.removeItem('otpVerification');
         return;
     }
     setEmergencyOtp(otpData.otp);
-  }, []);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +97,7 @@ const AdminOTPPage: React.FC = () => {
         // Validate Email OTP
         const otpDataString = sessionStorage.getItem('otpVerification');
         if (!otpDataString) {
-            setError('Phiên đã hết hạn. Vui lòng đăng nhập lại.');
+            setError('Phiên đã hết hạn. Vui lòng gửi lại mã.');
             setIsLoading(false);
             return;
         }
@@ -110,6 +115,10 @@ const AdminOTPPage: React.FC = () => {
             await recordAdminLogin('EMAIL_OTP', 'SUCCESS', 'admin');
             sessionStorage.removeItem('otpVerification');
             sessionStorage.removeItem('authMethod');
+            // Nếu login từ DB user (nhưng switch qua Email), cần set adminUser
+            if (pendingUser) {
+                sessionStorage.setItem('adminUser', JSON.stringify(pendingUser));
+            }
             sessionStorage.setItem('isAuthenticated', 'true');
             window.location.hash = '/admin';
         } else {
@@ -123,6 +132,25 @@ const AdminOTPPage: React.FC = () => {
       if (emergencyOtp) {
           alert(`MÃ OTP KHẨN CẤP CỦA BẠN LÀ: ${emergencyOtp}\n\nHãy sử dụng mã này để đăng nhập.`);
       }
+  };
+
+  const handleSwitchToEmail = async () => {
+      setIsLoading(true);
+      setError('');
+      try {
+          const result = await sendOtpRequest();
+          if (result.success) {
+              setAuthMethod('EMAIL');
+              // Re-check session to get the code for display
+              checkEmailOtpSession();
+          } else {
+              setError('Không thể gửi mã OTP. Vui lòng thử lại sau.');
+          }
+      } catch (e) {
+          console.error(e);
+          setError('Lỗi khi chuyển đổi phương thức xác thực.');
+      }
+      setIsLoading(false);
   };
 
   return (
@@ -166,13 +194,24 @@ const AdminOTPPage: React.FC = () => {
         </form>
 
         <div className="mt-6 flex flex-col gap-3 text-center">
+             {(authMethod === 'TOTP' || authMethod === 'DB_TOTP') && (
+                 <button 
+                    type="button"
+                    onClick={handleSwitchToEmail}
+                    disabled={isLoading}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                >
+                    Gặp sự cố với Google Auth? Sử dụng OTP Màn hình/Email
+                </button>
+             )}
+
              {authMethod === 'EMAIL' && (
                  <button 
                     type="button"
                     onClick={handleRevealOtp}
                     className="text-sm text-red-500 hover:text-red-700 font-medium hover:underline"
                 >
-                    Không nhận được mã? Bấm vào đây để lấy mã khẩn cấp
+                    Không nhận được mã? Bấm vào đây để lấy mã khẩn cấp (Màn hình)
                 </button>
              )}
 
