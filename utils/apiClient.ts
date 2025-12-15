@@ -13,9 +13,8 @@ export const API_BASE_URL = (() => {
 
 export const checkServerConnection = async (): Promise<boolean> => {
     try {
-        const res = await fetch(`${API_BASE_URL}/health`, { 
+        const res = await fetch(`${API_BASE_URL}/health?t=${Date.now()}`, { 
             method: 'GET',
-            // Thêm timeout ngắn để check nhanh hơn
             signal: AbortSignal.timeout(3000) 
         });
         return res.ok;
@@ -27,9 +26,19 @@ export const checkServerConnection = async (): Promise<boolean> => {
 
 const fetchData = async (endpoint: string) => {
     try {
-        // Bỏ checkServerConnection ở mỗi request để giảm độ trễ, 
-        // fetch sẽ tự throw lỗi nếu không kết nối được
-        const res = await fetch(`${API_BASE_URL}/${endpoint}`);
+        // Add timestamp to prevent browser caching
+        // Thêm tham số _t=... để trình duyệt luôn hiểu đây là yêu cầu mới
+        const separator = endpoint.includes('?') ? '&' : '?';
+        const url = `${API_BASE_URL}/${endpoint}${separator}_t=${Date.now()}`;
+        
+        const res = await fetch(url, {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+        
         if (!res.ok) return null;
         return await res.json();
     } catch (e) {
