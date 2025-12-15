@@ -873,6 +873,27 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  // NEW: Handler for uploading promo images
+  const handlePromoImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && homeSettings) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB Limit check
+          setHomeFeedback('Ảnh quá lớn (Max 5MB)');
+          return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newUrl = reader.result as string;
+        const updatedUrls = [...(homeSettings.promoImageUrls || []), newUrl];
+        handleHomePageSettingsChange('promoImageUrls', updatedUrls);
+      };
+      reader.onerror = () => {
+          setHomeFeedback('Lỗi đọc file ảnh.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleHomePageSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (homeSettings) {
@@ -1866,7 +1887,7 @@ const AdminPage: React.FC = () => {
                        <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
                        <div className="space-y-3">
                            <div>
-                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
+                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL hoặc Upload)</label>
                                {homeSettings.promoImageUrls.map((url, idx) => (
                                    <div key={idx} className="flex gap-2 mb-2">
                                        <input 
@@ -1891,13 +1912,26 @@ const AdminPage: React.FC = () => {
                                         </button>
                                    </div>
                                ))}
-                               <button 
-                                    type="button" 
-                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
-                                    className="text-blue-600 text-sm hover:underline"
-                                >
-                                    + Thêm ảnh
-                                </button>
+                               <div className="flex gap-4 mt-2">
+                                   <button 
+                                        type="button" 
+                                        onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
+                                        className="text-blue-600 text-sm hover:underline"
+                                    >
+                                        + Thêm dòng URL
+                                    </button>
+                                    
+                                    <label className="cursor-pointer text-[#00695C] text-sm hover:underline font-bold flex items-center gap-1">
+                                        <ImagePlus className="w-4 h-4" />
+                                        <span>+ Tải ảnh từ máy</span>
+                                        <input 
+                                            type="file" 
+                                            className="hidden" 
+                                            accept="image/*" 
+                                            onChange={handlePromoImageUpload} 
+                                        />
+                                    </label>
+                               </div>
                            </div>
                            <div className="grid grid-cols-2 gap-4">
                                <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
