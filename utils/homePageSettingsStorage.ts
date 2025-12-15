@@ -1,7 +1,9 @@
 
 import type { HomePageSettings } from '../types';
+import { fetchHomePageSettingsFromDB, syncHomePageSettingsToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_home_page_settings';
+let hasLoadedFromDB = false;
 
 const DEFAULT_SETTINGS: HomePageSettings = {
   headlineText: 'Hàng Mới Về',
@@ -69,20 +71,37 @@ const DEFAULT_SETTINGS: HomePageSettings = {
 export const getHomePageSettings = (): HomePageSettings => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
+    let localData = DEFAULT_SETTINGS;
+
     if (stored) {
       const parsed = JSON.parse(stored);
-      
       // Migration: If promoImageUrls doesn't exist but promoImageUrl does, create array
       if (!parsed.promoImageUrls) {
           parsed.promoImageUrls = parsed.promoImageUrl ? [parsed.promoImageUrl] : [];
       }
-      
       // Merge with default to ensure new fields exist if loading old data
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      localData = { ...DEFAULT_SETTINGS, ...parsed };
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
-      return DEFAULT_SETTINGS;
     }
+
+    // --- BACKGROUND SYNC FROM SERVER ---
+    if (!hasLoadedFromDB) {
+        hasLoadedFromDB = true;
+        fetchHomePageSettingsFromDB().then(dbSettings => {
+            if (dbSettings && Object.keys(dbSettings).length > 0) {
+                // Ensure array migration for DB data too
+                if (!dbSettings.promoImageUrls && dbSettings.promoImageUrl) {
+                    dbSettings.promoImageUrls = [dbSettings.promoImageUrl];
+                }
+                const merged = { ...DEFAULT_SETTINGS, ...dbSettings };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+                // Optional: Dispatch event if needed, but react state usually updates on next render/nav
+            }
+        }).catch(err => console.error("Error loading home settings:", err));
+    }
+
+    return localData;
   } catch (error) {
     console.error("Failed to parse home page settings from localStorage", error);
     return DEFAULT_SETTINGS;
@@ -91,4 +110,13 @@ export const getHomePageSettings = (): HomePageSettings => {
 
 export const updateHomePageSettings = (settings: HomePageSettings): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  
+  // Sync to Server
+  syncHomePageSettingsToDB(settings).then(res => {
+      if (res && res.success) {
+          console.log("Home settings synced to server.");
+      } else {
+          console.error("Failed to sync home settings:", res);
+      }
+  });
 };

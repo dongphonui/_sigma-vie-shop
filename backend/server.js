@@ -1,5 +1,4 @@
 
-// ... (existing code imports) ...
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -11,21 +10,24 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors()); 
+app.use(cors()); // Allow all origins (Important for LAN access)
+// TĂNG GIỚI HẠN DUNG LƯỢNG LÊN 50MB ĐỂ CHỨA ẢNH LỚN
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// ... (DB Connection) ...
+// Check Database Config
 if (!process.env.DATABASE_URL) {
     console.error("❌ FATAL ERROR: DATABASE_URL is missing in .env file.");
     process.exit(1);
 }
 
+// Database Connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Test DB Connection on Start
 pool.connect((err, client, release) => {
     if (err) {
         console.error('❌ Database connection error:', err.stack);
@@ -35,6 +37,7 @@ pool.connect((err, client, release) => {
     }
 });
 
+// Email Transporter
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -138,7 +141,7 @@ const initDb = async () => {
       );
     `);
 
-    // 7. Admin Users
+    // 7. Admin Users (Sub-admins)
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id TEXT PRIMARY KEY,
@@ -153,7 +156,7 @@ const initDb = async () => {
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
 
-    // 8. Settings Table
+    // 8. Settings Table (Generic)
     await client.query(`
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
@@ -161,7 +164,7 @@ const initDb = async () => {
       );
     `);
 
-    // Create Default Master Admin
+    // Create Default Master Admin if not exists
     const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
     if (checkAdmin.rows.length === 0) {
         await client.query(`
@@ -188,6 +191,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: Date.no
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
+        // Filter out null data if schema was just fixed but rows were empty
         const products = result.rows.map(row => row.data).filter(p => p !== null);
         res.json(products);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -196,11 +200,6 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
     const p = req.body;
     console.log(`📥 Nhận yêu cầu lưu sản phẩm: ${p.name} (ID: ${p.id})`);
-    
-    // Attempt to handle SKU explicitly if the column exists in the payload, 
-    // BUT since we rely on the DB constraints being relaxed, we stick to the standard query
-    // which puts everything in 'data'. 
-    
     try {
         await pool.query(
             `INSERT INTO products (id, name, stock, data, updated_at) 
@@ -213,7 +212,6 @@ app.post('/api/products', async (req, res) => {
         res.json({ success: true });
     } catch (err) { 
         console.error(`❌ Lỗi lưu sản phẩm ${p.name}:`, err.message);
-        // Specifically catch the SKU error to give a hint
         if (err.message.includes('sku') && err.message.includes('not-null')) {
              res.status(500).json({ error: "Lỗi cơ sở dữ liệu: Cột 'sku' đang bắt buộc. Hãy khởi động lại Server để tự động sửa lỗi này." });
         } else {
@@ -366,7 +364,9 @@ app.post('/api/inventory', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 6. SHIPPING & SETTINGS
+// 6. SETTINGS (Shipping & Home Page & Others)
+
+// Shipping Settings
 app.get('/api/settings/shipping', async (req, res) => {
     try {
         const result = await pool.query("SELECT value FROM app_settings WHERE key = 'shipping'");
@@ -383,6 +383,30 @@ app.post('/api/settings/shipping', async (req, res) => {
     try {
         await pool.query(
             `INSERT INTO app_settings (key, value) VALUES ('shipping', $1) 
+             ON CONFLICT (key) DO UPDATE SET value = $1`,
+            [settings]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Home Page Settings (NEW)
+app.get('/api/settings/home', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT value FROM app_settings WHERE key = 'home_page'");
+        if (result.rows.length > 0) {
+            res.json(result.rows[0].value);
+        } else {
+            res.json({}); 
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/home', async (req, res) => {
+    const settings = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO app_settings (key, value) VALUES ('home_page', $1) 
              ON CONFLICT (key) DO UPDATE SET value = $1`,
             [settings]
         );

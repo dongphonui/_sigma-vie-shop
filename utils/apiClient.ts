@@ -112,6 +112,10 @@ export const changeAdminPassword = (data: any) => syncData('admin/change-passwor
 export const fetchShippingSettingsFromDB = () => fetchData('settings/shipping');
 export const syncShippingSettingsToDB = (settings: any) => syncData('settings/shipping', settings);
 
+// Home Page Settings (NEW)
+export const fetchHomePageSettingsFromDB = () => fetchData('settings/home');
+export const syncHomePageSettingsToDB = (settings: any) => syncData('settings/home', settings);
+
 // Reset
 export const resetDatabase = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
     return syncData('admin/reset', { scope });
