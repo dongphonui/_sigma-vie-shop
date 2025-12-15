@@ -1,5 +1,6 @@
 
 import type { AboutPageContent } from '../types';
+import { fetchAboutContentFromDB, syncAboutContentToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_about_page';
 
@@ -20,18 +21,46 @@ const DEFAULT_ABOUT_CONTENT: AboutPageContent = {
 export const getAboutPageContent = (): AboutPageContent => {
   try {
     const storedContent = localStorage.getItem(STORAGE_KEY);
+    let localData = DEFAULT_ABOUT_CONTENT;
+
     if (storedContent) {
-      return JSON.parse(storedContent);
+      localData = JSON.parse(storedContent);
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_ABOUT_CONTENT));
-      return DEFAULT_ABOUT_CONTENT;
     }
+
+    // Background sync from DB
+    fetchAboutContentFromDB().then(dbContent => {
+        if (dbContent && Object.keys(dbContent).length > 0) {
+            const merged = { ...DEFAULT_ABOUT_CONTENT, ...dbContent };
+            const currentStr = localStorage.getItem(STORAGE_KEY);
+            const newStr = JSON.stringify(merged);
+            
+            if (currentStr !== newStr) {
+                localStorage.setItem(STORAGE_KEY, newStr);
+                // Dispatch event so About Page can re-render if it's listening (optional for now)
+            }
+        }
+    }).catch(err => console.error("Error checking about content from DB:", err));
+
+    return localData;
   } catch (error) {
     console.error("Failed to parse about page content from localStorage", error);
     return DEFAULT_ABOUT_CONTENT;
   }
 };
 
-export const updateAboutPageContent = (content: AboutPageContent): void => {
+export const updateAboutPageContent = async (content: AboutPageContent): Promise<{ success: boolean; message?: string }> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+  
+  try {
+      const res = await syncAboutContentToDB(content);
+      if (res && res.success) {
+          return { success: true };
+      } else {
+          return { success: false, message: res?.message || 'Lỗi server' };
+      }
+  } catch (e: any) {
+      return { success: false, message: e.message };
+  }
 };

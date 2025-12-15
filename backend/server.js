@@ -364,7 +364,7 @@ app.post('/api/inventory', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 6. SETTINGS (Shipping & Home Page & Others)
+// 6. SETTINGS
 
 // Shipping Settings
 app.get('/api/settings/shipping', async (req, res) => {
@@ -373,7 +373,7 @@ app.get('/api/settings/shipping', async (req, res) => {
         if (result.rows.length > 0) {
             res.json(result.rows[0].value);
         } else {
-            res.json({}); // Return empty if not found
+            res.json({});
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -390,7 +390,7 @@ app.post('/api/settings/shipping', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Home Page Settings (NEW)
+// Home Page Settings
 app.get('/api/settings/home', async (req, res) => {
     try {
         const result = await pool.query("SELECT value FROM app_settings WHERE key = 'home_page'");
@@ -407,6 +407,54 @@ app.post('/api/settings/home', async (req, res) => {
     try {
         await pool.query(
             `INSERT INTO app_settings (key, value) VALUES ('home_page', $1) 
+             ON CONFLICT (key) DO UPDATE SET value = $1`,
+            [settings]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// About Page Content (NEW)
+app.get('/api/settings/about-content', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT value FROM app_settings WHERE key = 'about_content'");
+        if (result.rows.length > 0) {
+            res.json(result.rows[0].value);
+        } else {
+            res.json({}); 
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/about-content', async (req, res) => {
+    const content = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO app_settings (key, value) VALUES ('about_content', $1) 
+             ON CONFLICT (key) DO UPDATE SET value = $1`,
+            [content]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// About Page Settings (Style) (NEW)
+app.get('/api/settings/about-settings', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT value FROM app_settings WHERE key = 'about_settings'");
+        if (result.rows.length > 0) {
+            res.json(result.rows[0].value);
+        } else {
+            res.json({}); 
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/about-settings', async (req, res) => {
+    const settings = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO app_settings (key, value) VALUES ('about_settings', $1) 
              ON CONFLICT (key) DO UPDATE SET value = $1`,
             [settings]
         );
