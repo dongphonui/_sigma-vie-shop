@@ -1,11 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, SocialSettings, BankSettings, AdminLoginLog, AdminUser } from '../../types';
-import { getAboutPageContent, updateAboutPageContent } from '../../utils/aboutPageStorage';
-import { getHomePageSettings, updateHomePageSettings } from '../../utils/homePageSettingsStorage';
-import { getAboutPageSettings, updateAboutPageSettings } from '../../utils/aboutPageSettingsStorage';
-import { getHeaderSettings, updateHeaderSettings } from '../../utils/headerSettingsStorage';
+import type { SocialSettings, BankSettings, AdminLoginLog, AdminUser } from '../../types';
 import { getBankSettings, updateBankSettings } from '../../utils/bankSettingsStorage';
 import { getSocialSettings, updateSocialSettings } from '../../utils/socialSettingsStorage';
 import { 
@@ -16,7 +12,12 @@ import { sendEmail, fetchAdminLoginLogs, changeAdminPassword, fetchAdminUsers, c
 import { getShippingSettings, updateShippingSettings } from '../../utils/shippingSettingsStorage';
 import { downloadBackup, restoreBackup, performFactoryReset } from '../../utils/backupHelper';
 import { VIET_QR_BANKS } from '../../utils/constants';
-import { ShieldCheckIcon, CheckIcon, CreditCardIcon, ActivityIcon, ImagePlus, UserIcon, LayersIcon, EditIcon } from '../Icons';
+import { ShieldCheckIcon, CheckIcon, CreditCardIcon, ActivityIcon } from '../Icons';
+
+// Import newly separated components
+import HomePageSettingsTab from './settings/HomePageSettingsTab';
+import HeaderSettingsTab from './settings/HeaderSettingsTab';
+import AboutPageSettingsTab from './settings/AboutPageSettingsTab';
 
 interface SettingsTabProps {
     currentUser: AdminUser | null;
@@ -32,16 +33,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
-  const [shippingSettings, setShippingSettings] = useState(getShippingSettings());
   
   // -- Password --
   const [passwordData, setPasswordData] = useState({ old: '', new: '', confirm: '' });
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-
-  // -- Sub-Admins --
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
-  const [adminUserForm, setAdminUserForm] = useState({ username: '', password: '', fullname: '', permissions: [] as string[] });
-  const [isEditingAdmin, setIsEditingAdmin] = useState<string | null>(null);
 
   // -- 2FA --
   const [totpEnabled, setTotpEnabled] = useState(false);
@@ -52,52 +47,16 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [showBankSecurityModal, setShowBankSecurityModal] = useState(false);
   const [securityCode, setSecurityCode] = useState('');
 
-  // -- Content State --
-  const [homeSettings, setHomeSettings] = useState<HomePageSettings | null>(null);
-  const [headerSettings, setHeaderSettings] = useState<HeaderSettings | null>(null);
-  const [aboutContent, setAboutContent] = useState<AboutPageContent | null>(null);
-  const [aboutSettings, setAboutSettings] = useState<AboutPageSettings | null>(null);
-
   useEffect(() => {
       // Load all settings
       setAdminEmails(getAdminEmails());
       setSocialSettings(getSocialSettings());
       setTotpEnabled(isTotpEnabled());
       setBankSettings(getBankSettings());
-      setShippingSettings(getShippingSettings());
       fetchAdminLoginLogs().then(logs => { if (logs) setAdminLogs(logs); });
-      
-      if (currentUser?.role === 'MASTER') {
-          fetchAdminUsers().then(users => { if(users) setAdminUsers(users); });
-      }
-
-      setHomeSettings(getHomePageSettings());
-      setHeaderSettings(getHeaderSettings());
-      setAboutContent(getAboutPageContent());
-      setAboutSettings(getAboutPageSettings());
   }, [currentUser]);
 
-  // --- Handlers (Simplified for brevity) ---
-  
-  const handleHomePageSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(homeSettings) { updateHomePageSettings(homeSettings); setSettingsFeedback('Đã lưu Trang chủ'); setTimeout(() => setSettingsFeedback(''), 3000); }
-  };
-  const handleHeaderSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(headerSettings) { updateHeaderSettings(headerSettings); setSettingsFeedback('Đã lưu Header'); setTimeout(() => setSettingsFeedback(''), 3000); }
-  };
-  const handleAboutSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(aboutContent && aboutSettings) { 
-          updateAboutPageContent(aboutContent); 
-          updateAboutPageSettings(aboutSettings);
-          setSettingsFeedback('Đã lưu Giới thiệu'); 
-          setTimeout(() => setSettingsFeedback(''), 3000); 
-      }
-  };
-
-  // ... (Most handlers copied from AdminPage.tsx, simplified here to save space but functionality preserved in full implementation below)
+  // --- Handlers ---
   
   const handleChangePassword = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -118,13 +77,64 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       if(verifyTotpToken(securityCode)) { if(bankSettings) updateBankSettings(bankSettings); setShowBankSecurityModal(false); setSettingsFeedback('Đã lưu NH'); } else alert('Sai mã');
   };
 
+  const handleAddEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newAdminEmail) {
+        addAdminEmail(newAdminEmail);
+        setNewAdminEmail('');
+        setAdminEmails(getAdminEmails());
+        setSettingsFeedback('Đã thêm Email.');
+    }
+  };
+
+  const handleRemoveEmail = (email: string) => {
+      removeAdminEmail(email);
+      setAdminEmails(getAdminEmails());
+  };
+
+  const handleStartTotpSetup = () => {
+      const secret = generateTotpSecret();
+      setTempTotpSecret(secret);
+      setTempTotpUri(getTotpUri(secret));
+      setShowTotpSetup(true);
+      setVerificationCode('');
+  };
+
+  const handleVerifyAndEnableTotp = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (verifyTempTotpToken(verificationCode.replace(/\s/g, ''), tempTotpSecret)) {
+          enableTotp(tempTotpSecret);
+          setTotpEnabled(true);
+          setShowTotpSetup(false);
+          setSettingsFeedback('Đã bật bảo mật 2 lớp.');
+      } else {
+          alert('Mã không đúng');
+      }
+  };
+
+  const handleDisableTotp = () => {
+      if(confirm('Tắt 2FA?')) {
+          disableTotp();
+          setTotpEnabled(false);
+          setSettingsFeedback('Đã tắt bảo mật 2 lớp.');
+      }
+  };
+
+  const handleSocialSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if(socialSettings) {
+          updateSocialSettings(socialSettings);
+          setSettingsFeedback('Đã lưu Mạng xã hội.');
+      }
+  }
+
   return (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
-          <div className="flex border-b mb-6">
-              <button onClick={() => setSubTab('GENERAL')} className={`px-4 py-2 border-b-2 font-bold ${subTab === 'GENERAL' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Cài đặt Chung</button>
-              <button onClick={() => setSubTab('HOME')} className={`px-4 py-2 border-b-2 font-bold ${subTab === 'HOME' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Trang Chủ</button>
-              <button onClick={() => setSubTab('HEADER')} className={`px-4 py-2 border-b-2 font-bold ${subTab === 'HEADER' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Header & Logo</button>
-              <button onClick={() => setSubTab('ABOUT')} className={`px-4 py-2 border-b-2 font-bold ${subTab === 'ABOUT' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Giới Thiệu</button>
+          <div className="flex border-b mb-6 overflow-x-auto">
+              <button onClick={() => setSubTab('GENERAL')} className={`px-4 py-2 border-b-2 font-bold whitespace-nowrap ${subTab === 'GENERAL' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Cài đặt Chung</button>
+              <button onClick={() => setSubTab('HOME')} className={`px-4 py-2 border-b-2 font-bold whitespace-nowrap ${subTab === 'HOME' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Trang Chủ</button>
+              <button onClick={() => setSubTab('HEADER')} className={`px-4 py-2 border-b-2 font-bold whitespace-nowrap ${subTab === 'HEADER' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Header & Logo</button>
+              <button onClick={() => setSubTab('ABOUT')} className={`px-4 py-2 border-b-2 font-bold whitespace-nowrap ${subTab === 'ABOUT' ? 'border-[#00695C] text-[#00695C]' : 'border-transparent text-gray-500'}`}>Giới Thiệu</button>
           </div>
 
           {subTab === 'GENERAL' && (
@@ -139,8 +149,41 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                               <input type="password" placeholder="Mật khẩu cũ" value={passwordData.old} onChange={e => setPasswordData({...passwordData, old: e.target.value})} className="w-full border p-2 rounded" required />
                               <input type="password" placeholder="Mật khẩu mới" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} className="w-full border p-2 rounded" required />
                               <input type="password" placeholder="Xác nhận" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border p-2 rounded" required />
-                              <button type="submit" className="bg-[#D4AF37] text-white px-4 py-1 rounded">Lưu</button>
+                              <div className="flex gap-2">
+                                  <button type="submit" className="bg-[#D4AF37] text-white px-4 py-1 rounded">Lưu</button>
+                                  <button type="button" onClick={() => setShowPasswordForm(false)} className="text-gray-500 px-4 py-1">Hủy</button>
+                              </div>
                           </form>
+                      )}
+                  </div>
+
+                  {/* 2FA Section */}
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4">Bảo mật 2 lớp (Google Authenticator)</h4>
+                      {totpEnabled ? (
+                          <div className="flex items-center gap-4">
+                              <span className="text-green-600 font-bold flex items-center gap-1"><CheckIcon className="w-4 h-4"/> Đã kích hoạt</span>
+                              <button onClick={handleDisableTotp} className="text-red-500 text-sm underline">Tắt</button>
+                          </div>
+                      ) : (
+                          !showTotpSetup ? (
+                              <button onClick={handleStartTotpSetup} className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold">Thiết lập ngay</button>
+                          ) : (
+                              <div className="bg-gray-50 p-4 rounded border">
+                                  <div className="flex gap-4 mb-4">
+                                      <div className="bg-white p-2 border"><QRCodeSVG value={tempTotpUri} size={120} /></div>
+                                      <div className="text-sm">
+                                          <p>1. Quét mã QR bằng Google Authenticator.</p>
+                                          <p>2. Nhập mã 6 số:</p>
+                                          <form onSubmit={handleVerifyAndEnableTotp} className="flex gap-2 mt-2">
+                                              <input type="text" className="border p-1 w-24 text-center tracking-widest" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} />
+                                              <button className="bg-[#00695C] text-white px-3 py-1 rounded">Bật</button>
+                                          </form>
+                                      </div>
+                                  </div>
+                                  <button onClick={() => setShowTotpSetup(false)} className="text-gray-500 text-sm underline">Hủy</button>
+                              </div>
+                          )
                       )}
                   </div>
 
@@ -148,7 +191,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   <div className="border-t pt-6">
                       <h4 className="font-bold text-gray-700 mb-4">Thanh toán (VietQR)</h4>
                       {bankSettings && (
-                          <form onSubmit={handleBankSettingsSubmit} className="space-y-4">
+                          <form onSubmit={handleBankSettingsSubmit} className="space-y-4 max-w-lg">
                               <select value={bankSettings.bankId} onChange={e => setBankSettings({...bankSettings, bankId: e.target.value})} className="w-full border p-2 rounded">
                                   <option value="">-- Ngân hàng --</option>
                                   {VIET_QR_BANKS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -160,50 +203,67 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                       )}
                   </div>
                   
+                  {/* Admin Emails */}
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4">Email Quản trị (Nhận thông báo)</h4>
+                      <ul className="mb-2 space-y-1">
+                          {adminEmails.map(email => (
+                              <li key={email} className="flex justify-between max-w-sm bg-gray-50 p-2 rounded">
+                                  <span>{email}</span>
+                                  <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-xs">Xóa</button>
+                              </li>
+                          ))}
+                      </ul>
+                      <form onSubmit={handleAddEmail} className="flex gap-2 max-w-sm">
+                          <input type="email" placeholder="Thêm email..." value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="border p-2 rounded flex-1" />
+                          <button type="submit" className="bg-[#00695C] text-white px-3 rounded">Thêm</button>
+                      </form>
+                  </div>
+
                   {/* Social Media */}
                   <div className="border-t pt-6">
                         <h4 className="font-bold text-gray-700 mb-4">Mạng xã hội</h4>
                         {socialSettings && (
-                            <div className="space-y-4">
+                            <form onSubmit={handleSocialSubmit} className="space-y-4 max-w-lg">
                                 <input type="url" placeholder="Facebook URL" value={socialSettings.facebook} onChange={(e) => setSocialSettings({...socialSettings, facebook: e.target.value})} className="w-full border rounded px-3 py-2" />
                                 <input type="url" placeholder="Instagram URL" value={socialSettings.instagram} onChange={(e) => setSocialSettings({...socialSettings, instagram: e.target.value})} className="w-full border rounded px-3 py-2" />
-                                <button onClick={() => { updateSocialSettings(socialSettings); setSettingsFeedback('Đã lưu MXH'); }} className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded">Cập nhật</button>
-                            </div>
+                                <input type="url" placeholder="TikTok URL" value={socialSettings.tiktok} onChange={(e) => setSocialSettings({...socialSettings, tiktok: e.target.value})} className="w-full border rounded px-3 py-2" />
+                                <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded">Cập nhật</button>
+                            </form>
                         )}
+                  </div>
+
+                  {/* Logs */}
+                  <div className="border-t pt-6">
+                        <h4 className="font-bold text-gray-700 mb-4">Nhật ký đăng nhập</h4>
+                        <div className="max-h-40 overflow-y-auto border rounded bg-gray-50 text-xs">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-200">
+                                    <tr><th className="p-2">Thời gian</th><th className="p-2">User</th><th className="p-2">IP</th></tr>
+                                </thead>
+                                <tbody>
+                                    {adminLogs.map(log => (
+                                        <tr key={log.id} className="border-b">
+                                            <td className="p-2">{new Date(log.timestamp).toLocaleString()}</td>
+                                            <td className="p-2">{log.username}</td>
+                                            <td className="p-2">{log.ip_address}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                   </div>
               </div>
           )}
 
-          {subTab === 'HOME' && homeSettings && (
-              <form onSubmit={handleHomePageSubmit} className="space-y-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <input type="text" value={homeSettings.headlineText} onChange={(e) => setHomeSettings({...homeSettings, headlineText: e.target.value})} className="border rounded px-3 py-2" placeholder="Tiêu đề chính" />
-                       <input type="color" value={homeSettings.headlineColor} onChange={(e) => setHomeSettings({...homeSettings, headlineColor: e.target.value})} className="w-full h-10 p-1 border rounded" />
-                   </div>
-                   <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold">Lưu Trang Chủ</button>
-              </form>
-          )}
+          {subTab === 'HOME' && <HomePageSettingsTab />}
 
-          {subTab === 'HEADER' && headerSettings && (
-              <form onSubmit={handleHeaderSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <input type="text" value={headerSettings.brandName} onChange={(e) => setHeaderSettings({...headerSettings, brandName: e.target.value})} className="border rounded px-3 py-2" />
-                       <input type="color" value={headerSettings.brandColor} onChange={(e) => setHeaderSettings({...headerSettings, brandColor: e.target.value})} className="w-full h-10 p-1 border rounded" />
-                  </div>
-                  <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold">Lưu Header</button>
-              </form>
-          )}
+          {subTab === 'HEADER' && <HeaderSettingsTab />}
 
-          {subTab === 'ABOUT' && aboutContent && (
-              <form onSubmit={handleAboutSubmit} className="space-y-6">
-                  <input type="text" value={aboutContent.heroTitle} onChange={(e) => setAboutContent({...aboutContent, heroTitle: e.target.value})} className="w-full border rounded px-3 py-2" placeholder="Tiêu đề Hero" />
-                  <textarea value={aboutContent.welcomeText} onChange={(e) => setAboutContent({...aboutContent, welcomeText: e.target.value})} className="w-full border rounded px-3 py-2" rows={4} placeholder="Nội dung chào mừng" />
-                  <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold">Lưu Giới Thiệu</button>
-              </form>
-          )}
+          {subTab === 'ABOUT' && <AboutPageSettingsTab />}
 
           {settingsFeedback && (
-                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 <div className={`fixed bottom-4 right-4 z-50 p-3 rounded text-center font-medium animate-bounce shadow-lg ${settingsFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
             )}
