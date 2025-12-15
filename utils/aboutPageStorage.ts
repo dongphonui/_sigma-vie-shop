@@ -3,6 +3,7 @@ import type { AboutPageContent } from '../types';
 import { fetchAboutContentFromDB, syncAboutContentToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_about_page';
+export const ABOUT_CONTENT_EVENT = 'sigma_vie_about_content_update';
 
 const DEFAULT_ABOUT_CONTENT: AboutPageContent = {
   heroTitle: 'Câu chuyện của chúng tôi',
@@ -38,7 +39,8 @@ export const getAboutPageContent = (): AboutPageContent => {
             
             if (currentStr !== newStr) {
                 localStorage.setItem(STORAGE_KEY, newStr);
-                // Dispatch event so About Page can re-render if it's listening (optional for now)
+                // Dispatch event so About Page can re-render
+                window.dispatchEvent(new Event(ABOUT_CONTENT_EVENT));
             }
         }
     }).catch(err => console.error("Error checking about content from DB:", err));
@@ -52,6 +54,7 @@ export const getAboutPageContent = (): AboutPageContent => {
 
 export const updateAboutPageContent = async (content: AboutPageContent): Promise<{ success: boolean; message?: string }> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+  window.dispatchEvent(new Event(ABOUT_CONTENT_EVENT));
   
   try {
       const res = await syncAboutContentToDB(content);

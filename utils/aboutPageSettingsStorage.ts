@@ -3,6 +3,7 @@ import type { AboutPageSettings } from '../types';
 import { fetchAboutSettingsFromDB, syncAboutSettingsToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_about_page_settings';
+export const ABOUT_SETTINGS_EVENT = 'sigma_vie_about_settings_update';
 
 const DEFAULT_SETTINGS: AboutPageSettings = {
   headingColor: '#111827', // text-gray-900
@@ -33,6 +34,7 @@ export const getAboutPageSettings = (): AboutPageSettings => {
             
             if (currentStr !== newStr) {
                 localStorage.setItem(STORAGE_KEY, newStr);
+                window.dispatchEvent(new Event(ABOUT_SETTINGS_EVENT));
             }
         }
     }).catch(err => console.error("Error checking about settings from DB:", err));
@@ -46,6 +48,7 @@ export const getAboutPageSettings = (): AboutPageSettings => {
 
 export const updateAboutPageSettings = async (settings: AboutPageSettings): Promise<{ success: boolean; message?: string }> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  window.dispatchEvent(new Event(ABOUT_SETTINGS_EVENT));
   
   try {
       const res = await syncAboutSettingsToDB(settings);
