@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings } from '../types';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, StoreSettings, ShippingSettings, AdminUser } from '../types';
 import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
@@ -15,6 +15,8 @@ import {
 import { getHomePageSettings, updateHomePageSettings } from '../utils/homePageSettingsStorage';
 import { getAboutPageSettings, updateAboutPageSettings } from '../utils/aboutPageSettingsStorage';
 import { getHeaderSettings, updateHeaderSettings } from '../utils/headerSettingsStorage';
+import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsStorage';
+import { getShippingSettings, updateShippingSettings } from '../utils/shippingSettingsStorage';
 import { getTransactions, addTransaction } from '../utils/inventoryStorage';
 import { getDashboardMetrics, type DashboardData } from '../utils/analytics';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../utils/categoryStorage';
@@ -22,7 +24,8 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
+import { sendEmail, fetchAdminLoginLogs, changeAdminPassword, syncShippingSettingsToDB, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser } from '../utils/apiClient';
+import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 import { VIET_QR_BANKS } from '../utils/constants';
 
 
@@ -120,6 +123,7 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
 const AdminPage: React.FC = () => {
   // General State
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
+  const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -191,7 +195,18 @@ const AdminPage: React.FC = () => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(getStoreSettings());
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings>(getShippingSettings());
+  const [passwordData, setPasswordData] = useState({ old: '', new: '', confirm: '' });
   
+  // Sub-Admin State
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUserForm, setAdminUserForm] = useState({ 
+      username: '', password: '', fullname: '', 
+      permissions: [] as string[]
+  });
+  const [isEditingAdmin, setIsEditingAdmin] = useState<string | null>(null);
+
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [tempTotpSecret, setTempTotpSecret] = useState('');
@@ -254,11 +269,25 @@ const AdminPage: React.FC = () => {
     setSocialSettings(getSocialSettings());
     setTotpEnabled(isTotpEnabled());
     setBankSettings(getBankSettings());
+    setStoreSettings(getStoreSettings());
+    setShippingSettings(getShippingSettings());
     
     // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
         if (logs) setAdminLogs(logs);
     });
+
+    // Fetch Sub Admins (Only if Master)
+    const userStr = sessionStorage.getItem('adminUser');
+    if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentAdminUser(user);
+        if (user.role === 'MASTER') {
+            fetchAdminUsers().then(users => {
+                if(users) setAdminUsers(users);
+            });
+        }
+    }
   }, []);
 
   const refreshHomeSettings = useCallback(() => {
@@ -848,6 +877,167 @@ const AdminPage: React.FC = () => {
           setSecurityCode('');
       } else {
           alert('Mã xác thực không đúng! Vui lòng thử lại.');
+      }
+  };
+
+  // Store & Shipping Handlers (NEW)
+  const handleStoreSettingsSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      updateStoreSettings(storeSettings);
+      setSettingsFeedback('Đã cập nhật thông tin cửa hàng.');
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleShippingSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      updateShippingSettings(shippingSettings);
+      syncShippingSettingsToDB(shippingSettings); // Sync to DB
+      setSettingsFeedback('Đã cập nhật cấu hình vận chuyển.');
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (passwordData.new !== passwordData.confirm) {
+          setSettingsFeedback('Mật khẩu xác nhận không khớp.');
+          return;
+      }
+      
+      const user = JSON.parse(sessionStorage.getItem('adminUser') || '{}');
+      if (!user.id) {
+          setSettingsFeedback('Không xác định được người dùng. Vui lòng đăng nhập lại.');
+          return;
+      }
+
+      const res = await changeAdminPassword({
+          id: user.id,
+          oldPassword: passwordData.old,
+          newPassword: passwordData.new
+      });
+
+      if (res && res.success) {
+          setSettingsFeedback('Đổi mật khẩu thành công!');
+          setPasswordData({ old: '', new: '', confirm: '' });
+      } else {
+          setSettingsFeedback(res?.message || 'Đổi mật khẩu thất bại.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  // SUB-ADMIN HANDLERS (New)
+  const handleAddAdminUser = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!adminUserForm.username || !adminUserForm.password || !adminUserForm.fullname) {
+          setSettingsFeedback('Vui lòng điền đủ thông tin.');
+          return;
+      }
+      
+      const res = await createAdminUser({
+          username: adminUserForm.username,
+          password: adminUserForm.password,
+          fullname: adminUserForm.fullname,
+          permissions: adminUserForm.permissions
+      });
+
+      if (res && res.success) {
+          setSettingsFeedback('Đã tạo tài khoản nhân viên thành công.');
+          setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+          // Refresh list
+          fetchAdminUsers().then(users => setAdminUsers(users || []));
+      } else {
+          setSettingsFeedback(`Lỗi: ${res?.message || 'Không thể tạo'}`);
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleUpdateAdminUser = async () => {
+      if (!isEditingAdmin) return;
+      const res = await updateAdminUser(isEditingAdmin, {
+          fullname: adminUserForm.fullname,
+          permissions: adminUserForm.permissions,
+          password: adminUserForm.password || undefined // Only update if provided
+      });
+      
+      if (res && res.success) {
+          setSettingsFeedback('Cập nhật nhân viên thành công.');
+          setIsEditingAdmin(null);
+          setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+          fetchAdminUsers().then(users => setAdminUsers(users || []));
+      } else {
+          setSettingsFeedback('Cập nhật thất bại.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleDeleteAdminUser = async (id: string) => {
+      if (window.confirm("Bạn có chắc chắn muốn xóa tài khoản này không?")) {
+          const res = await deleteAdminUser(id);
+          if (res && res.success) {
+              setSettingsFeedback('Đã xóa tài khoản.');
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback('Xóa thất bại.');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const togglePermission = (perm: string) => {
+      setAdminUserForm(prev => {
+          const exists = prev.permissions.includes(perm);
+          if (exists) {
+              return { ...prev, permissions: prev.permissions.filter(p => p !== perm) };
+          } else {
+              return { ...prev, permissions: [...prev.permissions, perm] };
+          }
+      });
+  };
+
+  const prepareEditAdmin = (user: AdminUser) => {
+      setIsEditingAdmin(user.id);
+      setAdminUserForm({
+          username: user.username,
+          password: '', // Don't show old password
+          fullname: user.fullname,
+          permissions: user.permissions || []
+      });
+  };
+
+  // Backup Handlers
+  const handleBackupDownload = () => {
+      downloadBackup();
+  };
+
+  const handleBackupRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      if (window.confirm("Cảnh báo: Khôi phục dữ liệu sẽ ghi đè lên dữ liệu hiện tại. Bạn có chắc chắn không?")) {
+          const result = await restoreBackup(file);
+          alert(result.message);
+          if (result.success) {
+              window.location.reload();
+          }
+      }
+  };
+
+  const handleFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
+      const msg = scope === 'FULL' 
+        ? "CẢNH BÁO: Bạn sắp xóa TOÀN BỘ dữ liệu (Sản phẩm, Đơn hàng, Khách hàng...). Hành động này không thể hoàn tác. Bạn có chắc chắn không?"
+        : `Bạn có chắc chắn muốn xóa tất cả ${scope === 'ORDERS' ? 'Đơn hàng' : 'Sản phẩm'} không?`;
+        
+      if (window.confirm(msg)) {
+          // Double confirm for FULL
+          if (scope === 'FULL') {
+              const confirm2 = prompt("Nhập 'DELETE' để xác nhận xóa toàn bộ hệ thống:");
+              if (confirm2 !== 'DELETE') return;
+          }
+
+          const result = await performFactoryReset(scope);
+          alert(result.message);
+          if (result.success) {
+              window.location.reload();
+          }
       }
   };
 
@@ -2029,6 +2219,65 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
+              
+              {/* Store Settings */}
+              <div className="border-b pb-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <LayersIcon className="w-5 h-5 text-gray-600" />
+                      Thông tin Cửa hàng
+                  </h4>
+                  <form onSubmit={handleStoreSettingsSubmit} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Tên cửa hàng</label>
+                              <input type="text" value={storeSettings.name} onChange={e => setStoreSettings({...storeSettings, name: e.target.value})} className="w-full border rounded px-3 py-2" />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
+                              <input type="text" value={storeSettings.phoneNumber} onChange={e => setStoreSettings({...storeSettings, phoneNumber: e.target.value})} className="w-full border rounded px-3 py-2" />
+                          </div>
+                          <div className="md:col-span-2">
+                              <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
+                              <input type="text" value={storeSettings.address} onChange={e => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full border rounded px-3 py-2" />
+                          </div>
+                      </div>
+                      <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu Thông tin</button>
+                  </form>
+              </div>
+
+              {/* Shipping Settings */}
+              <div className="border-b pb-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <TruckIcon className="w-5 h-5 text-gray-600" />
+                      Cấu hình Vận chuyển
+                  </h4>
+                  <form onSubmit={handleShippingSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
+                      <div className="flex items-center gap-2 mb-2">
+                          <input 
+                              type="checkbox" 
+                              id="shipEnabled"
+                              checked={shippingSettings.enabled} 
+                              onChange={e => setShippingSettings({...shippingSettings, enabled: e.target.checked})} 
+                              className="w-4 h-4 text-[#D4AF37]"
+                          />
+                          <label htmlFor="shipEnabled" className="font-medium text-gray-700">Bật tính phí vận chuyển</label>
+                      </div>
+                      {shippingSettings.enabled && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Phí cơ bản</label>
+                                  <input type="number" value={shippingSettings.baseFee} onChange={e => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-700">Freeship cho đơn từ</label>
+                                  <input type="number" value={shippingSettings.freeShipThreshold} onChange={e => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                              </div>
+                          </div>
+                      )}
+                      <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu hình Vận chuyển</button>
+                  </form>
+              </div>
+
               {/* Email Management */}
               <div>
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
@@ -2072,6 +2321,153 @@ const AdminPage: React.FC = () => {
                   </button>
               </div>
 
+              {/* ADMIN USER MANAGEMENT (SUB-ADMINS) - ONLY FOR MASTER */}
+              {currentAdminUser?.role === 'MASTER' && (
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <UsersIcon className="w-5 h-5 text-gray-600" />
+                          Quản lý Phân quyền (Sub-Admin)
+                      </h4>
+                      
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                          <h5 className="font-bold text-sm mb-3 uppercase text-gray-600">{isEditingAdmin ? 'Sửa thông tin nhân viên' : 'Thêm nhân viên mới'}</h5>
+                          <form onSubmit={isEditingAdmin ? handleUpdateAdminUser : handleAddAdminUser} className="space-y-3">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <input 
+                                      type="text" 
+                                      placeholder="Tên đăng nhập" 
+                                      value={adminUserForm.username}
+                                      onChange={e => setAdminUserForm({...adminUserForm, username: e.target.value})}
+                                      className="border rounded px-3 py-2"
+                                      disabled={!!isEditingAdmin}
+                                      required
+                                  />
+                                  <input 
+                                      type="text" 
+                                      placeholder="Họ tên nhân viên" 
+                                      value={adminUserForm.fullname}
+                                      onChange={e => setAdminUserForm({...adminUserForm, fullname: e.target.value})}
+                                      className="border rounded px-3 py-2"
+                                      required
+                                  />
+                                  <input 
+                                      type="password" 
+                                      placeholder={isEditingAdmin ? "Mật khẩu mới (để trống nếu ko đổi)" : "Mật khẩu"} 
+                                      value={adminUserForm.password}
+                                      onChange={e => setAdminUserForm({...adminUserForm, password: e.target.value})}
+                                      className="border rounded px-3 py-2"
+                                      required={!isEditingAdmin}
+                                  />
+                              </div>
+                              
+                              <div>
+                                  <p className="text-xs font-bold mb-2">Quyền hạn:</p>
+                                  <div className="flex flex-wrap gap-4">
+                                      {[
+                                          {id: 'products', label: 'Sản phẩm'},
+                                          {id: 'orders', label: 'Đơn hàng'},
+                                          {id: 'inventory', label: 'Kho hàng'},
+                                          {id: 'customers', label: 'Khách hàng'},
+                                          {id: 'settings', label: 'Cài đặt'}
+                                      ].map(perm => (
+                                          <label key={perm.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                                              <input 
+                                                  type="checkbox" 
+                                                  checked={adminUserForm.permissions.includes(perm.id) || adminUserForm.permissions.includes('ALL')}
+                                                  onChange={() => togglePermission(perm.id)}
+                                                  className="w-4 h-4 text-[#D4AF37]"
+                                              />
+                                              {perm.label}
+                                          </label>
+                                      ))}
+                                  </div>
+                              </div>
+
+                              <div className="flex gap-2">
+                                  <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] text-sm">
+                                      {isEditingAdmin ? 'Lưu thay đổi' : 'Tạo tài khoản'}
+                                  </button>
+                                  {isEditingAdmin && (
+                                      <button 
+                                          type="button" 
+                                          onClick={() => { setIsEditingAdmin(null); setAdminUserForm({username:'', password:'', fullname:'', permissions:[]}); }} 
+                                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-400"
+                                      >
+                                          Hủy
+                                      </button>
+                                  )}
+                              </div>
+                          </form>
+                      </div>
+
+                      <div className="overflow-x-auto border rounded-lg">
+                          <table className="min-w-full text-sm text-left">
+                              <thead className="bg-gray-100 text-gray-700 uppercase font-bold text-xs">
+                                  <tr>
+                                      <th className="px-4 py-3">Username</th>
+                                      <th className="px-4 py-3">Họ tên</th>
+                                      <th className="px-4 py-3">Vai trò</th>
+                                      <th className="px-4 py-3">Quyền hạn</th>
+                                      <th className="px-4 py-3 text-right">Thao tác</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                  {/* Master Row (Always Top) */}
+                                  <tr className="bg-yellow-50">
+                                      <td className="px-4 py-3 font-bold">admin (Bạn)</td>
+                                      <td className="px-4 py-3">Master Admin</td>
+                                      <td className="px-4 py-3"><span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold">MASTER</span></td>
+                                      <td className="px-4 py-3 text-xs">Toàn quyền</td>
+                                      <td className="px-4 py-3"></td>
+                                  </tr>
+                                  {/* Sub Admins */}
+                                  {adminUsers.filter(u => u.role !== 'MASTER').map(user => (
+                                      <tr key={user.id} className="hover:bg-gray-50">
+                                          <td className="px-4 py-3 font-medium">{user.username}</td>
+                                          <td className="px-4 py-3">{user.fullname}</td>
+                                          <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">STAFF</span></td>
+                                          <td className="px-4 py-3">
+                                              <div className="flex flex-wrap gap-1">
+                                                  {user.permissions.map(p => (
+                                                      <span key={p} className="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded text-[10px] uppercase">{p}</span>
+                                                  ))}
+                                              </div>
+                                          </td>
+                                          <td className="px-4 py-3 text-right">
+                                              <button onClick={() => prepareEditAdmin(user)} className="text-blue-600 hover:text-blue-800 mr-3 text-xs font-bold">Sửa</button>
+                                              <button onClick={() => handleDeleteAdminUser(user.id)} className="text-red-600 hover:text-red-800 text-xs font-bold">Xóa</button>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              )}
+
+              {/* Change Password */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <UserIcon className="w-5 h-5 text-gray-600" />
+                      Đổi Mật khẩu Admin
+                  </h4>
+                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700">Mật khẩu cũ</label>
+                          <input type="password" value={passwordData.old} onChange={e => setPasswordData({...passwordData, old: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700">Mật khẩu mới</label>
+                          <input type="password" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700">Nhập lại mật khẩu mới</label>
+                          <input type="password" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                      </div>
+                      <button type="submit" className="bg-gray-800 text-white px-4 py-2 rounded font-bold hover:bg-gray-700">Đổi Mật khẩu</button>
+                  </form>
+              </div>
+
               {/* Login Logs Section */}
               <div className="border-t pt-6">
                   <div className="flex justify-between items-center mb-4">
@@ -2098,6 +2494,7 @@ const AdminPage: React.FC = () => {
                           <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">
                               <tr>
                                   <th className="px-3 py-2">Thời gian</th>
+                                  <th className="px-3 py-2">Username</th>
                                   <th className="px-3 py-2">Phương thức</th>
                                   <th className="px-3 py-2">IP</th>
                                   <th className="px-3 py-2">Trạng thái</th>
@@ -2107,6 +2504,7 @@ const AdminPage: React.FC = () => {
                               {adminLogs.map((log) => (
                                   <tr key={log.id} className="hover:bg-white">
                                       <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
+                                      <td className="px-3 py-2 font-bold">{log.username}</td>
                                       <td className="px-3 py-2">
                                           {log.method === 'GOOGLE_AUTH' ? 
                                             <span className="text-purple-600 font-bold flex items-center gap-1"><ShieldCheckIcon className="w-3 h-3"/> 2FA App</span> : 
@@ -2122,7 +2520,7 @@ const AdminPage: React.FC = () => {
                               ))}
                               {adminLogs.length === 0 && (
                                   <tr>
-                                      <td colSpan={4} className="text-center py-4 italic text-gray-400">Chưa có dữ liệu nhật ký.</td>
+                                      <td colSpan={5} className="text-center py-4 italic text-gray-400">Chưa có dữ liệu nhật ký.</td>
                                   </tr>
                               )}
                           </tbody>
@@ -2287,10 +2685,47 @@ const AdminPage: React.FC = () => {
                       </form>
                   )}
               </div>
+
+              {/* Backup & Reset */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 text-red-600 flex items-center gap-2">
+                      <Trash2Icon className="w-5 h-5" />
+                      Khu vực Nguy hiểm & Sao lưu
+                  </h4>
+                  <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-6">
+                      <div>
+                          <h5 className="font-bold text-gray-800 mb-2">Sao lưu & Khôi phục dữ liệu</h5>
+                          <div className="flex gap-4">
+                              <button onClick={handleBackupDownload} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+                                  <PackageIcon className="w-4 h-4" /> Tải file Backup (.json)
+                              </button>
+                              <label className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer flex items-center gap-2">
+                                  <LayersIcon className="w-4 h-4" /> Khôi phục từ File
+                                  <input type="file" className="hidden" accept=".json" onChange={handleBackupRestore} />
+                              </label>
+                          </div>
+                      </div>
+                      
+                      <div className="border-t border-red-200 pt-4">
+                          <h5 className="font-bold text-red-800 mb-2">Reset Dữ liệu (Thao tác này sẽ xóa vĩnh viễn trên Server)</h5>
+                          <div className="flex flex-wrap gap-3">
+                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-200 text-sm">
+                                  Xóa tất cả Đơn hàng & Giao dịch
+                              </button>
+                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-200 text-sm">
+                                  Xóa tất cả Sản phẩm
+                              </button>
+                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-bold text-sm">
+                                  FACTORY RESET (XÓA TOÀN BỘ)
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
           </div>
           
            {settingsFeedback && (
-                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không đúng') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không đúng') || settingsFeedback.includes('thất bại') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
             )}
