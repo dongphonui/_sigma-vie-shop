@@ -5,8 +5,8 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings, AdminUser, StoreSettings, ShippingSettings } from '../types';
-import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct, forceReloadProducts } from '../utils/productStorage';
+import type { Product, AboutPageContent, HomePageSettings, AboutPageSettings, HeaderSettings, InventoryTransaction, Category, Order, SocialSettings, Customer, AdminLoginLog, BankSettings } from '../types';
+import { getProducts, addProduct, deleteProduct, updateProductStock, updateProduct } from '../utils/productStorage';
 import { getAboutPageContent, updateAboutPageContent } from '../utils/aboutPageStorage';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
@@ -22,11 +22,8 @@ import { getOrders, updateOrderStatus } from '../utils/orderStorage';
 import { getSocialSettings, updateSocialSettings } from '../utils/socialSettingsStorage';
 import { getCustomers, updateCustomer, deleteCustomer } from '../utils/customerStorage';
 import { getBankSettings, updateBankSettings } from '../utils/bankSettingsStorage';
-import { getStoreSettings, updateStoreSettings } from '../utils/storeSettingsStorage';
-import { getShippingSettings, updateShippingSettings } from '../utils/shippingSettingsStorage';
-import { sendEmail, fetchAdminLoginLogs, fetchAdminUsers, createAdminUser, updateAdminUser, deleteAdminUser, changeAdminPassword, checkServerConnection } from '../utils/apiClient';
+import { sendEmail, fetchAdminLoginLogs } from '../utils/apiClient';
 import { VIET_QR_BANKS } from '../utils/constants';
-import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 
 
 const ImagePlus: React.FC<{className?: string}> = ({className}) => (
@@ -119,29 +116,10 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
 
-const UserCogIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4.9-.9"/><path d="m15.3 22.8.9-.9"/><path d="m15.3 16.4-.9-.9"/><path d="m21.7 22.8-.9-.9"/><path d="m16 19h6"/><path d="m19 16v6"/></svg>
-);
-
-const KeyIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-);
-
-const StoreIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
-);
-
-const RefreshIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-);
-
 
 const AdminPage: React.FC = () => {
   // General State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings' | 'staff'>('dashboard');
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
-  const [serverStatus, setServerStatus] = useState<boolean>(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'about' | 'home' | 'header' | 'settings'>('dashboard');
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -213,14 +191,7 @@ const AdminPage: React.FC = () => {
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
-  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
-  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   
-  // Password Change State
-  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
-  const [newPasswordInput, setNewPasswordInput] = useState('');
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
-
   // 2FA State
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [tempTotpSecret, setTempTotpSecret] = useState('');
@@ -253,64 +224,9 @@ const AdminPage: React.FC = () => {
   const [inventorySize, setInventorySize] = useState(''); 
   const [inventoryColor, setInventoryColor] = useState(''); 
 
-  // Staff Management State
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
-  const [newStaffUsername, setNewStaffUsername] = useState('');
-  const [newStaffPassword, setNewStaffPassword] = useState('');
-  const [newStaffFullname, setNewStaffFullname] = useState('');
-  const [newStaffPermissions, setNewStaffPermissions] = useState<string[]>([]);
-  const [isAddingStaff, setIsAddingStaff] = useState(false);
-  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
-
   // Dashboard State
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
-  useEffect(() => {
-      const userStr = sessionStorage.getItem('adminUser');
-      if (userStr) {
-          const user = JSON.parse(userStr);
-          setCurrentUser(user);
-          
-          // Initial TOTP State Logic
-          if (user.role === 'STAFF') {
-              // For Staff, trust the DB value sent during login
-              setTotpEnabled(!!user.is_totp_enabled);
-          } else {
-              // For Master, check LocalStorage
-              setTotpEnabled(isTotpEnabled());
-          }
-
-          // Auto select first available tab if dashboard is not allowed
-          if (user.role !== 'MASTER' && user.permissions && !user.permissions.includes('dashboard') && !user.permissions.includes('ALL')) {
-              if (user.permissions.length > 0) setActiveTab(user.permissions[0] as any);
-          }
-      } else {
-          // Fallback to Master Admin if no session data
-          setCurrentUser({
-              id: 'master',
-              username: 'admin',
-              fullname: 'Master Admin',
-              role: 'MASTER',
-              permissions: ['ALL']
-          });
-      }
-      
-      // Check Server Status
-      const checkStatus = async () => {
-          const status = await checkServerConnection();
-          setServerStatus(status);
-      };
-      checkStatus();
-      const interval = setInterval(checkStatus, 30000); // Check every 30s
-      return () => clearInterval(interval);
-  }, []);
-
-  const hasPermission = (perm: string) => {
-      if (!currentUser) return false;
-      if (currentUser.role === 'MASTER') return true;
-      if (currentUser.permissions && currentUser.permissions.includes('ALL')) return true;
-      return currentUser.permissions && currentUser.permissions.includes(perm);
-  };
 
   const refreshProducts = useCallback(() => {
     setProducts(getProducts());
@@ -336,21 +252,14 @@ const AdminPage: React.FC = () => {
   const refreshSettings = useCallback(() => {
     setAdminEmails(getAdminEmails());
     setSocialSettings(getSocialSettings());
-    
-    // Refresh global settings only if Master, otherwise keep local staff state
-    if (currentUser?.role === 'MASTER') {
-        setTotpEnabled(isTotpEnabled());
-    }
-    
+    setTotpEnabled(isTotpEnabled());
     setBankSettings(getBankSettings());
-    setStoreSettings(getStoreSettings());
-    setShippingSettings(getShippingSettings());
     
     // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
         if (logs) setAdminLogs(logs);
     });
-  }, [currentUser]);
+  }, []);
 
   const refreshHomeSettings = useCallback(() => {
     setHomeSettings(getHomePageSettings());
@@ -368,12 +277,6 @@ const AdminPage: React.FC = () => {
     setDashboardData(getDashboardMetrics());
   }, []);
 
-  const refreshStaff = useCallback(() => {
-      fetchAdminUsers().then(users => {
-          if (users) setAdminUsers(users);
-      });
-  }, []);
-
   useEffect(() => {
     refreshProducts();
     refreshCategories();
@@ -385,15 +288,7 @@ const AdminPage: React.FC = () => {
     refreshHeaderSettings();
     refreshInventory();
     refreshDashboard();
-    refreshStaff();
-  }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard, refreshStaff]);
-
-  // Listener for auto-refresh from backend updates
-  useEffect(() => {
-      const handleProductUpdate = () => refreshProducts();
-      window.addEventListener('sigma_vie_products_update', handleProductUpdate);
-      return () => window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
-  }, [refreshProducts]);
+  }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard]);
 
   // Re-calculate dashboard when transactions or products change
   useEffect(() => {
@@ -410,11 +305,9 @@ const AdminPage: React.FC = () => {
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
-    sessionStorage.removeItem('adminUser');
     window.location.hash = '/';
   };
 
-  // ... [Image Upload & Date Format Helper] ...
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -430,70 +323,11 @@ const AdminPage: React.FC = () => {
   };
 
   const toLocalISOString = (date: Date) => {
-      const tzOffset = date.getTimezoneOffset() * 60000;
+      const tzOffset = date.getTimezoneOffset() * 60000; // offset in milliseconds
       const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
       return localISOTime;
   };
 
-  // --- STAFF MANAGEMENT HANDLERS ---
-  const togglePermission = (perm: string) => {
-      setNewStaffPermissions(prev => 
-          prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]
-      );
-  };
-
-  const handleStaffSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newStaffUsername || !newStaffFullname) {
-          alert('Vui lòng điền đủ thông tin.');
-          return;
-      }
-
-      if (editingStaffId) {
-          await updateAdminUser(editingStaffId, {
-              fullname: newStaffFullname,
-              permissions: newStaffPermissions,
-              password: newStaffPassword || undefined 
-          });
-      } else {
-          if (!newStaffPassword) {
-              alert('Vui lòng nhập mật khẩu cho nhân viên mới.');
-              return;
-          }
-          await createAdminUser({
-              username: newStaffUsername,
-              password: newStaffPassword,
-              fullname: newStaffFullname,
-              permissions: newStaffPermissions
-          });
-      }
-      
-      setNewStaffUsername('');
-      setNewStaffPassword('');
-      setNewStaffFullname('');
-      setNewStaffPermissions([]);
-      setEditingStaffId(null);
-      setIsAddingStaff(false);
-      refreshStaff();
-  };
-
-  const handleEditStaff = (user: AdminUser) => {
-      setEditingStaffId(user.id);
-      setNewStaffUsername(user.username);
-      setNewStaffFullname(user.fullname);
-      setNewStaffPermissions(user.permissions || []);
-      setNewStaffPassword(''); 
-      setIsAddingStaff(true);
-  };
-
-  const handleDeleteStaff = async (id: string) => {
-      if (window.confirm("Bạn có chắc chắn muốn xóa nhân viên này?")) {
-          await deleteAdminUser(id);
-          refreshStaff();
-      }
-  };
-
-  // ... [Product Handlers] ...
   const handleEditProduct = (product: Product) => {
       setEditingProduct(product);
       setNewProductName(product.name);
@@ -507,8 +341,8 @@ const AdminPage: React.FC = () => {
       setNewProductImage(product.imageUrl);
       setNewProductIsFlashSale(product.isFlashSale || false);
       setNewProductSalePrice(product.salePrice || '');
-      setNewProductSizes(product.sizes ? product.sizes.join(', ') : ''); 
-      setNewProductColors(product.colors ? product.colors.join(', ') : ''); 
+      setNewProductSizes(product.sizes ? product.sizes.join(', ') : ''); // Load sizes
+      setNewProductColors(product.colors ? product.colors.join(', ') : ''); // Load colors
       
       setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
       setNewProductFlashSaleEndTime(product.flashSaleEndTime ? toLocalISOString(new Date(product.flashSaleEndTime)) : '');
@@ -571,22 +405,29 @@ const AdminPage: React.FC = () => {
     };
 
     if (editingProduct) {
+        // Update existing product
         updateProduct({
             ...editingProduct,
             ...commonData,
-            stock: editingProduct.stock 
+            stock: editingProduct.stock // Preserve stock
         });
         setProductFeedback('Cập nhật sản phẩm thành công!');
     } else {
+        // Add new product
         addProduct({
             ...commonData,
-            stock: 0 
+            stock: 0 // Initial stock is 0
         });
         setProductFeedback('Thêm sản phẩm thành công!');
     }
     
     refreshProducts();
+
+    // Reset form
     handleCancelProductEdit();
+    const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+    if(fileInput) fileInput.value = '';
+    
     setTimeout(() => setProductFeedback(''), 3000);
   };
   
@@ -602,27 +443,21 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const handleForceRefreshProducts = async () => {
-      setIsRefreshing(true);
-      try {
-          await forceReloadProducts();
-          refreshProducts();
-      } finally {
-          setTimeout(() => setIsRefreshing(false), 500);
-      }
-  };
-
-  // ... [Other Handlers: Category, Order, Customer, Inventory] ...
+  // Category Handlers
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName) {
         if (editingCategory) {
+            // Update existing
             updateCategory({ id: editingCategory.id, name: newCategoryName, description: newCategoryDesc });
             setProductFeedback('Đã cập nhật danh mục.');
         } else {
+            // Add new
             addCategory({ name: newCategoryName, description: newCategoryDesc });
             setProductFeedback('Thêm danh mục thành công.');
         }
+        
+        // Reset form
         setNewCategoryName('');
         setNewCategoryDesc('');
         setEditingCategory(null);
@@ -653,23 +488,27 @@ const AdminPage: React.FC = () => {
       }
   };
 
+  // Order Handlers
   const handleOrderStatusChange = (orderId: string, newStatus: Order['status']) => {
       updateOrderStatus(orderId, newStatus);
       refreshOrders();
-      refreshProducts();
-      refreshInventory();
+      refreshProducts(); // Refresh products immediately to reflect stock changes
+      refreshInventory(); // Refresh inventory history
   };
 
+  // Printer Handler (NEW)
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
 
-      const storeName = storeSettings?.name || 'Sigma Vie Store'; 
-      const storePhone = storeSettings?.phoneNumber || '0912.345.678';
-      const storeAddress = storeSettings?.address || 'Hà Nội, Việt Nam';
+      const storeName = 'Sigma Vie Store'; 
+      const storePhone = '0912.345.678';
+      const storeAddress = 'Hà Nội, Việt Nam';
 
       const productUrl = `${window.location.origin}/?product=${order.productId}`;
+      
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
+
       const shippingFee = order.shippingFee || 0;
       const subtotal = order.totalPrice - shippingFee;
 
@@ -692,6 +531,7 @@ const AdminPage: React.FC = () => {
                 .total-section { text-align: right; margin-top: 20px; font-size: 16px; font-weight: bold; }
                 .footer { text-align: center; margin-top: 40px; font-size: 12px; font-style: italic; }
                 .qr-section { text-align: center; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px; }
+                
                 @media print {
                     @page { margin: 0.5cm; }
                     body { margin: 0; }
@@ -705,6 +545,7 @@ const AdminPage: React.FC = () => {
                 <p>Phiếu Giao Hàng / Hóa Đơn</p>
                 <p>Mã đơn: <strong>${order.id}</strong> | Ngày: ${new Date(order.timestamp).toLocaleDateString('vi-VN')}</p>
             </div>
+
             <div class="info-section">
                 <div class="box">
                     <h3>NGƯỜI GỬI</h3>
@@ -719,6 +560,7 @@ const AdminPage: React.FC = () => {
                     <p>Đ/C: ${order.customerAddress}</p>
                 </div>
             </div>
+
             <table class="order-details">
                 <thead>
                     <tr>
@@ -732,24 +574,33 @@ const AdminPage: React.FC = () => {
                 <tbody>
                     <tr>
                         <td>${order.productName}</td>
-                        <td>${order.productSize ? `Size: ${order.productSize}` : ''} ${order.productColor ? ` | Màu: ${order.productColor}` : ''}</td>
+                        <td>
+                            ${order.productSize ? `Size: ${order.productSize}` : ''} 
+                            ${order.productColor ? ` | Màu: ${order.productColor}` : ''}
+                            ${!order.productSize && !order.productColor ? '-' : ''}
+                        </td>
                         <td>${order.quantity}</td>
                         <td>${new Intl.NumberFormat('vi-VN').format(subtotal / order.quantity)}đ</td>
                         <td>${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</td>
                     </tr>
                 </tbody>
             </table>
+
             <div class="total-section">
                 <p>Tạm tính: ${new Intl.NumberFormat('vi-VN').format(subtotal)}đ</p>
                 <p>Phí vận chuyển: ${shippingFee === 0 ? '0đ (Miễn phí)' : new Intl.NumberFormat('vi-VN').format(shippingFee) + 'đ'}</p>
                 <p>Tổng thu (COD): ${order.paymentMethod === 'COD' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalPrice) : '0₫ (Đã chuyển khoản)'}</p>
+                ${order.paymentMethod === 'BANK_TRANSFER' ? '<p style="font-size: 12px; font-weight: normal;">(Khách đã thanh toán qua Ngân hàng)</p>' : ''}
             </div>
+
             <div class="qr-section">
                 <p>Quét mã để mua thêm sản phẩm này:</p>
                 <img src="${qrImageUrl}" alt="QR Code Sản phẩm" width="100" height="100" />
             </div>
+
             <div class="footer">
                 <p>Cảm ơn quý khách đã mua hàng tại ${storeName}!</p>
+                <p>Vui lòng quay video khi mở hàng để được hỗ trợ tốt nhất.</p>
             </div>
         </body>
         </html>
@@ -761,6 +612,7 @@ const AdminPage: React.FC = () => {
       }, 500);
   };
 
+  // Customer Handlers
   const handleEditCustomer = (customer: Customer) => {
       setEditingCustomer(customer);
       setEditCustName(customer.fullName);
@@ -814,6 +666,7 @@ const AdminPage: React.FC = () => {
         return;
     }
     
+    // Check if product requires size/color
     if (product.sizes && product.sizes.length > 0 && !inventorySize) {
         setInventoryFeedback('Vui lòng chọn Size cho sản phẩm này.');
         return;
@@ -824,6 +677,8 @@ const AdminPage: React.FC = () => {
     }
 
     const change = inventoryType === 'IMPORT' ? qty : -qty;
+    
+    // Check for stock availability on export (Variant Aware)
     let currentStock = product.stock;
     if (inventorySize || inventoryColor) {
         const variant = product.variants?.find(v => 
@@ -838,9 +693,11 @@ const AdminPage: React.FC = () => {
          return;
     }
 
+    // Update with size/color
     const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
+        // Construct Note
         let noteDetails = inventoryNote;
         if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
         if(inventoryColor) noteDetails += ` [Màu: ${inventoryColor}]`;
@@ -920,101 +777,44 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 3000);
   }
 
-  // TOTP Handlers (Updated for Role Awareness)
+  // TOTP Handlers
   const handleStartTotpSetup = () => {
       const secret = generateTotpSecret();
       setTempTotpSecret(secret);
-      
-      // Use Custom Label for Staff so they don't see Admin Email in their App
-      const label = currentUser?.role === 'STAFF' 
-          ? `Sigma Staff (${currentUser.username})` 
-          : getPrimaryAdminEmail();
-          
-      setTempTotpUri(getTotpUri(secret, label));
+      setTempTotpUri(getTotpUri(secret));
       setShowTotpSetup(true);
       setVerificationCode('');
   };
 
-  const handleVerifyAndEnableTotp = async (e: React.FormEvent) => {
+  const handleVerifyAndEnableTotp = (e: React.FormEvent) => {
       e.preventDefault();
       const cleanCode = verificationCode.replace(/\s/g, '');
-      
+      console.log('Verifying TOTP code (cleaned):', cleanCode);
+
       if (verifyTempTotpToken(cleanCode, tempTotpSecret)) {
-          if (currentUser?.role === 'STAFF') {
-              // Save to Database for Staff
-              await updateAdminUser(currentUser.id, {
-                  totp_secret: tempTotpSecret,
-                  is_totp_enabled: true
-              });
-              
-              // Update local currentUser state to reflect changes immediately
-              const updatedUser = { ...currentUser, is_totp_enabled: true, totp_secret: tempTotpSecret };
-              setCurrentUser(updatedUser);
-              sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
-              
-              setTotpEnabled(true);
-              setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công cho tài khoản nhân viên!');
-          } else {
-              // Master Admin (LocalStorage)
-              enableTotp(tempTotpSecret);
-              refreshSettings();
-              setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công (Master)!');
-          }
+          enableTotp(tempTotpSecret);
+          refreshSettings();
           setShowTotpSetup(false);
+          setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công! Từ giờ bạn hãy dùng app Google Authenticator để lấy mã.');
       } else {
-          setSettingsFeedback('❌ Mã xác nhận không đúng.');
+          setSettingsFeedback('❌ Mã xác nhận không đúng. Vui lòng kiểm tra lại đồng hồ điện thoại hoặc quét lại mã QR.');
       }
       setTimeout(() => setSettingsFeedback(''), 6000);
   };
 
-  const handleDisableTotp = async () => {
-      if (window.confirm('Bạn có chắc chắn muốn tắt bảo mật 2 lớp không?')) {
-          if (currentUser?.role === 'STAFF') {
-              await updateAdminUser(currentUser.id, {
-                  totp_secret: '', // Clear secret
-                  is_totp_enabled: false
-              });
-              
-              // Update local state
-              const updatedUser = { ...currentUser, is_totp_enabled: false, totp_secret: undefined };
-              setCurrentUser(updatedUser);
-              sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
-              
-              setTotpEnabled(false);
-          } else {
-              disableTotp();
-              refreshSettings();
-          }
+  const handleDisableTotp = () => {
+      if (window.confirm('Bạn có chắc chắn muốn tắt bảo mật 2 lớp không? Tài khoản của bạn sẽ kém an toàn hơn.')) {
+          disableTotp();
+          refreshSettings();
           setSettingsFeedback('Đã tắt bảo mật 2 lớp.');
           setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
+  // Bank Settings Handler (NEW with Security)
   const handleBankSettingsChange = (field: keyof BankSettings, value: string) => {
       if (bankSettings) {
           setBankSettings({ ...bankSettings, [field]: value });
-      }
-  };
-
-  const handleStoreSettingsChange = (field: keyof StoreSettings, value: string) => {
-      if (storeSettings) {
-          setStoreSettings({ ...storeSettings, [field]: value });
-      }
-  };
-
-  // --- Shipping Settings Handlers (NEW) ---
-  const handleShippingSettingsChange = (field: keyof ShippingSettings, value: any) => {
-      if (shippingSettings) {
-          setShippingSettings({ ...shippingSettings, [field]: value });
-      }
-  };
-
-  const handleShippingSettingsSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (shippingSettings) {
-          updateShippingSettings(shippingSettings);
-          setSettingsFeedback('Đã cập nhật phí vận chuyển!');
-          setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
@@ -1028,43 +828,21 @@ const AdminPage: React.FC = () => {
 
   const handleBankSettingsSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Determine if 2FA is active for the current user
-      const isMaster2FA = currentUser?.role === 'MASTER' && isTotpEnabled();
-      const isStaff2FA = currentUser?.role === 'STAFF' && totpEnabled; // totpEnabled state is synced for staff
-
-      if (isMaster2FA || isStaff2FA) {
-          // If 2FA is enabled, require verification code
+      if (isTotpEnabled()) {
+          // If 2FA enabled, show modal
           setShowBankSecurityModal(true);
           setSecurityCode('');
       } else {
-          // STRICT POLICY: Block access if 2FA is disabled
-          alert('⚠️ BẢO MẬT: Bạn bắt buộc phải kích hoạt xác thực 2 lớp (Google Authenticator) trước khi thay đổi cấu hình thanh toán/ngân hàng.');
-      }
-  };
-
-  const handleStoreSettingsSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (storeSettings) {
-          updateStoreSettings(storeSettings);
-          setSettingsFeedback('Đã cập nhật thông tin cửa hàng thành công!');
-          setTimeout(() => setSettingsFeedback(''), 3000);
+          // If not enabled, warn but allow (or force enable - here we allow with warning)
+          if(confirm('Cảnh báo: Bạn chưa bật bảo mật 2 lớp. Hành động này kém an toàn. Bạn có muốn tiếp tục lưu không?')) {
+              executeBankUpdate();
+          }
       }
   };
 
   const handleVerifyBankUpdate = (e: React.FormEvent) => {
       e.preventDefault();
-      let isValid = false;
-      
-      if (currentUser?.role === 'STAFF') {
-          // Verify against staff's secret from context
-          if (currentUser.totp_secret) {
-              isValid = verifyTempTotpToken(securityCode, currentUser.totp_secret);
-          }
-      } else {
-          isValid = verifyTotpToken(securityCode);
-      }
-
-      if (isValid) {
+      if (verifyTotpToken(securityCode)) {
           executeBankUpdate();
           setShowBankSecurityModal(false);
           setSecurityCode('');
@@ -1073,41 +851,7 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // Change Password Handler
-  const handleChangePassword = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!currentUser) return;
-
-      if (newPasswordInput !== confirmPasswordInput) {
-          setSettingsFeedback('Mật khẩu mới không khớp.');
-          setTimeout(() => setSettingsFeedback(''), 3000);
-          return;
-      }
-
-      if (newPasswordInput.length < 6) {
-          setSettingsFeedback('Mật khẩu mới phải có ít nhất 6 ký tự.');
-          setTimeout(() => setSettingsFeedback(''), 3000);
-          return;
-      }
-
-      const response = await changeAdminPassword({
-          id: currentUser.id,
-          oldPassword: currentPasswordInput,
-          newPassword: newPasswordInput
-      });
-
-      if (response && response.success) {
-          setSettingsFeedback('Đổi mật khẩu thành công!');
-          setCurrentPasswordInput('');
-          setNewPasswordInput('');
-          setConfirmPasswordInput('');
-      } else {
-          setSettingsFeedback(response?.message || 'Đổi mật khẩu thất bại.');
-      }
-      setTimeout(() => setSettingsFeedback(''), 5000);
-  };
-
-  // ... [Social, Home, Header Handlers kept same] ...
+  // Social Settings Handler
   const handleSocialSettingsChange = (field: keyof SocialSettings, value: string) => {
       if (socialSettings) {
           setSocialSettings({ ...socialSettings, [field]: value });
@@ -1129,28 +873,18 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  const handlePromoImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && homeSettings) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        // Add to array
-        const newUrls = [...homeSettings.promoImageUrls, reader.result as string];
-        handleHomePageSettingsChange('promoImageUrls', newUrls);
-      };
-      reader.onerror = () => {
-          setHomeFeedback('Lỗi: Không thể đọc file.');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleHomePageSubmit = (e: React.FormEvent) => {
+  const handleHomePageSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (homeSettings) {
-          updateHomePageSettings(homeSettings);
-          setHomeFeedback('Cập nhật Trang chủ thành công!');
-          setTimeout(() => setHomeFeedback(''), 3000);
+          setHomeFeedback('Đang lưu...');
+          const result = await updateHomePageSettings(homeSettings);
+          
+          if (result && result.success) {
+              setHomeFeedback('✅ Cập nhật Trang chủ thành công trên Server!');
+          } else {
+              setHomeFeedback(`⚠️ Đã lưu trên máy này nhưng LỖI SERVER: ${result?.message || 'Không xác định'}. (Máy khác sẽ không thấy thay đổi)`);
+          }
+          setTimeout(() => setHomeFeedback(''), 5000);
       }
   };
 
@@ -1183,24 +917,29 @@ const AdminPage: React.FC = () => {
       }
   };
   
+  const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
+    e.preventDefault();
+    window.location.hash = path;
+  };
+
   const handleTestEmail = async () => {
       const email = getPrimaryAdminEmail();
-      const result = await sendEmail(email, 'Kiểm tra', 'Hello');
-      if(result && result.success) setSettingsFeedback('Email sent.');
-      else setSettingsFeedback('Email failed.');
+      const result = await sendEmail(
+          email, 
+          'Kiểm tra cấu hình Email Sigma Vie', 
+          '<h1>Xin chào!</h1><p>Nếu bạn nhận được email này, hệ thống gửi mail đang hoạt động tốt.</p>'
+      );
+      
+      if(result && result.success) {
+          setSettingsFeedback('Thành công: Email kiểm tra đã được gửi.');
+      } else {
+          setSettingsFeedback('Lỗi: Không thể gửi email. Vui lòng kiểm tra Log trên Render.');
+      }
       setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
-  const handleFactoryReset = async (type: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
-      if (window.confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa dữ liệu không?")) {
-          setSettingsFeedback('Đang tiến hành xóa...');
-          const result = await performFactoryReset(type);
-          setSettingsFeedback(result.message);
-          if (result.success) setTimeout(() => window.location.reload(), 2000);
-      }
-  };
+  // --- RENDER FUNCTIONS IMPLEMENTATION ---
 
-  // ... [Render Functions] ...
   const renderDashboard = () => (
       <div className="space-y-6 animate-fade-in-up">
           {/* Summary Cards */}
@@ -1290,15 +1029,7 @@ const AdminPage: React.FC = () => {
   const renderProductManager = () => (
     <div className="space-y-6 animate-fade-in-up">
         {/* Toggle Category Manager */}
-        <div className="flex justify-end gap-2">
-             <button 
-                onClick={handleForceRefreshProducts}
-                disabled={isRefreshing}
-                className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50 flex items-center gap-2 disabled:opacity-50"
-            >
-                <div className={`w-4 h-4 rounded-full border-2 border-[#00695C] border-t-transparent ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Đang đồng bộ...' : 'Đồng bộ dữ liệu'}
-            </button>
+        <div className="flex justify-end">
              <button 
                 onClick={() => setIsManagingCategories(!isManagingCategories)}
                 className="text-[#00695C] border border-[#00695C] px-4 py-2 rounded hover:bg-teal-50"
@@ -2135,54 +1866,38 @@ const AdminPage: React.FC = () => {
                        <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
                        <div className="space-y-3">
                            <div>
-                               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Hình ảnh Banner (URL hoặc Tải lên)</label>
+                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
                                {homeSettings.promoImageUrls.map((url, idx) => (
-                                   <div key={idx} className="flex gap-2 mb-2 items-center">
-                                       <div className="flex-1 flex items-center gap-2">
-                                            {url && (
-                                                <img src={url} alt="Mini preview" className="w-8 h-8 object-cover rounded border bg-white" />
-                                            )}
-                                            <input 
-                                                type="text" 
-                                                value={url} 
-                                                onChange={(e) => {
-                                                    const newUrls = [...homeSettings.promoImageUrls];
-                                                    newUrls[idx] = e.target.value;
-                                                    handleHomePageSettingsChange('promoImageUrls', newUrls);
-                                                }}
-                                                className="border rounded px-3 py-2 flex-1 text-sm truncate" 
-                                                placeholder="https://... hoặc Data URL"
-                                            />
-                                       </div>
+                                   <div key={idx} className="flex gap-2 mb-2">
+                                       <input 
+                                            type="text" 
+                                            value={url} 
+                                            onChange={(e) => {
+                                                const newUrls = [...homeSettings.promoImageUrls];
+                                                newUrls[idx] = e.target.value;
+                                                handleHomePageSettingsChange('promoImageUrls', newUrls);
+                                            }}
+                                            className="border rounded px-3 py-2 flex-1 text-sm" 
+                                        />
                                         <button 
                                             type="button" 
                                             onClick={() => {
                                                 const newUrls = homeSettings.promoImageUrls.filter((_, i) => i !== idx);
                                                 handleHomePageSettingsChange('promoImageUrls', newUrls);
                                             }}
-                                            className="text-red-500 text-xs hover:bg-red-50 p-2 rounded"
-                                            title="Xóa ảnh"
+                                            className="text-red-500 text-xs hover:underline"
                                         >
-                                            <Trash2Icon className="w-4 h-4" />
+                                            Xóa
                                         </button>
                                    </div>
                                ))}
-                               
-                               <div className="flex gap-3 mt-3">
-                                   <button 
-                                        type="button" 
-                                        onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
-                                        className="text-blue-600 text-sm hover:underline flex items-center gap-1"
-                                    >
-                                        + Thêm URL
-                                    </button>
-                                    <span className="text-gray-300">|</span>
-                                    <label className="cursor-pointer text-blue-600 text-sm hover:underline flex items-center gap-1">
-                                        <ImagePlus className="w-4 h-4" />
-                                        <span>Tải ảnh từ máy</span>
-                                        <input type="file" className="hidden" accept="image/*" onChange={handlePromoImageUpload} />
-                                    </label>
-                               </div>
+                               <button 
+                                    type="button" 
+                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
+                                    className="text-blue-600 text-sm hover:underline"
+                                >
+                                    + Thêm ảnh
+                                </button>
                            </div>
                            <div className="grid grid-cols-2 gap-4">
                                <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
@@ -2275,259 +1990,192 @@ const AdminPage: React.FC = () => {
       </div>
   );
 
-  const renderStaffManager = () => (
-      <div className="space-y-6 animate-fade-in-up">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold text-gray-800 mb-6">{editingStaffId ? 'Chỉnh sửa Nhân viên' : 'Thêm Nhân viên Mới'}</h3>
-              <form onSubmit={handleStaffSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập *</label>
-                          <input 
-                              type="text" 
-                              value={newStaffUsername} 
-                              onChange={(e) => setNewStaffUsername(e.target.value)} 
-                              className="w-full border rounded px-3 py-2" 
-                              required 
-                              disabled={!!editingStaffId} 
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên *</label>
-                          <input 
-                              type="text" 
-                              value={newStaffFullname} 
-                              onChange={(e) => setNewStaffFullname(e.target.value)} 
-                              className="w-full border rounded px-3 py-2" 
-                              required 
-                          />
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu {editingStaffId && '(Để trống nếu không đổi)'}</label>
-                          <input 
-                              type="password" 
-                              value={newStaffPassword} 
-                              onChange={(e) => setNewStaffPassword(e.target.value)} 
-                              className="w-full border rounded px-3 py-2" 
-                              required={!editingStaffId}
-                          />
-                      </div>
-                  </div>
-                  
-                  <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Quyền hạn truy cập</label>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-4 rounded border">
-                          {['products', 'orders', 'inventory', 'customers', 'about', 'home', 'header', 'settings', 'staff', 'dashboard'].map(perm => (
-                              <label key={perm} className="flex items-center gap-2 cursor-pointer">
-                                  <input 
-                                      type="checkbox" 
-                                      checked={newStaffPermissions.includes(perm) || newStaffPermissions.includes('ALL')}
-                                      onChange={() => togglePermission(perm)}
-                                      disabled={newStaffPermissions.includes('ALL')}
-                                      className="w-4 h-4 rounded text-[#00695C] focus:ring-[#00695C]"
-                                  />
-                                  <span className="capitalize">{perm}</span>
-                              </label>
-                          ))}
-                          <label className="flex items-center gap-2 cursor-pointer font-bold text-[#00695C]">
-                              <input 
-                                  type="checkbox" 
-                                  checked={newStaffPermissions.includes('ALL')}
-                                  onChange={() => togglePermission('ALL')}
-                                  className="w-4 h-4 rounded text-[#00695C] focus:ring-[#00695C]"
-                              />
-                              <span>TOÀN QUYỀN (ALL)</span>
-                          </label>
-                      </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-4">
-                      {editingStaffId && (
-                          <button 
-                              type="button" 
-                              onClick={() => {
-                                  setEditingStaffId(null);
-                                  setNewStaffUsername('');
-                                  setNewStaffPassword('');
-                                  setNewStaffFullname('');
-                                  setNewStaffPermissions([]);
-                                  setIsAddingStaff(false);
-                              }}
-                              className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-100"
-                          >
-                              Hủy
-                          </button>
-                      )}
-                      <button type="submit" className="bg-[#D4AF37] text-white px-6 py-2 rounded font-bold hover:bg-[#b89b31]">
-                          {editingStaffId ? 'Cập nhật' : 'Thêm nhân viên'}
-                      </button>
-                  </div>
-              </form>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                  <h3 className="font-bold text-gray-700">Danh sách Nhân viên</h3>
-                  <button onClick={refreshStaff} className="text-blue-600 text-sm hover:underline">Làm mới</button>
-              </div>
-              <table className="min-w-full text-sm text-left text-gray-600">
-                  <thead className="bg-gray-100 text-gray-700 font-medium">
-                      <tr>
-                          <th className="px-4 py-3">Tên đăng nhập</th>
-                          <th className="px-4 py-3">Họ tên</th>
-                          <th className="px-4 py-3">Vai trò</th>
-                          <th className="px-4 py-3">Bảo mật</th>
-                          <th className="px-4 py-3">Quyền hạn</th>
-                          <th className="px-4 py-3 text-right">Thao tác</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                      {adminUsers.filter(u => u.role !== 'MASTER').map(user => (
-                          <tr key={user.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-bold">{user.username}</td>
-                              <td className="px-4 py-3">{user.fullname}</td>
-                              <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">STAFF</span></td>
-                              <td className="px-4 py-3">
-                                  {user.is_totp_enabled ? 
-                                      <span className="text-green-600 font-bold text-xs flex items-center gap-1"><ShieldCheckIcon className="w-3 h-3"/> 2FA ON</span> : 
-                                      <span className="text-gray-400 text-xs">2FA OFF</span>
-                                  }
-                              </td>
-                              <td className="px-4 py-3">
-                                  <div className="flex flex-wrap gap-1">
-                                      {user.permissions?.includes('ALL') ? 
-                                          <span className="bg-[#00695C] text-white px-2 py-0.5 rounded text-xs">ALL</span> : 
-                                          user.permissions?.slice(0, 3).map(p => (
-                                              <span key={p} className="bg-gray-200 px-2 py-0.5 rounded text-xs">{p}</span>
-                                          ))
-                                      }
-                                      {user.permissions && user.permissions.length > 3 && !user.permissions.includes('ALL') && (
-                                          <span className="text-xs text-gray-500">+{user.permissions.length - 3}</span>
-                                      )}
-                                  </div>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                  <button onClick={() => handleEditStaff(user)} className="text-blue-600 hover:text-blue-800 mr-3" title="Sửa"><EditIcon className="w-4 h-4"/></button>
-                                  <button onClick={() => handleDeleteStaff(user.id)} className="text-red-600 hover:text-red-800" title="Xóa"><Trash2Icon className="w-4 h-4"/></button>
-                              </td>
-                          </tr>
-                      ))}
-                      {adminUsers.filter(u => u.role !== 'MASTER').length === 0 && (
-                          <tr>
-                              <td colSpan={6} className="text-center py-8 text-gray-400 italic">Chưa có nhân viên phụ.</td>
-                          </tr>
-                      )}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-  );
-
   const renderSettings = () => (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              {/* Change Password Section - MOVED TO TOP */}
-              <div className="border-b pb-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <KeyIcon className="w-5 h-5 text-gray-600" />
-                      Đổi mật khẩu
-                  </h4>
-                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-md bg-gray-50 p-4 rounded-lg border">
-                      <div>
-                          <input 
-                              type="password" 
-                              placeholder="Mật khẩu hiện tại" 
-                              value={currentPasswordInput}
-                              onChange={(e) => setCurrentPasswordInput(e.target.value)}
-                              className="w-full border rounded px-3 py-2"
-                              required
-                          />
-                      </div>
-                      <div>
-                          <input 
-                              type="password" 
-                              placeholder="Mật khẩu mới" 
-                              value={newPasswordInput}
-                              onChange={(e) => setNewPasswordInput(e.target.value)}
-                              className="w-full border rounded px-3 py-2"
-                              required
-                          />
-                      </div>
-                      <div>
-                          <input 
-                              type="password" 
-                              placeholder="Nhập lại mật khẩu mới" 
-                              value={confirmPasswordInput}
-                              onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                              className="w-full border rounded px-3 py-2"
-                              required
-                          />
-                      </div>
-                      <button type="submit" className="bg-gray-800 text-white px-4 py-2 rounded font-bold hover:bg-gray-700 transition-colors w-full">
-                          Cập nhật mật khẩu
-                      </button>
+              {/* Email Management */}
+              <div>
+                  <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
+                  <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP.</p>
+                  
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                      <p className="text-sm text-blue-700 font-bold">
+                          ℹ️ Hệ thống Email đang hoạt động.
+                      </p>
+                      <p className="text-xs text-blue-600">
+                          Nếu gửi lỗi, mã OTP sẽ tự động hiển thị trên màn hình (Chế độ Fallback).
+                      </p>
+                  </div>
+
+                  <ul className="mb-4 space-y-2">
+                      {adminEmails.map((email, idx) => (
+                          <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
+                              <span className="text-gray-700">{email}</span>
+                              <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-sm hover:underline">Xóa</button>
+                          </li>
+                      ))}
+                  </ul>
+
+                  <form onSubmit={handleAddEmail} className="flex gap-2 mb-4">
+                      <input 
+                          type="email" 
+                          value={newAdminEmail}
+                          onChange={(e) => setNewAdminEmail(e.target.value)}
+                          placeholder="Thêm email mới..."
+                          className="flex-1 border rounded px-3 py-2 focus:ring-[#D4AF37]"
+                          required
+                      />
+                      <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
                   </form>
+                  
+                  <button 
+                      onClick={handleTestEmail}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                  >
+                      📧 Gửi Email kiểm tra
+                  </button>
               </div>
 
-              {/* Store Settings Section - NEW */}
+              {/* Login Logs Section */}
+              <div className="border-t pt-6">
+                  <div className="flex justify-between items-center mb-4">
+                      <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                          <ActivityIcon className="w-5 h-5 text-gray-600" />
+                          Nhật ký đăng nhập
+                      </h4>
+                      <button 
+                          onClick={() => {
+                              fetchAdminLoginLogs().then(logs => {
+                                  if (logs) setAdminLogs(logs);
+                                  setSettingsFeedback('Đã làm mới nhật ký.');
+                                  setTimeout(() => setSettingsFeedback(''), 3000);
+                              });
+                          }}
+                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                          Làm mới
+                      </button>
+                  </div>
+                  <div className="bg-gray-50 border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+                      <table className="min-w-full text-xs text-left text-gray-600">
+                          <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">
+                              <tr>
+                                  <th className="px-3 py-2">Thời gian</th>
+                                  <th className="px-3 py-2">Phương thức</th>
+                                  <th className="px-3 py-2">IP</th>
+                                  <th className="px-3 py-2">Trạng thái</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                              {adminLogs.map((log) => (
+                                  <tr key={log.id} className="hover:bg-white">
+                                      <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
+                                      <td className="px-3 py-2">
+                                          {log.method === 'GOOGLE_AUTH' ? 
+                                            <span className="text-purple-600 font-bold flex items-center gap-1"><ShieldCheckIcon className="w-3 h-3"/> 2FA App</span> : 
+                                            <span className="text-blue-600 flex items-center gap-1">📧 Email OTP</span>}
+                                      </td>
+                                      <td className="px-3 py-2 font-mono">{log.ip_address || 'Unknown'}</td>
+                                      <td className="px-3 py-2">
+                                          {log.status === 'SUCCESS' ? 
+                                            <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">Thành công</span> : 
+                                            <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">Thất bại</span>}
+                                      </td>
+                                  </tr>
+                              ))}
+                              {adminLogs.length === 0 && (
+                                  <tr>
+                                      <td colSpan={4} className="text-center py-4 italic text-gray-400">Chưa có dữ liệu nhật ký.</td>
+                                  </tr>
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+
+              {/* 2FA Setup Section */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <StoreIcon className="w-5 h-5 text-gray-600" />
-                      Thông tin Cửa hàng
+                      <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
+                      Bảo mật 2 lớp (Google Authenticator)
                   </h4>
-                  {storeSettings && (
-                      <form onSubmit={handleStoreSettingsSubmit} className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Tên Cửa Hàng</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.name} 
-                                      onChange={(e) => handleStoreSettingsChange('name', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2" 
-                                      required
-                                  />
+                  
+                  {totpEnabled ? (
+                      <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                          <div className="flex items-center gap-3 mb-2">
+                              <div className="bg-green-500 text-white rounded-full p-1">
+                                  <CheckIcon className="w-4 h-4" />
                               </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.phoneNumber} 
-                                      onChange={(e) => handleStoreSettingsChange('phoneNumber', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2" 
-                                      required
-                                  />
-                              </div>
-                              <div className="md:col-span-2">
-                                  <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                                  <input 
-                                      type="text" 
-                                      value={storeSettings.address} 
-                                      onChange={(e) => handleStoreSettingsChange('address', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2" 
-                                      required
-                                  />
-                              </div>
-                              <div className="md:col-span-2">
-                                  <label className="block text-sm font-medium text-gray-700">Email liên hệ</label>
-                                  <input 
-                                      type="email" 
-                                      value={storeSettings.email || ''} 
-                                      onChange={(e) => handleStoreSettingsChange('email', e.target.value)} 
-                                      className="mt-1 w-full border rounded px-3 py-2" 
-                                  />
-                              </div>
+                              <h5 className="font-bold text-green-800">Đã kích hoạt</h5>
                           </div>
-                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
-                              Lưu thông tin
+                          <p className="text-sm text-green-700 mb-4">
+                              Tài khoản của bạn đang được bảo vệ bởi Google Authenticator. Bạn cần nhập mã từ ứng dụng khi đăng nhập.
+                          </p>
+                          <button 
+                              onClick={handleDisableTotp}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium underline"
+                          >
+                              Tắt bảo mật 2 lớp
                           </button>
-                      </form>
+                      </div>
+                  ) : (
+                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                          {!showTotpSetup ? (
+                              <>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    Tăng cường bảo mật bằng cách sử dụng Google Authenticator. Bạn sẽ không cần phụ thuộc vào Email để lấy OTP nữa.
+                                </p>
+                                <button 
+                                    onClick={handleStartTotpSetup}
+                                    className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] transition-colors"
+                                >
+                                    Thiết lập ngay
+                                </button>
+                              </>
+                          ) : (
+                              <div className="space-y-4 animate-fade-in-up">
+                                  <h5 className="font-bold text-gray-800">Cài đặt Google Authenticator</h5>
+                                  <div className="flex flex-col md:flex-row gap-6">
+                                      <div className="bg-white p-2 rounded border inline-block">
+                                          <QRCodeSVG value={tempTotpUri} size={150} />
+                                      </div>
+                                      <div className="flex-1 space-y-3">
+                                          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-2">
+                                              <li>Tải ứng dụng <strong>Google Authenticator</strong> trên điện thoại.</li>
+                                              <li>Mở ứng dụng và chọn <strong>Quét mã QR</strong>.</li>
+                                              <li>Quét mã bên cạnh.</li>
+                                              <li>Nhập mã 6 số hiển thị trong ứng dụng vào ô dưới đây để xác nhận.</li>
+                                          </ol>
+                                          
+                                          <form onSubmit={handleVerifyAndEnableTotp} className="mt-4 flex gap-2">
+                                              <input 
+                                                  type="text" 
+                                                  placeholder="Nhập mã 6 số (VD: 123456)"
+                                                  value={verificationCode}
+                                                  onChange={(e) => setVerificationCode(e.target.value)}
+                                                  className="border rounded px-3 py-2 w-48 text-center tracking-widest font-mono"
+                                                  maxLength={6}
+                                                  required
+                                              />
+                                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">
+                                                  Kích hoạt
+                                              </button>
+                                          </form>
+                                          <button onClick={() => setShowTotpSetup(false)} className="text-sm text-gray-500 hover:text-gray-700 underline">
+                                              Hủy bỏ
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
                   )}
               </div>
 
-              {/* Bank Settings Section */}
+              {/* Bank Settings Section (NEW with Security) */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <CreditCardIcon className="w-5 h-5 text-gray-600" />
@@ -2578,260 +2226,37 @@ const AdminPage: React.FC = () => {
                   )}
               </div>
 
-              {/* Shipping Settings Section - NEWLY RESTORED */}
+              {/* Social Media Links */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <TruckIcon className="w-5 h-5 text-gray-600" />
-                      Cấu hình Phí vận chuyển
-                  </h4>
-                  {shippingSettings && (
-                      <form onSubmit={handleShippingSettingsSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                          <div className="flex items-center gap-2 mb-2">
-                              <input 
-                                  type="checkbox" 
-                                  checked={shippingSettings.enabled} 
-                                  onChange={(e) => handleShippingSettingsChange('enabled', e.target.checked)} 
-                                  className="w-4 h-4 text-[#D4AF37] rounded focus:ring-[#D4AF37]"
-                              />
-                              <label className="text-sm font-medium text-gray-700">Bật tính phí vận chuyển</label>
+                  <h4 className="font-bold text-gray-700 mb-4">Liên kết Mạng xã hội (Footer)</h4>
+                  {socialSettings && (
+                      <form onSubmit={handleSocialSettingsSubmit} className="space-y-4">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Facebook URL</label>
+                              <input type="url" value={socialSettings.facebook} onChange={(e) => handleSocialSettingsChange('facebook', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Phí cơ bản (VNĐ)</label>
-                                  <input 
-                                      type="number" 
-                                      value={shippingSettings.baseFee} 
-                                      onChange={(e) => handleShippingSettingsChange('baseFee', parseInt(e.target.value))} 
-                                      className="mt-1 w-full border rounded px-3 py-2" 
-                                      disabled={!shippingSettings.enabled}
-                                  />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Miễn phí ship cho đơn từ (VNĐ)</label>
-                                  <input 
-                                      type="number" 
-                                      value={shippingSettings.freeShipThreshold} 
-                                      onChange={(e) => handleShippingSettingsChange('freeShipThreshold', parseInt(e.target.value))} 
-                                      className="mt-1 w-full border rounded px-3 py-2" 
-                                      disabled={!shippingSettings.enabled}
-                                  />
-                              </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">Instagram URL</label>
+                              <input type="url" value={socialSettings.instagram} onChange={(e) => handleSocialSettingsChange('instagram', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
                           </div>
-                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
-                              Lưu cấu hình Vận chuyển
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700">TikTok URL</label>
+                              <input type="url" value={socialSettings.tiktok} onChange={(e) => handleSocialSettingsChange('tiktok', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                           <div>
+                              <label className="block text-sm font-medium text-gray-700">Twitter/X URL</label>
+                              <input type="url" value={socialSettings.twitter} onChange={(e) => handleSocialSettingsChange('twitter', e.target.value)} className="mt-1 w-full border rounded px-3 py-2" />
+                          </div>
+                          <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded hover:bg-[#b89b31]">
+                              Cập nhật Liên kết
                           </button>
                       </form>
-                  )}
-              </div>
-
-              {/* Data Management Section (Backup/Reset) - RESTORED & PROMINENT */}
-              {currentUser?.role === 'MASTER' && (
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-red-700 mb-4 flex items-center gap-2">
-                      <Trash2Icon className="w-5 h-5" />
-                      Quản lý Dữ liệu (Sao lưu & Khôi phục)
-                  </h4>
-                  <div className="bg-red-50 border border-red-200 p-4 rounded-lg space-y-4">
-                      <div className="flex flex-wrap gap-3">
-                          <button onClick={downloadBackup} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 shadow-sm">
-                              ⬇️ Tải bản sao lưu (Backup)
-                          </button>
-                          <label className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 cursor-pointer shadow-sm">
-                              ⬆️ Khôi phục (Restore)
-                              <input type="file" className="hidden" accept=".json" onChange={(e) => {
-                                  if(e.target.files?.[0]) {
-                                      restoreBackup(e.target.files[0]).then(res => {
-                                          alert(res.message);
-                                          if(res.success) window.location.reload();
-                                      });
-                                  }
-                              }} />
-                          </label>
-                      </div>
-                      
-                      <div className="pt-4 border-t border-red-200">
-                          <p className="text-xs text-red-600 mb-2 font-bold uppercase tracking-wide">Vùng nguy hiểm: Xóa dữ liệu vĩnh viễn</p>
-                          <div className="flex flex-wrap gap-3">
-                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-800 px-3 py-1.5 rounded hover:bg-red-200 text-sm font-medium border border-red-200">
-                                  Xóa tất cả Đơn hàng & Kho
-                              </button>
-                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-800 px-3 py-1.5 rounded hover:bg-red-200 text-sm font-medium border border-red-200">
-                                  Xóa tất cả Sản phẩm
-                              </button>
-                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 text-sm font-bold shadow">
-                                  Factory Reset (Toàn bộ)
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-              )}
-
-              {/* Email Management - Only Master */}
-              {currentUser?.role === 'MASTER' && (
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
-                  <p className="text-sm text-gray-500 mb-4">Các email này sẽ nhận thông báo đơn hàng và mã OTP (Master).</p>
-                  
-                  <ul className="mb-4 space-y-2">
-                      {adminEmails.map((email, idx) => (
-                          <li key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
-                              <span className="text-gray-700">{email}</span>
-                              <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-sm hover:underline">Xóa</button>
-                          </li>
-                      ))}
-                  </ul>
-
-                  <form onSubmit={handleAddEmail} className="flex gap-2 mb-4">
-                      <input 
-                          type="email" 
-                          value={newAdminEmail}
-                          onChange={(e) => setNewAdminEmail(e.target.value)}
-                          placeholder="Thêm email mới..."
-                          className="flex-1 border rounded px-3 py-2 focus:ring-[#D4AF37]"
-                          required
-                      />
-                      <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded hover:bg-[#004d40]">Thêm</button>
-                  </form>
-                  
-                  <button onClick={handleTestEmail} className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
-                      📧 Gửi Email kiểm tra
-                  </button>
-              </div>
-              )}
-
-              {/* Login Logs Section */}
-              <div className="border-t pt-6">
-                  <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-bold text-gray-700 flex items-center gap-2">
-                          <ActivityIcon className="w-5 h-5 text-gray-600" />
-                          Nhật ký đăng nhập
-                      </h4>
-                      <button 
-                          onClick={() => {
-                              fetchAdminLoginLogs().then(logs => {
-                                  if (logs) setAdminLogs(logs);
-                                  setSettingsFeedback('Đã làm mới nhật ký.');
-                                  setTimeout(() => setSettingsFeedback(''), 3000);
-                              });
-                          }}
-                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                      >
-                          Làm mới
-                      </button>
-                  </div>
-                  <div className="bg-gray-50 border rounded-lg overflow-hidden max-h-60 overflow-y-auto">
-                      <table className="min-w-full text-xs text-left text-gray-600">
-                          <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">
-                              <tr>
-                                  <th className="px-3 py-2">Thời gian</th>
-                                  <th className="px-3 py-2">User</th>
-                                  <th className="px-3 py-2">Phương thức</th>
-                                  <th className="px-3 py-2">Trạng thái</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                              {adminLogs.map((log) => (
-                                  <tr key={log.id} className="hover:bg-white">
-                                      <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
-                                      <td className="px-3 py-2 font-bold">{log.username}</td>
-                                      <td className="px-3 py-2">
-                                          {log.method === 'GOOGLE_AUTH' ? '2FA App' : 'Email OTP'}
-                                      </td>
-                                      <td className="px-3 py-2">
-                                          {log.status === 'SUCCESS' ? 
-                                            <span className="text-green-600 font-bold">Thành công</span> : 
-                                            <span className="text-red-600 font-bold">Thất bại</span>}
-                                      </td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
-                  </div>
-              </div>
-
-              {/* 2FA Setup Section - Adapted for Staff */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
-                      Bảo mật 2 lớp (Google Authenticator) 
-                      {currentUser?.role === 'STAFF' && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">Cá nhân: {currentUser.username}</span>}
-                  </h4>
-                  
-                  {totpEnabled ? (
-                      <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                          <div className="flex items-center gap-3 mb-2">
-                              <div className="bg-green-500 text-white rounded-full p-1">
-                                  <CheckIcon className="w-4 h-4" />
-                              </div>
-                              <h5 className="font-bold text-green-800">Đã kích hoạt</h5>
-                          </div>
-                          <p className="text-sm text-green-700 mb-4">
-                              Tài khoản của bạn đang được bảo vệ.
-                          </p>
-                          <button 
-                              onClick={handleDisableTotp}
-                              className="text-red-600 hover:text-red-800 text-sm font-medium underline"
-                          >
-                              Tắt bảo mật 2 lớp
-                          </button>
-                      </div>
-                  ) : (
-                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
-                          {!showTotpSetup ? (
-                              <>
-                                <p className="text-sm text-gray-600 mb-4">
-                                    Tăng cường bảo mật bằng cách sử dụng Google Authenticator.
-                                </p>
-                                <button 
-                                    onClick={handleStartTotpSetup}
-                                    className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] transition-colors"
-                                >
-                                    Thiết lập ngay
-                                </button>
-                              </>
-                          ) : (
-                              <div className="space-y-4 animate-fade-in-up">
-                                  <h5 className="font-bold text-gray-800">Cài đặt Google Authenticator</h5>
-                                  <div className="flex flex-col md:flex-row gap-6">
-                                      <div className="bg-white p-2 rounded border inline-block">
-                                          <QRCodeSVG value={tempTotpUri} size={150} />
-                                      </div>
-                                      <div className="flex-1 space-y-3">
-                                          <ol className="list-decimal pl-5 text-sm text-gray-600 space-y-2">
-                                              <li>Tải ứng dụng <strong>Google Authenticator</strong>.</li>
-                                              <li>Quét mã QR bên cạnh.</li>
-                                              <li>Nhập mã 6 số để xác nhận.</li>
-                                          </ol>
-                                          
-                                          <form onSubmit={handleVerifyAndEnableTotp} className="mt-4 flex gap-2">
-                                              <input 
-                                                  type="text" 
-                                                  placeholder="123456"
-                                                  value={verificationCode}
-                                                  onChange={(e) => setVerificationCode(e.target.value)}
-                                                  className="border rounded px-3 py-2 w-48 text-center tracking-widest font-mono"
-                                                  maxLength={6}
-                                                  required
-                                              />
-                                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">
-                                                  Kích hoạt
-                                              </button>
-                                          </form>
-                                          <button onClick={() => setShowTotpSetup(false)} className="text-sm text-gray-500 hover:text-gray-700 underline">
-                                              Hủy bỏ
-                                          </button>
-                                      </div>
-                                  </div>
-                              </div>
-                          )}
-                      </div>
                   )}
               </div>
           </div>
           
            {settingsFeedback && (
-                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không đúng') || settingsFeedback.includes('thất bại') || settingsFeedback.includes('không khớp') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 <div className={`mt-6 p-3 rounded text-center font-medium animate-pulse ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('không đúng') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
             )}
@@ -2884,17 +2309,6 @@ const AdminPage: React.FC = () => {
   );
 
   const renderContent = () => {
-    // Permission Check Wrapper
-    if (activeTab !== 'dashboard' && !hasPermission(activeTab)) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500 py-20">
-                <ShieldCheckIcon className="w-16 h-16 text-gray-300 mb-4" />
-                <h3 className="text-xl font-bold">Truy cập bị từ chối</h3>
-                <p>Bạn không có quyền truy cập vào mục này.</p>
-            </div>
-        );
-    }
-
     switch(activeTab) {
       case 'dashboard': return renderDashboard();
       case 'products': return renderProductManager();
@@ -2905,7 +2319,6 @@ const AdminPage: React.FC = () => {
       case 'home': return renderHomePageSettings();
       case 'header': return renderHeaderSettings();
       case 'settings': return renderSettings();
-      case 'staff': return renderStaffManager();
       default: return renderDashboard();
     }
   };
@@ -2917,65 +2330,66 @@ const AdminPage: React.FC = () => {
           <div className="bg-[#D4AF37] p-2 rounded-lg">
              <BarChart2 className="w-6 h-6 text-white" />
           </div>
-          <div>
-              <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
-              <p className="text-xs text-gray-400 mt-1">{currentUser?.fullname}</p>
-          </div>
+          <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
         </div>
         <nav className="p-4 space-y-2">
-           {(hasPermission('dashboard') || hasPermission('ALL')) && (
-               <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <BarChart2 className="w-5 h-5" /> Tổng quan
-              </button>
-           )}
-           {(hasPermission('products') || hasPermission('ALL')) && (
-               <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <PackageIcon className="w-5 h-5" /> Sản phẩm
-              </button>
-           )}
-           {(hasPermission('orders') || hasPermission('ALL')) && (
-              <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
-              </button>
-           )}
-           {(hasPermission('inventory') || hasPermission('ALL')) && (
-              <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <BarChart2 className="w-5 h-5" /> Kho hàng
-              </button>
-           )}
-           {(hasPermission('customers') || hasPermission('ALL')) && (
-               <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <UsersIcon className="w-5 h-5" /> Khách hàng
-              </button>
-           )}
+           <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <BarChart2 className="w-5 h-5" /> Tổng quan
+          </button>
+           <button 
+            onClick={() => setActiveTab('products')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <PackageIcon className="w-5 h-5" /> Sản phẩm
+          </button>
+          <button 
+            onClick={() => setActiveTab('orders')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
+          </button>
+          <button 
+            onClick={() => setActiveTab('inventory')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <BarChart2 className="w-5 h-5" /> Kho hàng
+          </button>
+           <button 
+            onClick={() => setActiveTab('customers')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+          >
+            <UsersIcon className="w-5 h-5" /> Khách hàng
+          </button>
           
           <div className="pt-4 mt-4 border-t border-gray-700">
             <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Giao diện</p>
-            {(hasPermission('home') || hasPermission('ALL')) && (
-                <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                    <EditIcon className="w-5 h-5" /> Trang chủ
-                </button>
-            )}
-            {(hasPermission('header') || hasPermission('ALL')) && (
-                 <button onClick={() => setActiveTab('header')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                    <LayersIcon className="w-5 h-5" /> Header/Menu
-                </button>
-            )}
-            {(hasPermission('about') || hasPermission('ALL')) && (
-                 <button onClick={() => setActiveTab('about')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                    <EditIcon className="w-5 h-5" /> Giới thiệu
-                </button>
-            )}
-            {(hasPermission('settings') || hasPermission('ALL')) && (
-                <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                    <UserIcon className="w-5 h-5" /> Cài đặt chung
-                </button>
-            )}
-            {currentUser?.role === 'MASTER' && (
-                <button onClick={() => setActiveTab('staff')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'staff' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                    <UserCogIcon className="w-5 h-5" /> Quản lý Nhân viên
-                </button>
-            )}
+            <button 
+                onClick={() => setActiveTab('home')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <EditIcon className="w-5 h-5" /> Trang chủ
+            </button>
+             <button 
+                onClick={() => setActiveTab('header')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <LayersIcon className="w-5 h-5" /> Header/Menu
+            </button>
+             <button 
+                onClick={() => setActiveTab('about')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <EditIcon className="w-5 h-5" /> Giới thiệu
+            </button>
+            <button 
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+                <UserIcon className="w-5 h-5" /> Cài đặt chung
+            </button>
           </div>
         </nav>
         
@@ -2999,19 +2413,12 @@ const AdminPage: React.FC = () => {
                  activeTab === 'customers' ? 'Danh sách Khách hàng' :
                  activeTab === 'about' ? 'Chỉnh sửa Giới thiệu' :
                  activeTab === 'home' ? 'Cấu hình Trang chủ' :
-                 activeTab === 'staff' ? 'Quản lý Phân quyền' :
                  activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
             </h2>
             <div className="flex items-center gap-4">
-                {/* SERVER STATUS INDICATOR */}
-                <div className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold transition-colors ${serverStatus ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
-                    <div className={`w-2 h-2 rounded-full ${serverStatus ? 'bg-green-600 animate-pulse' : 'bg-red-600'}`}></div>
-                    {serverStatus ? 'Server Online' : 'Server Offline'}
-                </div>
-
                 <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
-                <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg uppercase" title={currentUser?.fullname}>
-                    {currentUser?.username.charAt(0)}
+                <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                    A
                 </div>
             </div>
         </header>

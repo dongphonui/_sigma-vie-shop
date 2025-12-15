@@ -3,16 +3,15 @@ import type { HomePageSettings } from '../types';
 import { fetchHomePageSettingsFromDB, syncHomePageSettingsToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_home_page_settings';
-const EVENT_KEY = 'sigma_vie_home_settings_update'; // Key sự kiện update
-let hasLoadedFromDB = false;
+const EVENT_KEY = 'sigma_vie_home_settings_update'; 
 
 const DEFAULT_SETTINGS: HomePageSettings = {
   headlineText: 'Hàng Mới Về',
-  headlineColor: '#111827', // text-gray-900
+  headlineColor: '#111827', 
   headlineFont: 'Playfair Display',
   headlineSize: '3rem',
   subtitleText: 'Khám phá bộ sưu tập mới nhất với những thiết kế vượt thời gian.',
-  subtitleColor: '#374151', // text-gray-700
+  subtitleColor: '#374151', 
   subtitleFont: 'Poppins',
 
   // Promotion Section Defaults
@@ -31,11 +30,11 @@ const DEFAULT_SETTINGS: HomePageSettings = {
   promoTitle2: 'Mới',
   promoTitleFont: 'Playfair Display',
   promoTitleColor: '#FFFFFF',
-  promoTitleSize: '2.25rem', // 36px (text-4xl approx)
+  promoTitleSize: '2.25rem', 
   promoDescription: 'Đắm mình trong sự tinh tế của bộ sưu tập "Giao Mùa". Mỗi thiết kế là một câu chuyện, mỗi đường may là một lời khẳng định đẳng cấp.',
   promoDescriptionFont: 'Poppins',
-  promoDescriptionColor: '#E5E7EB', // text-gray-200 equivalent
-  promoDescriptionSize: '1.125rem', // 18px (text-lg)
+  promoDescriptionColor: '#E5E7EB', 
+  promoDescriptionSize: '1.125rem', 
   promoButtonText: 'Khám Phá Ngay',
   promoButtonBgColor: '#D4AF37',
   promoButtonTextColor: '#FFFFFF',
@@ -44,28 +43,28 @@ const DEFAULT_SETTINGS: HomePageSettings = {
   regHeadlineText: 'Trở thành thành viên Sigma Vie',
   regHeadlineColor: '#FFFFFF',
   regHeadlineFont: 'Playfair Display',
-  regHeadlineSize: '1.875rem', // text-3xl
+  regHeadlineSize: '1.875rem',
   regDescriptionText: 'Đăng ký tài khoản ngay hôm nay để nhận thông báo về bộ sưu tập mới nhất, ưu đãi độc quyền dành riêng cho thành viên và theo dõi đơn hàng dễ dàng hơn.',
-  regDescriptionColor: '#D1D5DB', // gray-300
+  regDescriptionColor: '#D1D5DB', 
   regDescriptionFont: 'Poppins',
-  regDescriptionSize: '1.125rem', // text-lg
-  regBgColorStart: '#111827', // gray-900
-  regBgColorEnd: '#1F2937',   // gray-800
+  regDescriptionSize: '1.125rem',
+  regBgColorStart: '#111827', 
+  regBgColorEnd: '#1F2937',   
   regButtonText: 'Đăng ký ngay',
   regButtonBgColor: '#D4AF37',
   regButtonTextColor: '#FFFFFF',
   regButtonFont: 'Poppins',
   regButtonFontSize: '1rem',
-  regPadding: '3rem', // p-12 equivalent
-  regBorderRadius: '1rem', // rounded-2xl
+  regPadding: '3rem', 
+  regBorderRadius: '1rem',
 
   // Flash Sale Defaults
-  flashSaleBgColorStart: '#DC2626', // red-600
-  flashSaleBgColorEnd: '#F97316',   // orange-500
+  flashSaleBgColorStart: '#DC2626', 
+  flashSaleBgColorEnd: '#F97316',   
   flashSaleTitleText: 'FLASH SALE',
   flashSaleTitleColor: '#FFFFFF',
   flashSaleTitleFont: 'Playfair Display',
-  flashSaleTitleSize: '2.25rem', // 36px
+  flashSaleTitleSize: '2.25rem', 
   flashSaleTextColor: '#FFFFFF',
 };
 
@@ -86,24 +85,20 @@ export const getHomePageSettings = (): HomePageSettings => {
     }
 
     // --- BACKGROUND SYNC FROM SERVER ---
-    // Luôn luôn gọi server để check update mỗi khi load trang (không chỉ lần đầu)
-    // Để đảm bảo máy khác luôn nhận được dữ liệu mới nhất
+    // Luôn gọi server để check update mỗi khi load trang
     fetchHomePageSettingsFromDB().then(dbSettings => {
         if (dbSettings && Object.keys(dbSettings).length > 0) {
-            // Ensure array migration for DB data too
             if (!dbSettings.promoImageUrls && dbSettings.promoImageUrl) {
                 dbSettings.promoImageUrls = [dbSettings.promoImageUrl];
             }
             const merged = { ...DEFAULT_SETTINGS, ...dbSettings };
             
-            // Check changes before dispatching to avoid loops if needed, 
-            // but simple overwrite is safer for consistency here
             const currentStr = localStorage.getItem(STORAGE_KEY);
             const newStr = JSON.stringify(merged);
             
+            // Nếu có thay đổi so với local, cập nhật và báo cho UI
             if (currentStr !== newStr) {
                 localStorage.setItem(STORAGE_KEY, newStr);
-                // QUAN TRỌNG: Bắn sự kiện để giao diện tự vẽ lại
                 window.dispatchEvent(new Event(EVENT_KEY));
                 console.log("Home settings updated from server & UI refreshed.");
             }
@@ -117,16 +112,22 @@ export const getHomePageSettings = (): HomePageSettings => {
   }
 };
 
-export const updateHomePageSettings = (settings: HomePageSettings): void => {
+export const updateHomePageSettings = async (settings: HomePageSettings): Promise<{ success: boolean; message?: string }> => {
+  // 1. Save Local & Update UI immediately
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  window.dispatchEvent(new Event(EVENT_KEY)); // Update local UI immediately
+  window.dispatchEvent(new Event(EVENT_KEY)); 
   
-  // Sync to Server
-  syncHomePageSettingsToDB(settings).then(res => {
+  // 2. Sync to Server and Return Result
+  try {
+      const res = await syncHomePageSettingsToDB(settings);
       if (res && res.success) {
           console.log("Home settings synced to server.");
+          return { success: true };
       } else {
           console.error("Failed to sync home settings:", res);
+          return { success: false, message: res?.message || 'Lỗi không xác định từ Server' };
       }
-  });
+  } catch (e: any) {
+      return { success: false, message: e.message || 'Lỗi kết nối mạng' };
+  }
 };

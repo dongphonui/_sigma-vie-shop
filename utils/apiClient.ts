@@ -5,8 +5,6 @@ export const API_BASE_URL = (() => {
         return import.meta.env.VITE_API_URL;
     }
     // Tự động lấy hostname hiện tại của trình duyệt
-    // Nếu bạn truy cập bằng 192.168.1.x, nó sẽ gọi API về 192.168.1.x:3000
-    // Nếu bạn truy cập bằng localhost, nó sẽ gọi về localhost:3000
     const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
     return `http://${hostname}:3000/api`;
 })();
@@ -26,7 +24,7 @@ export const checkServerConnection = async (): Promise<boolean> => {
 
 const fetchData = async (endpoint: string) => {
     try {
-        // Add timestamp to prevent browser caching
+        // Add timestamp to prevent browser caching (QUAN TRỌNG)
         // Thêm tham số _t=... để trình duyệt luôn hiểu đây là yêu cầu mới
         const separator = endpoint.includes('?') ? '&' : '?';
         const url = `${API_BASE_URL}/${endpoint}${separator}_t=${Date.now()}`;
@@ -58,14 +56,10 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
         if (!res.ok) {
             let errorText = res.statusText;
             try {
-                // Try to parse JSON error message from server
                 const errJson = await res.json();
                 if (errJson && errJson.error) errorText = errJson.error;
-            } catch (e) { 
-                // Ignore parsing error, stick to statusText
-            }
+            } catch (e) { }
             
-            // Special handling for Payload Too Large
             if (res.status === 413) {
                 return { success: false, message: `Lỗi: Ảnh hoặc dữ liệu quá lớn (Giới hạn Server). Vui lòng nén ảnh.` };
             }

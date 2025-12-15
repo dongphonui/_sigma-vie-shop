@@ -10,17 +10,15 @@ import { getHomePageSettings } from '../utils/homePageSettingsStorage';
 
 interface HomeProps {
   isAdminLinkVisible: boolean;
-  onOpenAuth: (mode?: 'LOGIN' | 'REGISTER') => void;
+  onOpenAuth: (mode: 'LOGIN' | 'REGISTER') => void;
   currentUser: Customer | null;
-  cartItemCount?: number;
-  onOpenCart?: () => void;
-  initialProductId?: string | null; 
+  cartItemCount: number;
+  onOpenCart: () => void;
+  initialProductId: string | null;
 }
 
 const SearchIcon: React.FC<{className?: string}> = ({className}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 );
 
 const UserPlusIcon: React.FC<{className?: string, style?: React.CSSProperties}> = ({className, style}) => (
@@ -34,52 +32,41 @@ const LightningIcon: React.FC<{className?: string, style?: React.CSSProperties}>
 );
 
 const ClockIcon: React.FC<{className?: string, style?: React.CSSProperties}> = ({className, style}) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
 );
 
-// Countdown Timer Component
-const FlashSaleTimer: React.FC<{textColor: string, targetDate?: number}> = ({ textColor, targetDate }) => {
-    const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+const FlashSaleTimer: React.FC<{ textColor?: string; targetDate?: number }> = ({ textColor, targetDate }) => {
+    const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number }>({ hours: 0, minutes: 0, seconds: 0 });
 
     useEffect(() => {
         if (!targetDate) return;
+        const updateTimer = () => {
+             const now = Date.now();
+            const difference = targetDate - now;
 
-        const calculateTimeLeft = () => {
-            const difference = targetDate - Date.now();
-            
-            if (difference > 0) {
-                return {
-                    hours: Math.floor((difference / (1000 * 60 * 60))), // Allow > 24 hours
-                    minutes: Math.floor((difference / 1000 / 60) % 60),
-                    seconds: Math.floor((difference / 1000) % 60),
-                };
+            if (difference <= 0) {
+                setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+            } else {
+                const hours = Math.floor(difference / (1000 * 60 * 60));
+                const minutes = Math.floor((difference / 1000 / 60) % 60);
+                const seconds = Math.floor((difference / 1000) % 60);
+                setTimeLeft({ hours, minutes, seconds });
             }
-            return { hours: 0, minutes: 0, seconds: 0 };
         };
 
-        // Initial set
-        setTimeLeft(calculateTimeLeft());
-
-        const interval = setInterval(() => {
-            setTimeLeft(calculateTimeLeft());
-        }, 1000);
-
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
         return () => clearInterval(interval);
     }, [targetDate]);
 
-    const formatTime = (time: number) => time.toString().padStart(2, '0');
-
     return (
-        <div className="flex items-center gap-2 font-mono font-bold text-lg" style={{ color: textColor }}>
-            <div className="bg-black/20 rounded px-2 py-1 min-w-[2.5rem] text-center">{formatTime(timeLeft.hours)}</div>
-            <span>:</span>
-            <div className="bg-black/20 rounded px-2 py-1 min-w-[2.5rem] text-center">{formatTime(timeLeft.minutes)}</div>
-            <span>:</span>
-            <div className="bg-black/20 rounded px-2 py-1 min-w-[2.5rem] text-center">{formatTime(timeLeft.seconds)}</div>
+        <div className="flex gap-1 font-mono font-bold text-lg" style={{ color: textColor }}>
+            <span>{String(timeLeft.hours).padStart(2, '0')}</span>:
+            <span>{String(timeLeft.minutes).padStart(2, '0')}</span>:
+            <span>{String(timeLeft.seconds).padStart(2, '0')}</span>
         </div>
     );
 };
-
 
 const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser, cartItemCount, onOpenCart, initialProductId }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -97,7 +84,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
   const [isLookingForProduct, setIsLookingForProduct] = useState(false);
 
   useEffect(() => {
-    // 1. Initial Load from local cache immediately for speed
+    // 1. Initial Load from local cache
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
@@ -105,12 +92,20 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     // Load Settings
     setSettings(getHomePageSettings());
 
-    // 2. FORCE RELOAD from Server to ensure mobile is up to date
+    // 2. FORCE RELOAD from Server (Important for Guest PCs)
     forceReloadProducts().then(() => {
-        console.log("Forced reload complete via Home mount");
+        console.log("Forced reload products complete");
     });
+    
+    // 3. Retry fetching settings (Aggressive sync)
+    // Thử lấy lại settings vài lần trong 5s đầu để đảm bảo máy khách nhận được update từ server
+    const retrySettings = setInterval(() => {
+        const freshSettings = getHomePageSettings();
+        setSettings(freshSettings);
+    }, 2000);
+    setTimeout(() => clearInterval(retrySettings), 6000);
 
-    // Deep Link Check on Initial Load
+    // Deep Link Check
     if (initialProductId) {
         const found = allProducts.find(p => String(p.id) === String(initialProductId));
         if (found) {
@@ -124,24 +119,20 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     const handleProductUpdate = () => {
         const updated = getProducts();
         setProducts(updated);
-        
-        if (!searchQuery) {
-            setFilteredProducts(updated);
-        }
+        if (!searchQuery) setFilteredProducts(updated);
 
-        // Retry Deep Link after update
         if (initialProductId) {
             const found = updated.find(p => String(p.id) === String(initialProductId));
             if (found) {
                 setSelectedProduct(found);
-                setIsLookingForProduct(false); // Found it!
+                setIsLookingForProduct(false); 
             } else {
                 setIsLookingForProduct(false);
             }
         }
     };
     
-    // LISTENER: Update Settings when Server response arrives (Real-time sync)
+    // LISTENER: Update Settings (Real-time sync)
     const handleSettingsUpdate = () => {
         console.log("UI received settings update event");
         setSettings(getHomePageSettings());
@@ -153,6 +144,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     return () => {
         window.removeEventListener('sigma_vie_products_update', handleProductUpdate);
         window.removeEventListener('sigma_vie_home_settings_update', handleSettingsUpdate);
+        clearInterval(retrySettings);
     };
   }, [initialProductId]); 
 
@@ -229,7 +221,6 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
       />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 relative">
         
-        {/* Loading Indicator for Deep Link */}
         {isLookingForProduct && !selectedProduct && (
             <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center backdrop-blur-sm">
                 <div className="bg-white p-6 rounded-lg shadow-xl flex items-center gap-4 animate-fade-in-up">
