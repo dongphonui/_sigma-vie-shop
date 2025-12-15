@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import type { AdminUser } from '../types';
-import { fetchAdminUsers } from '../utils/apiClient';
-import { BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, EditIcon, LayersIcon, UserIcon } from '../components/Icons';
+import { BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, EditIcon, LayersIcon, UserIcon, ImagePlus } from '../components/Icons';
 
-// Import New Components
+// Import Components
 import DashboardTab from '../components/admin/DashboardTab';
 import ProductTab from '../components/admin/ProductTab';
 import OrderTab from '../components/admin/OrderTab';
@@ -12,15 +11,33 @@ import InventoryTab from '../components/admin/InventoryTab';
 import CustomerTab from '../components/admin/CustomerTab';
 import SettingsTab from '../components/admin/SettingsTab';
 
+// Import Setting Components Directly
+import HomePageSettingsTab from '../components/admin/settings/HomePageSettingsTab';
+import HeaderSettingsTab from '../components/admin/settings/HeaderSettingsTab';
+import AboutPageSettingsTab from '../components/admin/settings/AboutPageSettingsTab';
+
 const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'settings' | 'home' | 'header' | 'about'>('dashboard');
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
+    // 1. Try to get detailed user info
     const userStr = sessionStorage.getItem('adminUser');
     if (userStr) {
-        const user = JSON.parse(userStr);
-        setCurrentAdminUser(user);
+        setCurrentAdminUser(JSON.parse(userStr));
+    } else {
+        // 2. FALLBACK for Legacy Login (Fixes "Empty Menu" issue)
+        // If authenticated but no user object exists, assume it's the local Master Admin
+        const isAuth = sessionStorage.getItem('isAuthenticated') === 'true';
+        if (isAuth) {
+            setCurrentAdminUser({
+                id: 'local_master',
+                username: 'admin',
+                fullname: 'Quản trị viên',
+                role: 'MASTER',
+                permissions: ['ALL']
+            });
+        }
     }
   }, []);
 
@@ -32,8 +49,10 @@ const AdminPage: React.FC = () => {
 
   const hasPermission = (perm: string) => {
       if (!currentAdminUser) return false;
-      if (currentAdminUser.role === 'MASTER') return true;
-      return currentAdminUser.permissions.includes(perm) || currentAdminUser.permissions.includes('ALL');
+      // Master always has permission
+      if (currentAdminUser.role === 'MASTER' || currentAdminUser.username === 'admin') return true;
+      // Check specific permission or ALL
+      return currentAdminUser.permissions?.includes(perm) || currentAdminUser.permissions?.includes('ALL');
   };
 
   const renderContent = () => {
@@ -43,6 +62,9 @@ const AdminPage: React.FC = () => {
       case 'orders': return <OrderTab />;
       case 'inventory': return <InventoryTab />;
       case 'customers': return <CustomerTab />;
+      case 'home': return <HomePageSettingsTab />;     // New Tab
+      case 'header': return <HeaderSettingsTab />;     // New Tab
+      case 'about': return <AboutPageSettingsTab />;   // New Tab
       case 'settings': return <SettingsTab currentUser={currentAdminUser} />;
       default: return <DashboardTab />;
     }
@@ -57,7 +79,7 @@ const AdminPage: React.FC = () => {
           </div>
           <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
         </div>
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 overflow-y-auto max-h-[calc(100vh-180px)]">
            {hasPermission('dashboard') && (
                <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
                 <BarChart2 className="w-5 h-5" /> Tổng quan
@@ -83,10 +105,29 @@ const AdminPage: React.FC = () => {
                 <UsersIcon className="w-5 h-5" /> Khách hàng
               </button>
            )}
+           
+           {/* GIAO DIỆN SECTION */}
+           {(hasPermission('settings') || hasPermission('ALL')) && (
+               <div className="pt-4 mt-4 border-t border-gray-700">
+                    <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Giao diện Web</p>
+                    <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                        <EditIcon className="w-5 h-5" /> Trang chủ
+                    </button>
+                    <button onClick={() => setActiveTab('header')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                        <LayersIcon className="w-5 h-5" /> Header & Logo
+                    </button>
+                    <button onClick={() => setActiveTab('about')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                        <ImagePlus className="w-5 h-5" /> Giới thiệu
+                    </button>
+               </div>
+           )}
+
            {hasPermission('settings') && (
-               <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <UserIcon className="w-5 h-5" /> Cài đặt
-              </button>
+               <div className="pt-2 mt-2">
+                   <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                    <UserIcon className="w-5 h-5" /> Cài đặt chung
+                  </button>
+               </div>
            )}
         </nav>
         
@@ -103,11 +144,15 @@ const AdminPage: React.FC = () => {
                  activeTab === 'products' ? 'Quản lý Sản phẩm' : 
                  activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
                  activeTab === 'inventory' ? 'Nhập xuất Kho' : 
-                 activeTab === 'customers' ? 'Danh sách Khách hàng' : 'Cài đặt'}
+                 activeTab === 'customers' ? 'Danh sách Khách hàng' : 
+                 activeTab === 'home' ? 'Cấu hình Trang chủ' :
+                 activeTab === 'header' ? 'Cấu hình Header & Logo' :
+                 activeTab === 'about' ? 'Nội dung trang Giới thiệu' :
+                 'Cài đặt & Bảo mật'}
             </h2>
             <div className="flex items-center gap-4">
                 <div className="text-right">
-                    <span className="text-sm font-bold text-gray-800 block">{currentAdminUser ? currentAdminUser.fullname : 'Master Admin'}</span>
+                    <span className="text-sm font-bold text-gray-800 block">{currentAdminUser ? currentAdminUser.fullname : 'Quản trị viên'}</span>
                     <span className="text-xs text-gray-500">{new Date().toLocaleDateString('vi-VN')}</span>
                 </div>
                 <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
