@@ -23,11 +23,11 @@ const LoginPage: React.FC = () => {
             // Logged in via DB
             const user = serverAuth.user;
             
-            // Check Staff 2FA
-            if (user.role === 'STAFF' && user.is_totp_enabled) {
-                // If staff has 2FA enabled, redirect to OTP page
+            // Check ANY user (Master or Staff) for 2FA
+            if (user.is_totp_enabled) {
+                // If user has 2FA enabled, redirect to OTP page
                 // Store temp user info to verify later
-                sessionStorage.setItem('pendingStaffUser', JSON.stringify(user));
+                sessionStorage.setItem('pendingUser', JSON.stringify(user));
                 window.location.hash = '/otp';
                 setIsLoading(false);
                 return;
@@ -37,8 +37,9 @@ const LoginPage: React.FC = () => {
             sessionStorage.setItem('adminUser', JSON.stringify(user));
             sessionStorage.setItem('isAuthenticated', 'true');
             
-            // Only Master needs strict 2FA from localStorage settings if enabled there
-            if (user.role === 'MASTER' && isTotpEnabled()) {
+            // Backup check: Only Legacy Local Master needs strict 2FA from localStorage if DB auth didn't catch it
+            // (This usually happens if "admin" exists in LocalStorage but not DB, or DB has different settings)
+            if (user.role === 'MASTER' && isTotpEnabled() && !user.is_totp_enabled) {
                  sessionStorage.setItem('authMethod', 'TOTP');
                  window.location.hash = '/otp';
                  setIsLoading(false);
@@ -49,9 +50,9 @@ const LoginPage: React.FC = () => {
             return;
         }
 
-        // 2. Fallback to LocalStorage Auth (For recovery Master Admin)
+        // 2. Fallback to LocalStorage Auth (For recovery Master Admin if DB fails)
         if (verifyCredentials(username, password)) {
-            // Check if 2FA (TOTP) is enabled
+            // Check if 2FA (TOTP) is enabled in LocalStorage
             if (isTotpEnabled()) {
                 sessionStorage.setItem('authMethod', 'TOTP');
                 window.location.hash = '/otp';

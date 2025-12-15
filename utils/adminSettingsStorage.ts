@@ -144,9 +144,13 @@ export const disableTotp = (): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
 
-export const verifyTotpToken = (token: string): boolean => {
+// Updated: Accepts optional secret to verify ANY user, not just local master
+export const verifyTotpToken = (token: string, secretOverride?: string): boolean => {
     const settings = getSettings();
-    if (!settings.totpSecret || !settings.isTotpEnabled) return false;
+    const secret = secretOverride || settings.totpSecret;
+    const isEnabled = secretOverride ? true : settings.isTotpEnabled;
+
+    if (!secret || !isEnabled) return false;
 
     // Tự động xóa khoảng trắng
     const cleanToken = token.replace(/\s/g, '');
@@ -155,7 +159,7 @@ export const verifyTotpToken = (token: string): boolean => {
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
-        secret: OTPAuth.Secret.fromBase32(settings.totpSecret)
+        secret: OTPAuth.Secret.fromBase32(secret)
     });
 
     // validate returns the delta (0 for current, -1 for prev, 1 for next) or null if invalid
@@ -166,16 +170,5 @@ export const verifyTotpToken = (token: string): boolean => {
 
 // Helper to verify a token against a temporary secret (during setup)
 export const verifyTempTotpToken = (token: string, tempSecret: string): boolean => {
-    // Tự động xóa khoảng trắng
-    const cleanToken = token.replace(/\s/g, '');
-
-    const totp = new OTPAuth.TOTP({
-        algorithm: 'SHA1',
-        digits: 6,
-        period: 30,
-        secret: OTPAuth.Secret.fromBase32(tempSecret)
-    });
-    // Tăng window lên 6 để dễ kích hoạt hơn
-    const delta = totp.validate({ token: cleanToken, window: 6 });
-    return delta !== null;
+    return verifyTotpToken(token, tempSecret);
 };

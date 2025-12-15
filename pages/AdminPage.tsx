@@ -28,7 +28,7 @@ import { sendEmail, fetchAdminLoginLogs, changeAdminPassword, syncShippingSettin
 import { downloadBackup, restoreBackup, performFactoryReset } from '../utils/backupHelper';
 import { VIET_QR_BANKS } from '../utils/constants';
 
-
+// --- ICONS ---
 const ImagePlus: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12H3"/><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
 );
@@ -119,6 +119,33 @@ const PrinterIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
 );
 
+// DEFINE PERMISSION GROUPS
+const PERMISSION_GROUPS = [
+    {
+        label: 'Quản lý Cửa hàng',
+        options: [
+            { id: 'dashboard', label: 'Tổng quan' },
+            { id: 'products', label: 'Sản phẩm' },
+            { id: 'orders', label: 'Đơn hàng' },
+            { id: 'inventory', label: 'Kho hàng' },
+            { id: 'customers', label: 'Khách hàng' },
+        ]
+    },
+    {
+        label: 'Quản lý Giao diện',
+        options: [
+            { id: 'home', label: 'Trang chủ' },
+            { id: 'header', label: 'Header & Menu' },
+            { id: 'about', label: 'Trang Giới thiệu' },
+        ]
+    },
+    {
+        label: 'Hệ thống',
+        options: [
+            { id: 'settings', label: 'Cài đặt chung' },
+        ]
+    }
+];
 
 const AdminPage: React.FC = () => {
   // General State
@@ -207,7 +234,7 @@ const AdminPage: React.FC = () => {
   });
   const [isEditingAdmin, setIsEditingAdmin] = useState<string | null>(null);
 
-  // 2FA State
+  // 2FA State (Global / Legacy)
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [tempTotpSecret, setTempTotpSecret] = useState('');
   const [tempTotpUri, setTempTotpUri] = useState('');
@@ -243,26 +270,16 @@ const AdminPage: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
 
-  const refreshProducts = useCallback(() => {
-    setProducts(getProducts());
-  }, []);
-
-  const refreshCategories = useCallback(() => {
-    setCategories(getCategories());
-  }, []);
-
-  const refreshOrders = useCallback(() => {
-      setOrders(getOrders());
-  }, []);
-
-  const refreshCustomers = useCallback(() => {
-      setCustomers(getCustomers());
-  }, []);
-  
-  const refreshAboutPage = useCallback(() => {
-    setAboutContent(getAboutPageContent());
-    setAboutSettings(getAboutPageSettings());
-  }, []);
+  // Callbacks
+  const refreshProducts = useCallback(() => { setProducts(getProducts()); }, []);
+  const refreshCategories = useCallback(() => { setCategories(getCategories()); }, []);
+  const refreshOrders = useCallback(() => { setOrders(getOrders()); }, []);
+  const refreshCustomers = useCallback(() => { setCustomers(getCustomers()); }, []);
+  const refreshAboutPage = useCallback(() => { setAboutContent(getAboutPageContent()); setAboutSettings(getAboutPageSettings()); }, []);
+  const refreshHomeSettings = useCallback(() => { setHomeSettings(getHomePageSettings()); }, []);
+  const refreshHeaderSettings = useCallback(() => { setHeaderSettings(getHeaderSettings()); }, []);
+  const refreshInventory = useCallback(() => { setTransactions(getTransactions()); }, []);
+  const refreshDashboard = useCallback(() => { setDashboardData(getDashboardMetrics()); }, []);
 
   const refreshSettings = useCallback(() => {
     setAdminEmails(getAdminEmails());
@@ -272,12 +289,10 @@ const AdminPage: React.FC = () => {
     setStoreSettings(getStoreSettings());
     setShippingSettings(getShippingSettings());
     
-    // Fetch Logs
     fetchAdminLoginLogs().then(logs => {
         if (logs) setAdminLogs(logs);
     });
 
-    // Fetch Sub Admins (Only if Master)
     const userStr = sessionStorage.getItem('adminUser');
     if (userStr) {
         const user = JSON.parse(userStr);
@@ -288,22 +303,6 @@ const AdminPage: React.FC = () => {
             });
         }
     }
-  }, []);
-
-  const refreshHomeSettings = useCallback(() => {
-    setHomeSettings(getHomePageSettings());
-  }, []);
-  
-  const refreshHeaderSettings = useCallback(() => {
-    setHeaderSettings(getHeaderSettings());
-  }, []);
-
-  const refreshInventory = useCallback(() => {
-    setTransactions(getTransactions());
-  }, []);
-
-  const refreshDashboard = useCallback(() => {
-    setDashboardData(getDashboardMetrics());
   }, []);
 
   useEffect(() => {
@@ -319,14 +318,12 @@ const AdminPage: React.FC = () => {
     refreshDashboard();
   }, [refreshProducts, refreshCategories, refreshOrders, refreshCustomers, refreshAboutPage, refreshSettings, refreshHomeSettings, refreshHeaderSettings, refreshInventory, refreshDashboard]);
 
-  // Re-calculate dashboard when transactions or products change
   useEffect(() => {
       if (activeTab === 'dashboard') {
           refreshDashboard();
       }
   }, [activeTab, transactions, products, refreshDashboard]);
 
-  // Reset pagination when search or filter changes
   useEffect(() => {
     setOrderCurrentPage(1);
   }, [orderSearch, orderFilterStatus]);
@@ -334,9 +331,165 @@ const AdminPage: React.FC = () => {
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
+    sessionStorage.removeItem('adminUser');
     window.location.hash = '/';
   };
 
+  const hasPermission = (perm: string) => {
+      if (!currentAdminUser) return false;
+      if (currentAdminUser.role === 'MASTER') return true;
+      return currentAdminUser.permissions.includes(perm) || currentAdminUser.permissions.includes('ALL');
+  };
+
+  // --- Sub-Admin Handlers ---
+  const handleSaveAdminUser = async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      const { username, password, fullname, permissions } = adminUserForm;
+      
+      if (!username || !fullname) {
+          setSettingsFeedback('Vui lòng nhập Username và Họ tên.');
+          return;
+      }
+
+      if (isEditingAdmin) {
+          // Update
+          const res = await updateAdminUser(isEditingAdmin, {
+              password: password || undefined,
+              fullname,
+              permissions
+          });
+          if (res && res.success) {
+              setSettingsFeedback('Cập nhật nhân viên thành công.');
+              setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+              setIsEditingAdmin(null);
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback(res?.message || 'Lỗi cập nhật.');
+          }
+      } else {
+          // Create
+          if (!password) {
+              setSettingsFeedback('Vui lòng nhập mật khẩu cho nhân viên mới.');
+              return;
+          }
+          const res = await createAdminUser({
+              username, password, fullname, permissions
+          });
+          if (res && res.success) {
+              setSettingsFeedback('Thêm nhân viên thành công.');
+              setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback(res?.message || 'Lỗi thêm mới.');
+          }
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const prepareEditAdmin = (user: AdminUser) => {
+      setIsEditingAdmin(user.id);
+      setAdminUserForm({
+          username: user.username,
+          password: '', // Don't show hash
+          fullname: user.fullname,
+          permissions: user.permissions
+      });
+  };
+
+  const handleDeleteAdminUser = async (id: string) => {
+      if(confirm('Bạn có chắc chắn muốn xóa nhân viên này?')) {
+          const res = await deleteAdminUser(id);
+          if (res && res.success) {
+              setSettingsFeedback('Đã xóa nhân viên.');
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback('Lỗi xóa nhân viên.');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  // --- 2FA Handlers ---
+  const handleStartTotpSetup = () => {
+      const secret = generateTotpSecret();
+      setTempTotpSecret(secret);
+      setTempTotpUri(getTotpUri(secret, currentAdminUser ? `${currentAdminUser.username}@SigmaVie` : undefined));
+      setShowTotpSetup(true);
+      setVerificationCode('');
+  };
+
+  const handleVerifyAndEnableTotp = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const cleanCode = verificationCode.replace(/\s/g, '');
+
+      if (verifyTempTotpToken(cleanCode, tempTotpSecret)) {
+          if (currentAdminUser) {
+              const res = await updateAdminUser(currentAdminUser.id, {
+                  totp_secret: tempTotpSecret,
+                  is_totp_enabled: true
+              });
+              if (res && res.success) {
+                  const updatedUser = { ...currentAdminUser, is_totp_enabled: true };
+                  setCurrentAdminUser(updatedUser);
+                  sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
+                  
+                  setShowTotpSetup(false);
+                  setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công cho tài khoản của bạn!');
+              } else {
+                  setSettingsFeedback('❌ Lỗi lưu cấu hình lên Server.');
+              }
+          } else {
+              enableTotp(tempTotpSecret);
+              refreshSettings();
+              setShowTotpSetup(false);
+              setSettingsFeedback('✅ Đã bật bảo mật 2 lớp (Local) thành công!');
+          }
+      } else {
+          setSettingsFeedback('❌ Mã xác nhận không đúng.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 6000);
+  };
+
+  const handleDisableTotp = async () => {
+      if (window.confirm('Bạn có chắc chắn muốn tắt bảo mật 2 lớp không? Tài khoản của bạn sẽ kém an toàn hơn.')) {
+          if (currentAdminUser) {
+              const res = await updateAdminUser(currentAdminUser.id, {
+                  is_totp_enabled: false
+              });
+              
+              if (res && res.success) {
+                  const updatedUser = { ...currentAdminUser, is_totp_enabled: false };
+                  setCurrentAdminUser(updatedUser);
+                  sessionStorage.setItem('adminUser', JSON.stringify(updatedUser));
+                  setSettingsFeedback('Đã tắt bảo mật 2 lớp.');
+              } else {
+                  setSettingsFeedback('Lỗi tắt bảo mật trên Server.');
+              }
+          } else {
+              disableTotp();
+              refreshSettings();
+              setSettingsFeedback('Đã tắt bảo mật 2 lớp (Local).');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const handleResetUser2FA = async (userId: string, username: string) => {
+      if (window.confirm(`Bạn có chắc chắn muốn đặt lại (TẮT) bảo mật 2 lớp cho nhân viên "${username}" không?`)) {
+          const res = await updateAdminUser(userId, { is_totp_enabled: false });
+          if (res && res.success) {
+              setSettingsFeedback(`Đã tắt 2FA cho ${username}. Họ sẽ cần thiết lập lại.`);
+              fetchAdminUsers().then(users => setAdminUsers(users || []));
+          } else {
+              setSettingsFeedback('Lỗi khi đặt lại 2FA.');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  // --- Other Handlers (Bank, Settings, etc.) ---
+  
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -352,7 +505,7 @@ const AdminPage: React.FC = () => {
   };
 
   const toLocalISOString = (date: Date) => {
-      const tzOffset = date.getTimezoneOffset() * 60000; // offset in milliseconds
+      const tzOffset = date.getTimezoneOffset() * 60000;
       const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
       return localISOTime;
   };
@@ -370,8 +523,8 @@ const AdminPage: React.FC = () => {
       setNewProductImage(product.imageUrl);
       setNewProductIsFlashSale(product.isFlashSale || false);
       setNewProductSalePrice(product.salePrice || '');
-      setNewProductSizes(product.sizes ? product.sizes.join(', ') : ''); // Load sizes
-      setNewProductColors(product.colors ? product.colors.join(', ') : ''); // Load colors
+      setNewProductSizes(product.sizes ? product.sizes.join(', ') : '');
+      setNewProductColors(product.colors ? product.colors.join(', ') : '');
       
       setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
       setNewProductFlashSaleEndTime(product.flashSaleEndTime ? toLocalISOString(new Date(product.flashSaleEndTime)) : '');
@@ -434,25 +587,21 @@ const AdminPage: React.FC = () => {
     };
 
     if (editingProduct) {
-        // Update existing product
         updateProduct({
             ...editingProduct,
             ...commonData,
-            stock: editingProduct.stock // Preserve stock
+            stock: editingProduct.stock
         });
         setProductFeedback('Cập nhật sản phẩm thành công!');
     } else {
-        // Add new product
         addProduct({
             ...commonData,
-            stock: 0 // Initial stock is 0
+            stock: 0
         });
         setProductFeedback('Thêm sản phẩm thành công!');
     }
     
     refreshProducts();
-
-    // Reset form
     handleCancelProductEdit();
     const fileInput = document.getElementById('image-upload') as HTMLInputElement;
     if(fileInput) fileInput.value = '';
@@ -472,21 +621,17 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // Category Handlers
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategoryName) {
         if (editingCategory) {
-            // Update existing
             updateCategory({ id: editingCategory.id, name: newCategoryName, description: newCategoryDesc });
             setProductFeedback('Đã cập nhật danh mục.');
         } else {
-            // Add new
             addCategory({ name: newCategoryName, description: newCategoryDesc });
             setProductFeedback('Thêm danh mục thành công.');
         }
         
-        // Reset form
         setNewCategoryName('');
         setNewCategoryDesc('');
         setEditingCategory(null);
@@ -517,15 +662,13 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // Order Handlers
   const handleOrderStatusChange = (orderId: string, newStatus: Order['status']) => {
       updateOrderStatus(orderId, newStatus);
       refreshOrders();
-      refreshProducts(); // Refresh products immediately to reflect stock changes
-      refreshInventory(); // Refresh inventory history
+      refreshProducts();
+      refreshInventory();
   };
 
-  // Printer Handler (NEW)
   const handlePrintOrder = (order: Order) => {
       const printWindow = window.open('', '', 'width=800,height=600');
       if (!printWindow) return;
@@ -535,7 +678,6 @@ const AdminPage: React.FC = () => {
       const storeAddress = 'Hà Nội, Việt Nam';
 
       const productUrl = `${window.location.origin}/?product=${order.productId}`;
-      
       const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(productUrl)}`;
 
       const shippingFee = order.shippingFee || 0;
@@ -641,7 +783,6 @@ const AdminPage: React.FC = () => {
       }, 500);
   };
 
-  // Customer Handlers
   const handleEditCustomer = (customer: Customer) => {
       setEditingCustomer(customer);
       setEditCustName(customer.fullName);
@@ -695,7 +836,6 @@ const AdminPage: React.FC = () => {
         return;
     }
     
-    // Check if product requires size/color
     if (product.sizes && product.sizes.length > 0 && !inventorySize) {
         setInventoryFeedback('Vui lòng chọn Size cho sản phẩm này.');
         return;
@@ -707,7 +847,6 @@ const AdminPage: React.FC = () => {
 
     const change = inventoryType === 'IMPORT' ? qty : -qty;
     
-    // Check for stock availability on export (Variant Aware)
     let currentStock = product.stock;
     if (inventorySize || inventoryColor) {
         const variant = product.variants?.find(v => 
@@ -722,11 +861,9 @@ const AdminPage: React.FC = () => {
          return;
     }
 
-    // Update with size/color
     const success = updateProductStock(productId, change, inventorySize, inventoryColor);
 
     if (success) {
-        // Construct Note
         let noteDetails = inventoryNote;
         if(inventorySize) noteDetails += ` [Size: ${inventorySize}]`;
         if(inventoryColor) noteDetails += ` [Màu: ${inventoryColor}]`;
@@ -806,41 +943,6 @@ const AdminPage: React.FC = () => {
       setTimeout(() => setSettingsFeedback(''), 3000);
   }
 
-  // TOTP Handlers
-  const handleStartTotpSetup = () => {
-      const secret = generateTotpSecret();
-      setTempTotpSecret(secret);
-      setTempTotpUri(getTotpUri(secret));
-      setShowTotpSetup(true);
-      setVerificationCode('');
-  };
-
-  const handleVerifyAndEnableTotp = (e: React.FormEvent) => {
-      e.preventDefault();
-      const cleanCode = verificationCode.replace(/\s/g, '');
-      console.log('Verifying TOTP code (cleaned):', cleanCode);
-
-      if (verifyTempTotpToken(cleanCode, tempTotpSecret)) {
-          enableTotp(tempTotpSecret);
-          refreshSettings();
-          setShowTotpSetup(false);
-          setSettingsFeedback('✅ Đã bật bảo mật 2 lớp thành công! Từ giờ bạn hãy dùng app Google Authenticator để lấy mã.');
-      } else {
-          setSettingsFeedback('❌ Mã xác nhận không đúng. Vui lòng kiểm tra lại đồng hồ điện thoại hoặc quét lại mã QR.');
-      }
-      setTimeout(() => setSettingsFeedback(''), 6000);
-  };
-
-  const handleDisableTotp = () => {
-      if (window.confirm('Bạn có chắc chắn muốn tắt bảo mật 2 lớp không? Tài khoản của bạn sẽ kém an toàn hơn.')) {
-          disableTotp();
-          refreshSettings();
-          setSettingsFeedback('Đã tắt bảo mật 2 lớp.');
-          setTimeout(() => setSettingsFeedback(''), 3000);
-      }
-  };
-
-  // Bank Settings Handler (NEW with Security)
   const handleBankSettingsChange = (field: keyof BankSettings, value: string) => {
       if (bankSettings) {
           setBankSettings({ ...bankSettings, [field]: value });
@@ -858,11 +960,9 @@ const AdminPage: React.FC = () => {
   const handleBankSettingsSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (isTotpEnabled()) {
-          // If 2FA enabled, show modal
           setShowBankSecurityModal(true);
           setSecurityCode('');
       } else {
-          // If not enabled, warn but allow (or force enable - here we allow with warning)
           if(confirm('Cảnh báo: Bạn chưa bật bảo mật 2 lớp. Hành động này kém an toàn. Bạn có muốn tiếp tục lưu không?')) {
               executeBankUpdate();
           }
@@ -880,168 +980,6 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // Store & Shipping Handlers (NEW)
-  const handleStoreSettingsSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      updateStoreSettings(storeSettings);
-      setSettingsFeedback('Đã cập nhật thông tin cửa hàng.');
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  const handleShippingSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      updateShippingSettings(shippingSettings);
-      syncShippingSettingsToDB(shippingSettings); // Sync to DB
-      setSettingsFeedback('Đã cập nhật cấu hình vận chuyển.');
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (passwordData.new !== passwordData.confirm) {
-          setSettingsFeedback('Mật khẩu xác nhận không khớp.');
-          return;
-      }
-      
-      const user = JSON.parse(sessionStorage.getItem('adminUser') || '{}');
-      if (!user.id) {
-          setSettingsFeedback('Không xác định được người dùng. Vui lòng đăng nhập lại.');
-          return;
-      }
-
-      const res = await changeAdminPassword({
-          id: user.id,
-          oldPassword: passwordData.old,
-          newPassword: passwordData.new
-      });
-
-      if (res && res.success) {
-          setSettingsFeedback('Đổi mật khẩu thành công!');
-          setPasswordData({ old: '', new: '', confirm: '' });
-      } else {
-          setSettingsFeedback(res?.message || 'Đổi mật khẩu thất bại.');
-      }
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  // SUB-ADMIN HANDLERS (New)
-  const handleAddAdminUser = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!adminUserForm.username || !adminUserForm.password || !adminUserForm.fullname) {
-          setSettingsFeedback('Vui lòng điền đủ thông tin.');
-          return;
-      }
-      
-      const res = await createAdminUser({
-          username: adminUserForm.username,
-          password: adminUserForm.password,
-          fullname: adminUserForm.fullname,
-          permissions: adminUserForm.permissions
-      });
-
-      if (res && res.success) {
-          setSettingsFeedback('Đã tạo tài khoản nhân viên thành công.');
-          setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
-          // Refresh list
-          fetchAdminUsers().then(users => setAdminUsers(users || []));
-      } else {
-          setSettingsFeedback(`Lỗi: ${res?.message || 'Không thể tạo'}`);
-      }
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  const handleUpdateAdminUser = async () => {
-      if (!isEditingAdmin) return;
-      const res = await updateAdminUser(isEditingAdmin, {
-          fullname: adminUserForm.fullname,
-          permissions: adminUserForm.permissions,
-          password: adminUserForm.password || undefined // Only update if provided
-      });
-      
-      if (res && res.success) {
-          setSettingsFeedback('Cập nhật nhân viên thành công.');
-          setIsEditingAdmin(null);
-          setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
-          fetchAdminUsers().then(users => setAdminUsers(users || []));
-      } else {
-          setSettingsFeedback('Cập nhật thất bại.');
-      }
-      setTimeout(() => setSettingsFeedback(''), 3000);
-  };
-
-  const handleDeleteAdminUser = async (id: string) => {
-      if (window.confirm("Bạn có chắc chắn muốn xóa tài khoản này không?")) {
-          const res = await deleteAdminUser(id);
-          if (res && res.success) {
-              setSettingsFeedback('Đã xóa tài khoản.');
-              fetchAdminUsers().then(users => setAdminUsers(users || []));
-          } else {
-              setSettingsFeedback('Xóa thất bại.');
-          }
-          setTimeout(() => setSettingsFeedback(''), 3000);
-      }
-  };
-
-  const togglePermission = (perm: string) => {
-      setAdminUserForm(prev => {
-          const exists = prev.permissions.includes(perm);
-          if (exists) {
-              return { ...prev, permissions: prev.permissions.filter(p => p !== perm) };
-          } else {
-              return { ...prev, permissions: [...prev.permissions, perm] };
-          }
-      });
-  };
-
-  const prepareEditAdmin = (user: AdminUser) => {
-      setIsEditingAdmin(user.id);
-      setAdminUserForm({
-          username: user.username,
-          password: '', // Don't show old password
-          fullname: user.fullname,
-          permissions: user.permissions || []
-      });
-  };
-
-  // Backup Handlers
-  const handleBackupDownload = () => {
-      downloadBackup();
-  };
-
-  const handleBackupRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      
-      if (window.confirm("Cảnh báo: Khôi phục dữ liệu sẽ ghi đè lên dữ liệu hiện tại. Bạn có chắc chắn không?")) {
-          const result = await restoreBackup(file);
-          alert(result.message);
-          if (result.success) {
-              window.location.reload();
-          }
-      }
-  };
-
-  const handleFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
-      const msg = scope === 'FULL' 
-        ? "CẢNH BÁO: Bạn sắp xóa TOÀN BỘ dữ liệu (Sản phẩm, Đơn hàng, Khách hàng...). Hành động này không thể hoàn tác. Bạn có chắc chắn không?"
-        : `Bạn có chắc chắn muốn xóa tất cả ${scope === 'ORDERS' ? 'Đơn hàng' : 'Sản phẩm'} không?`;
-        
-      if (window.confirm(msg)) {
-          // Double confirm for FULL
-          if (scope === 'FULL') {
-              const confirm2 = prompt("Nhập 'DELETE' để xác nhận xóa toàn bộ hệ thống:");
-              if (confirm2 !== 'DELETE') return;
-          }
-
-          const result = await performFactoryReset(scope);
-          alert(result.message);
-          if (result.success) {
-              window.location.reload();
-          }
-      }
-  };
-
-  // Social Settings Handler
   const handleSocialSettingsChange = (field: keyof SocialSettings, value: string) => {
       if (socialSettings) {
           setSocialSettings({ ...socialSettings, [field]: value });
@@ -1063,39 +1001,12 @@ const AdminPage: React.FC = () => {
       }
   };
 
-  // NEW: Handler for uploading promo images
-  const handlePromoImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && homeSettings) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB Limit check
-          setHomeFeedback('Ảnh quá lớn (Max 5MB)');
-          return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newUrl = reader.result as string;
-        const updatedUrls = [...(homeSettings.promoImageUrls || []), newUrl];
-        handleHomePageSettingsChange('promoImageUrls', updatedUrls);
-      };
-      reader.onerror = () => {
-          setHomeFeedback('Lỗi đọc file ảnh.');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleHomePageSubmit = async (e: React.FormEvent) => {
+  const handleHomePageSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (homeSettings) {
-          setHomeFeedback('Đang lưu...');
-          const result = await updateHomePageSettings(homeSettings);
-          
-          if (result && result.success) {
-              setHomeFeedback('✅ Cập nhật Trang chủ thành công trên Server!');
-          } else {
-              setHomeFeedback(`⚠️ Đã lưu trên máy này nhưng LỖI SERVER: ${result?.message || 'Không xác định'}. (Máy khác sẽ không thấy thay đổi)`);
-          }
-          setTimeout(() => setHomeFeedback(''), 5000);
+          updateHomePageSettings(homeSettings);
+          setHomeFeedback('Cập nhật Trang chủ thành công!');
+          setTimeout(() => setHomeFeedback(''), 3000);
       }
   };
 
@@ -1128,11 +1039,6 @@ const AdminPage: React.FC = () => {
       }
   };
   
-  const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
-    e.preventDefault();
-    window.location.hash = path;
-  };
-
   const handleTestEmail = async () => {
       const email = getPrimaryAdminEmail();
       const result = await sendEmail(
@@ -1147,6 +1053,15 @@ const AdminPage: React.FC = () => {
           setSettingsFeedback('Lỗi: Không thể gửi email. Vui lòng kiểm tra Log trên Render.');
       }
       setTimeout(() => setSettingsFeedback(''), 5000);
+  };
+
+  const togglePermission = (perm: string) => {
+      setAdminUserForm(prev => {
+          const perms = prev.permissions.includes(perm)
+              ? prev.permissions.filter(p => p !== perm)
+              : [...prev.permissions, perm];
+          return { ...prev, permissions: perms };
+      });
   };
 
   // --- RENDER FUNCTIONS IMPLEMENTATION ---
@@ -1669,7 +1584,6 @@ const AdminPage: React.FC = () => {
                       ))}
                   </tbody>
               </table>
-              {/* Pagination (Simple) */}
               <div className="p-4 border-t flex justify-between items-center">
                   <span className="text-sm text-gray-500">Trang {orderCurrentPage}</span>
                   <div className="flex gap-2">
@@ -1732,7 +1646,6 @@ const AdminPage: React.FC = () => {
                             </select>
                         </div>
 
-                        {/* Dynamic Size/Color Selectors */}
                         {selectedProductForInventory && (() => {
                             const p = products.find(prod => prod.id === parseInt(selectedProductForInventory));
                             if (!p) return null;
@@ -1804,7 +1717,6 @@ const AdminPage: React.FC = () => {
                             />
                         </div>
                         
-                        {/* Stock Display Helper */}
                         {selectedProductForInventory && (
                              <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
                                  {(() => {
@@ -1980,7 +1892,6 @@ const AdminPage: React.FC = () => {
     <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
         {aboutContent && aboutSettings ? (
             <form onSubmit={handleAboutSubmit} className="space-y-6">
-                {/* Hero Section */}
                 <div className="border-b pb-4">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Hero (Đầu trang)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2006,7 +1917,6 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Welcome Section */}
                 <div className="border-b pb-4">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Phần Chào mừng</h3>
                     <div className="space-y-4">
@@ -2021,7 +1931,6 @@ const AdminPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Styling Settings */}
                 <div className="border-b pb-4">
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Cài đặt Giao diện</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2058,7 +1967,6 @@ const AdminPage: React.FC = () => {
                <form onSubmit={handleHomePageSubmit} className="space-y-6">
                    <h3 className="text-xl font-bold text-gray-800 mb-6">Cấu hình Trang Chủ</h3>
                    
-                   {/* Hero Headline */}
                    <div className="border p-4 rounded-lg bg-gray-50">
                        <h4 className="font-bold text-gray-700 mb-3">Tiêu đề chính (Headline)</h4>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2072,12 +1980,11 @@ const AdminPage: React.FC = () => {
                        </div>
                    </div>
 
-                   {/* Promotion Section */}
                    <div className="border p-4 rounded-lg bg-gray-50">
                        <h4 className="font-bold text-gray-700 mb-3">Banner Quảng Cáo (Featured)</h4>
                        <div className="space-y-3">
                            <div>
-                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL hoặc Upload)</label>
+                               <label className="block text-xs font-bold text-gray-500 uppercase">Hình ảnh (URL)</label>
                                {homeSettings.promoImageUrls.map((url, idx) => (
                                    <div key={idx} className="flex gap-2 mb-2">
                                        <input 
@@ -2102,26 +2009,13 @@ const AdminPage: React.FC = () => {
                                         </button>
                                    </div>
                                ))}
-                               <div className="flex gap-4 mt-2">
-                                   <button 
-                                        type="button" 
-                                        onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
-                                        className="text-blue-600 text-sm hover:underline"
-                                    >
-                                        + Thêm dòng URL
-                                    </button>
-                                    
-                                    <label className="cursor-pointer text-[#00695C] text-sm hover:underline font-bold flex items-center gap-1">
-                                        <ImagePlus className="w-4 h-4" />
-                                        <span>+ Tải ảnh từ máy</span>
-                                        <input 
-                                            type="file" 
-                                            className="hidden" 
-                                            accept="image/*" 
-                                            onChange={handlePromoImageUpload} 
-                                        />
-                                    </label>
-                               </div>
+                               <button 
+                                    type="button" 
+                                    onClick={() => handleHomePageSettingsChange('promoImageUrls', [...homeSettings.promoImageUrls, ''])}
+                                    className="text-blue-600 text-sm hover:underline"
+                                >
+                                    + Thêm ảnh
+                                </button>
                            </div>
                            <div className="grid grid-cols-2 gap-4">
                                <input type="text" value={homeSettings.promoTitle1} onChange={(e) => handleHomePageSettingsChange('promoTitle1', e.target.value)} className="border rounded px-3 py-2" placeholder="Dòng 1" />
@@ -2132,7 +2026,6 @@ const AdminPage: React.FC = () => {
                        </div>
                    </div>
 
-                   {/* Flash Sale Section */}
                     <div className="border p-4 rounded-lg bg-gray-50">
                        <h4 className="font-bold text-gray-700 mb-3">Banner Flash Sale</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2219,65 +2112,6 @@ const AdminPage: React.FC = () => {
           <h3 className="text-xl font-bold mb-6 text-gray-800">Cài đặt Chung</h3>
           
           <div className="grid grid-cols-1 gap-8">
-              
-              {/* Store Settings */}
-              <div className="border-b pb-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <LayersIcon className="w-5 h-5 text-gray-600" />
-                      Thông tin Cửa hàng
-                  </h4>
-                  <form onSubmit={handleStoreSettingsSubmit} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Tên cửa hàng</label>
-                              <input type="text" value={storeSettings.name} onChange={e => setStoreSettings({...storeSettings, name: e.target.value})} className="w-full border rounded px-3 py-2" />
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                              <input type="text" value={storeSettings.phoneNumber} onChange={e => setStoreSettings({...storeSettings, phoneNumber: e.target.value})} className="w-full border rounded px-3 py-2" />
-                          </div>
-                          <div className="md:col-span-2">
-                              <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                              <input type="text" value={storeSettings.address} onChange={e => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full border rounded px-3 py-2" />
-                          </div>
-                      </div>
-                      <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu Thông tin</button>
-                  </form>
-              </div>
-
-              {/* Shipping Settings */}
-              <div className="border-b pb-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <TruckIcon className="w-5 h-5 text-gray-600" />
-                      Cấu hình Vận chuyển
-                  </h4>
-                  <form onSubmit={handleShippingSubmit} className="space-y-4 bg-gray-50 p-4 rounded-lg border">
-                      <div className="flex items-center gap-2 mb-2">
-                          <input 
-                              type="checkbox" 
-                              id="shipEnabled"
-                              checked={shippingSettings.enabled} 
-                              onChange={e => setShippingSettings({...shippingSettings, enabled: e.target.checked})} 
-                              className="w-4 h-4 text-[#D4AF37]"
-                          />
-                          <label htmlFor="shipEnabled" className="font-medium text-gray-700">Bật tính phí vận chuyển</label>
-                      </div>
-                      {shippingSettings.enabled && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Phí cơ bản</label>
-                                  <input type="number" value={shippingSettings.baseFee} onChange={e => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-700">Freeship cho đơn từ</label>
-                                  <input type="number" value={shippingSettings.freeShipThreshold} onChange={e => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
-                              </div>
-                          </div>
-                      )}
-                      <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu Cấu hình Vận chuyển</button>
-                  </form>
-              </div>
-
               {/* Email Management */}
               <div>
                   <h4 className="font-bold text-gray-700 mb-4">Quản lý Email Admin</h4>
@@ -2321,153 +2155,6 @@ const AdminPage: React.FC = () => {
                   </button>
               </div>
 
-              {/* ADMIN USER MANAGEMENT (SUB-ADMINS) - ONLY FOR MASTER */}
-              {currentAdminUser?.role === 'MASTER' && (
-                  <div className="border-t pt-6">
-                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                          <UsersIcon className="w-5 h-5 text-gray-600" />
-                          Quản lý Phân quyền (Sub-Admin)
-                      </h4>
-                      
-                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-                          <h5 className="font-bold text-sm mb-3 uppercase text-gray-600">{isEditingAdmin ? 'Sửa thông tin nhân viên' : 'Thêm nhân viên mới'}</h5>
-                          <form onSubmit={isEditingAdmin ? handleUpdateAdminUser : handleAddAdminUser} className="space-y-3">
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  <input 
-                                      type="text" 
-                                      placeholder="Tên đăng nhập" 
-                                      value={adminUserForm.username}
-                                      onChange={e => setAdminUserForm({...adminUserForm, username: e.target.value})}
-                                      className="border rounded px-3 py-2"
-                                      disabled={!!isEditingAdmin}
-                                      required
-                                  />
-                                  <input 
-                                      type="text" 
-                                      placeholder="Họ tên nhân viên" 
-                                      value={adminUserForm.fullname}
-                                      onChange={e => setAdminUserForm({...adminUserForm, fullname: e.target.value})}
-                                      className="border rounded px-3 py-2"
-                                      required
-                                  />
-                                  <input 
-                                      type="password" 
-                                      placeholder={isEditingAdmin ? "Mật khẩu mới (để trống nếu ko đổi)" : "Mật khẩu"} 
-                                      value={adminUserForm.password}
-                                      onChange={e => setAdminUserForm({...adminUserForm, password: e.target.value})}
-                                      className="border rounded px-3 py-2"
-                                      required={!isEditingAdmin}
-                                  />
-                              </div>
-                              
-                              <div>
-                                  <p className="text-xs font-bold mb-2">Quyền hạn:</p>
-                                  <div className="flex flex-wrap gap-4">
-                                      {[
-                                          {id: 'products', label: 'Sản phẩm'},
-                                          {id: 'orders', label: 'Đơn hàng'},
-                                          {id: 'inventory', label: 'Kho hàng'},
-                                          {id: 'customers', label: 'Khách hàng'},
-                                          {id: 'settings', label: 'Cài đặt'}
-                                      ].map(perm => (
-                                          <label key={perm.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                                              <input 
-                                                  type="checkbox" 
-                                                  checked={adminUserForm.permissions.includes(perm.id) || adminUserForm.permissions.includes('ALL')}
-                                                  onChange={() => togglePermission(perm.id)}
-                                                  className="w-4 h-4 text-[#D4AF37]"
-                                              />
-                                              {perm.label}
-                                          </label>
-                                      ))}
-                                  </div>
-                              </div>
-
-                              <div className="flex gap-2">
-                                  <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] text-sm">
-                                      {isEditingAdmin ? 'Lưu thay đổi' : 'Tạo tài khoản'}
-                                  </button>
-                                  {isEditingAdmin && (
-                                      <button 
-                                          type="button" 
-                                          onClick={() => { setIsEditingAdmin(null); setAdminUserForm({username:'', password:'', fullname:'', permissions:[]}); }} 
-                                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-400"
-                                      >
-                                          Hủy
-                                      </button>
-                                  )}
-                              </div>
-                          </form>
-                      </div>
-
-                      <div className="overflow-x-auto border rounded-lg">
-                          <table className="min-w-full text-sm text-left">
-                              <thead className="bg-gray-100 text-gray-700 uppercase font-bold text-xs">
-                                  <tr>
-                                      <th className="px-4 py-3">Username</th>
-                                      <th className="px-4 py-3">Họ tên</th>
-                                      <th className="px-4 py-3">Vai trò</th>
-                                      <th className="px-4 py-3">Quyền hạn</th>
-                                      <th className="px-4 py-3 text-right">Thao tác</th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-200">
-                                  {/* Master Row (Always Top) */}
-                                  <tr className="bg-yellow-50">
-                                      <td className="px-4 py-3 font-bold">admin (Bạn)</td>
-                                      <td className="px-4 py-3">Master Admin</td>
-                                      <td className="px-4 py-3"><span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold">MASTER</span></td>
-                                      <td className="px-4 py-3 text-xs">Toàn quyền</td>
-                                      <td className="px-4 py-3"></td>
-                                  </tr>
-                                  {/* Sub Admins */}
-                                  {adminUsers.filter(u => u.role !== 'MASTER').map(user => (
-                                      <tr key={user.id} className="hover:bg-gray-50">
-                                          <td className="px-4 py-3 font-medium">{user.username}</td>
-                                          <td className="px-4 py-3">{user.fullname}</td>
-                                          <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">STAFF</span></td>
-                                          <td className="px-4 py-3">
-                                              <div className="flex flex-wrap gap-1">
-                                                  {user.permissions.map(p => (
-                                                      <span key={p} className="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded text-[10px] uppercase">{p}</span>
-                                                  ))}
-                                              </div>
-                                          </td>
-                                          <td className="px-4 py-3 text-right">
-                                              <button onClick={() => prepareEditAdmin(user)} className="text-blue-600 hover:text-blue-800 mr-3 text-xs font-bold">Sửa</button>
-                                              <button onClick={() => handleDeleteAdminUser(user.id)} className="text-red-600 hover:text-red-800 text-xs font-bold">Xóa</button>
-                                          </td>
-                                      </tr>
-                                  ))}
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
-              )}
-
-              {/* Change Password */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <UserIcon className="w-5 h-5 text-gray-600" />
-                      Đổi Mật khẩu Admin
-                  </h4>
-                  <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700">Mật khẩu cũ</label>
-                          <input type="password" value={passwordData.old} onChange={e => setPasswordData({...passwordData, old: e.target.value})} className="w-full border rounded px-3 py-2" required />
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700">Mật khẩu mới</label>
-                          <input type="password" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} className="w-full border rounded px-3 py-2" required />
-                      </div>
-                      <div>
-                          <label className="block text-sm font-medium text-gray-700">Nhập lại mật khẩu mới</label>
-                          <input type="password" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border rounded px-3 py-2" required />
-                      </div>
-                      <button type="submit" className="bg-gray-800 text-white px-4 py-2 rounded font-bold hover:bg-gray-700">Đổi Mật khẩu</button>
-                  </form>
-              </div>
-
               {/* Login Logs Section */}
               <div className="border-t pt-6">
                   <div className="flex justify-between items-center mb-4">
@@ -2494,7 +2181,6 @@ const AdminPage: React.FC = () => {
                           <thead className="bg-gray-200 text-gray-700 font-medium sticky top-0">
                               <tr>
                                   <th className="px-3 py-2">Thời gian</th>
-                                  <th className="px-3 py-2">Username</th>
                                   <th className="px-3 py-2">Phương thức</th>
                                   <th className="px-3 py-2">IP</th>
                                   <th className="px-3 py-2">Trạng thái</th>
@@ -2504,7 +2190,6 @@ const AdminPage: React.FC = () => {
                               {adminLogs.map((log) => (
                                   <tr key={log.id} className="hover:bg-white">
                                       <td className="px-3 py-2">{new Date(log.timestamp).toLocaleString('vi-VN')}</td>
-                                      <td className="px-3 py-2 font-bold">{log.username}</td>
                                       <td className="px-3 py-2">
                                           {log.method === 'GOOGLE_AUTH' ? 
                                             <span className="text-purple-600 font-bold flex items-center gap-1"><ShieldCheckIcon className="w-3 h-3"/> 2FA App</span> : 
@@ -2520,7 +2205,7 @@ const AdminPage: React.FC = () => {
                               ))}
                               {adminLogs.length === 0 && (
                                   <tr>
-                                      <td colSpan={5} className="text-center py-4 italic text-gray-400">Chưa có dữ liệu nhật ký.</td>
+                                      <td colSpan={4} className="text-center py-4 italic text-gray-400">Chưa có dữ liệu nhật ký.</td>
                                   </tr>
                               )}
                           </tbody>
@@ -2532,10 +2217,10 @@ const AdminPage: React.FC = () => {
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
-                      Bảo mật 2 lớp (Google Authenticator)
+                      Bảo mật 2 lớp (Của Bạn)
                   </h4>
                   
-                  {totpEnabled ? (
+                  {(currentAdminUser ? currentAdminUser.is_totp_enabled : totpEnabled) ? (
                       <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
                           <div className="flex items-center gap-3 mb-2">
                               <div className="bg-green-500 text-white rounded-full p-1">
@@ -2544,7 +2229,7 @@ const AdminPage: React.FC = () => {
                               <h5 className="font-bold text-green-800">Đã kích hoạt</h5>
                           </div>
                           <p className="text-sm text-green-700 mb-4">
-                              Tài khoản của bạn đang được bảo vệ bởi Google Authenticator. Bạn cần nhập mã từ ứng dụng khi đăng nhập.
+                              Tài khoản <strong>{currentAdminUser ? currentAdminUser.username : 'Admin'}</strong> đang được bảo vệ bởi Google Authenticator.
                           </p>
                           <button 
                               onClick={handleDisableTotp}
@@ -2558,7 +2243,7 @@ const AdminPage: React.FC = () => {
                           {!showTotpSetup ? (
                               <>
                                 <p className="text-sm text-gray-600 mb-4">
-                                    Tăng cường bảo mật bằng cách sử dụng Google Authenticator. Bạn sẽ không cần phụ thuộc vào Email để lấy OTP nữa.
+                                    Tăng cường bảo mật cho tài khoản <strong>{currentAdminUser ? currentAdminUser.username : 'Admin'}</strong>. Bạn sẽ cần nhập mã từ điện thoại khi đăng nhập.
                                 </p>
                                 <button 
                                     onClick={handleStartTotpSetup}
@@ -2606,6 +2291,141 @@ const AdminPage: React.FC = () => {
                       </div>
                   )}
               </div>
+
+              {/* ADMIN USER MANAGEMENT (SUB-ADMINS) - ONLY FOR MASTER */}
+              {currentAdminUser?.role === 'MASTER' && (
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <UsersIcon className="w-5 h-5 text-gray-600" />
+                          Quản lý Phân quyền (Sub-Admin)
+                      </h4>
+                      
+                      <form onSubmit={handleSaveAdminUser} className="bg-gray-50 p-4 rounded-lg border mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Tên đăng nhập</label>
+                                <input 
+                                    type="text" 
+                                    value={adminUserForm.username} 
+                                    onChange={e => setAdminUserForm({...adminUserForm, username: e.target.value})}
+                                    className="w-full border rounded px-3 py-2"
+                                    disabled={!!isEditingAdmin}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Họ tên</label>
+                                <input 
+                                    type="text" 
+                                    value={adminUserForm.fullname} 
+                                    onChange={e => setAdminUserForm({...adminUserForm, fullname: e.target.value})}
+                                    className="w-full border rounded px-3 py-2"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Mật khẩu {isEditingAdmin && '(Để trống nếu không đổi)'}</label>
+                                <input 
+                                    type="password" 
+                                    value={adminUserForm.password} 
+                                    onChange={e => setAdminUserForm({...adminUserForm, password: e.target.value})}
+                                    className="w-full border rounded px-3 py-2"
+                                    required={!isEditingAdmin}
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-gray-500 mb-2">Quyền hạn</label>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                {PERMISSION_GROUPS.flatMap(g => g.options).map(perm => (
+                                    <label key={perm.id} className="flex items-center gap-2 text-sm bg-white border px-2 py-1 rounded cursor-pointer hover:bg-gray-100">
+                                        <input 
+                                            type="checkbox"
+                                            checked={adminUserForm.permissions.includes(perm.id)}
+                                            onChange={() => togglePermission(perm.id)}
+                                            className="rounded text-[#D4AF37] focus:ring-[#D4AF37]"
+                                        />
+                                        {perm.label}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">
+                                {isEditingAdmin ? 'Cập nhật Nhân viên' : 'Tạo Nhân viên'}
+                            </button>
+                            {isEditingAdmin && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setIsEditingAdmin(null);
+                                        setAdminUserForm({ username: '', password: '', fullname: '', permissions: [] });
+                                    }}
+                                    className="bg-gray-300 text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-400"
+                                >
+                                    Hủy
+                                </button>
+                            )}
+                        </div>
+                    </form>
+
+                      <div className="overflow-x-auto border rounded-lg mt-4">
+                          <table className="min-w-full text-sm text-left">
+                              <thead className="bg-gray-100 text-gray-700 uppercase font-bold text-xs">
+                                  <tr>
+                                      <th className="px-4 py-3">Username</th>
+                                      <th className="px-4 py-3">Họ tên</th>
+                                      <th className="px-4 py-3">Vai trò</th>
+                                      <th className="px-4 py-3">Bảo mật</th>
+                                      <th className="px-4 py-3 text-right">Thao tác</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                  {/* Master Row */}
+                                  <tr className="bg-yellow-50">
+                                      <td className="px-4 py-3 font-bold">admin (Bạn)</td>
+                                      <td className="px-4 py-3">Master Admin</td>
+                                      <td className="px-4 py-3"><span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs font-bold">MASTER</span></td>
+                                      <td className="px-4 py-3">
+                                          {currentAdminUser.is_totp_enabled ? <span className="text-green-600 font-bold text-xs">2FA ON</span> : <span className="text-gray-400 text-xs">2FA OFF</span>}
+                                      </td>
+                                      <td className="px-4 py-3"></td>
+                                  </tr>
+                                  {/* Sub Admins */}
+                                  {adminUsers.filter(u => u.role !== 'MASTER').map(user => (
+                                      <tr key={user.id} className="hover:bg-gray-50">
+                                          <td className="px-4 py-3 font-medium">{user.username}</td>
+                                          <td className="px-4 py-3">{user.fullname}</td>
+                                          <td className="px-4 py-3"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">STAFF</span></td>
+                                          <td className="px-4 py-3">
+                                              {user.is_totp_enabled ? (
+                                                  <div className="flex items-center gap-2">
+                                                      <span className="text-green-600 font-bold text-xs">2FA ON</span>
+                                                      <button 
+                                                          onClick={() => handleResetUser2FA(user.id, user.username)}
+                                                          className="text-xs text-red-500 hover:underline border border-red-200 px-1 rounded bg-white"
+                                                          title="Tắt 2FA nếu nhân viên mất máy"
+                                                      >
+                                                          Reset
+                                                      </button>
+                                                  </div>
+                                              ) : (
+                                                  <span className="text-gray-400 text-xs">Chưa bật</span>
+                                              )}
+                                          </td>
+                                          <td className="px-4 py-3 text-right">
+                                              <button onClick={() => prepareEditAdmin(user)} className="text-blue-600 hover:text-blue-800 mr-3 text-xs font-bold">Sửa</button>
+                                              <button onClick={() => handleDeleteAdminUser(user.id)} className="text-red-600 hover:text-red-800 text-xs font-bold">Xóa</button>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              )}
 
               {/* Bank Settings Section (NEW with Security) */}
               <div className="border-t pt-6">
@@ -2684,43 +2504,6 @@ const AdminPage: React.FC = () => {
                           </button>
                       </form>
                   )}
-              </div>
-
-              {/* Backup & Reset */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 text-red-600 flex items-center gap-2">
-                      <Trash2Icon className="w-5 h-5" />
-                      Khu vực Nguy hiểm & Sao lưu
-                  </h4>
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-6">
-                      <div>
-                          <h5 className="font-bold text-gray-800 mb-2">Sao lưu & Khôi phục dữ liệu</h5>
-                          <div className="flex gap-4">
-                              <button onClick={handleBackupDownload} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
-                                  <PackageIcon className="w-4 h-4" /> Tải file Backup (.json)
-                              </button>
-                              <label className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 cursor-pointer flex items-center gap-2">
-                                  <LayersIcon className="w-4 h-4" /> Khôi phục từ File
-                                  <input type="file" className="hidden" accept=".json" onChange={handleBackupRestore} />
-                              </label>
-                          </div>
-                      </div>
-                      
-                      <div className="border-t border-red-200 pt-4">
-                          <h5 className="font-bold text-red-800 mb-2">Reset Dữ liệu (Thao tác này sẽ xóa vĩnh viễn trên Server)</h5>
-                          <div className="flex flex-wrap gap-3">
-                              <button onClick={() => handleFactoryReset('ORDERS')} className="bg-red-100 text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-200 text-sm">
-                                  Xóa tất cả Đơn hàng & Giao dịch
-                              </button>
-                              <button onClick={() => handleFactoryReset('PRODUCTS')} className="bg-red-100 text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-200 text-sm">
-                                  Xóa tất cả Sản phẩm
-                              </button>
-                              <button onClick={() => handleFactoryReset('FULL')} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-bold text-sm">
-                                  FACTORY RESET (XÓA TOÀN BỘ)
-                              </button>
-                          </div>
-                      </div>
-                  </div>
               </div>
           </div>
           
@@ -2802,63 +2585,81 @@ const AdminPage: React.FC = () => {
           <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
         </div>
         <nav className="p-4 space-y-2">
-           <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <BarChart2 className="w-5 h-5" /> Tổng quan
-          </button>
-           <button 
-            onClick={() => setActiveTab('products')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <PackageIcon className="w-5 h-5" /> Sản phẩm
-          </button>
-          <button 
-            onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
-          </button>
-          <button 
-            onClick={() => setActiveTab('inventory')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <BarChart2 className="w-5 h-5" /> Kho hàng
-          </button>
-           <button 
-            onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-          >
-            <UsersIcon className="w-5 h-5" /> Khách hàng
-          </button>
+           {hasPermission('dashboard') && (
+               <button 
+                onClick={() => setActiveTab('dashboard')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              >
+                <BarChart2 className="w-5 h-5" /> Tổng quan
+              </button>
+           )}
+           {hasPermission('products') && (
+               <button 
+                onClick={() => setActiveTab('products')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              >
+                <PackageIcon className="w-5 h-5" /> Sản phẩm
+              </button>
+           )}
+           {hasPermission('orders') && (
+              <button 
+                onClick={() => setActiveTab('orders')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              >
+                <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
+              </button>
+           )}
+           {hasPermission('inventory') && (
+              <button 
+                onClick={() => setActiveTab('inventory')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              >
+                <BarChart2 className="w-5 h-5" /> Kho hàng
+              </button>
+           )}
+           {hasPermission('customers') && (
+               <button 
+                onClick={() => setActiveTab('customers')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+              >
+                <UsersIcon className="w-5 h-5" /> Khách hàng
+              </button>
+           )}
           
           <div className="pt-4 mt-4 border-t border-gray-700">
             <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Giao diện</p>
-            <button 
-                onClick={() => setActiveTab('home')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <EditIcon className="w-5 h-5" /> Trang chủ
-            </button>
-             <button 
-                onClick={() => setActiveTab('header')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <LayersIcon className="w-5 h-5" /> Header/Menu
-            </button>
-             <button 
-                onClick={() => setActiveTab('about')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <EditIcon className="w-5 h-5" /> Giới thiệu
-            </button>
-            <button 
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
-            >
-                <UserIcon className="w-5 h-5" /> Cài đặt chung
-            </button>
+            {hasPermission('home') && (
+                <button 
+                    onClick={() => setActiveTab('home')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'home' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                >
+                    <EditIcon className="w-5 h-5" /> Trang chủ
+                </button>
+            )}
+            {hasPermission('header') && (
+                 <button 
+                    onClick={() => setActiveTab('header')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'header' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                >
+                    <LayersIcon className="w-5 h-5" /> Header/Menu
+                </button>
+            )}
+            {hasPermission('about') && (
+                 <button 
+                    onClick={() => setActiveTab('about')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'about' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                >
+                    <EditIcon className="w-5 h-5" /> Giới thiệu
+                </button>
+            )}
+            {hasPermission('settings') && (
+                <button 
+                    onClick={() => setActiveTab('settings')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+                >
+                    <UserIcon className="w-5 h-5" /> Cài đặt chung
+                </button>
+            )}
           </div>
         </nav>
         
@@ -2885,9 +2686,12 @@ const AdminPage: React.FC = () => {
                  activeTab === 'header' ? 'Cấu hình Menu/Logo' : 'Cài đặt'}
             </h2>
             <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500 hidden md:inline">Đăng nhập: {new Date().toLocaleDateString('vi-VN')}</span>
+                <div className="text-right">
+                    <span className="text-sm font-bold text-gray-800 block">{currentAdminUser ? currentAdminUser.fullname : 'Master Admin'}</span>
+                    <span className="text-xs text-gray-500">{new Date().toLocaleDateString('vi-VN')}</span>
+                </div>
                 <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                    A
+                    {currentAdminUser ? currentAdminUser.username.charAt(0).toUpperCase() : 'A'}
                 </div>
             </div>
         </header>
