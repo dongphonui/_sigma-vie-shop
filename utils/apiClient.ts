@@ -1,13 +1,40 @@
 
 export const API_BASE_URL = (() => {
-    // Ưu tiên biến môi trường nếu có
-    if (import.meta.env.VITE_API_URL) {
-        return import.meta.env.VITE_API_URL;
+    // 1. Try process.env (Provided by Vite's define config)
+    try {
+        if (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
+            return process.env.VITE_API_URL;
+        }
+    } catch(e) {}
+
+    // 2. Try import.meta.env (Standard Vite) with extreme safety
+    try {
+        // @ts-ignore
+        const meta = import.meta;
+        if (meta && meta.env && meta.env.VITE_API_URL) {
+            return meta.env.VITE_API_URL;
+        }
+    } catch (e) {
+        // Ignore errors if import.meta is not supported
     }
-    // Tự động lấy hostname hiện tại của trình duyệt
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    return `http://${hostname}:3000/api`;
+    
+    // 3. Fallback: Automatically determine hostname
+    let host = 'localhost';
+    try {
+        if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+            const h = window.location.hostname.trim();
+            if (h !== '') {
+                host = h;
+            }
+        }
+    } catch (e) {
+        // Fallback to localhost on error
+    }
+    return `http://${host}:3000/api`;
 })();
+
+// Track offline status to reduce console noise
+let isOffline = false;
 
 export const checkServerConnection = async (): Promise<boolean> => {
     try {
@@ -15,17 +42,19 @@ export const checkServerConnection = async (): Promise<boolean> => {
             method: 'GET',
             signal: AbortSignal.timeout(3000) 
         });
-        return res.ok;
+        if (res.ok) {
+            isOffline = false;
+            return true;
+        }
+        return false;
     } catch (e) {
-        console.warn(`Server connection failed at ${API_BASE_URL}`, e);
         return false;
     }
 };
 
 const fetchData = async (endpoint: string) => {
     try {
-        // Add timestamp to prevent browser caching (QUAN TRỌNG)
-        // Thêm tham số _t=... để trình duyệt luôn hiểu đây là yêu cầu mới
+        // Add timestamp to prevent browser caching
         const separator = endpoint.includes('?') ? '&' : '?';
         const url = `${API_BASE_URL}/${endpoint}${separator}_t=${Date.now()}`;
         
@@ -38,9 +67,20 @@ const fetchData = async (endpoint: string) => {
         });
         
         if (!res.ok) return null;
+        
+        // If we were offline and now succeed, log it
+        if (isOffline) {
+            console.log('[API] Connection restored.');
+            isOffline = false;
+        }
+        
         return await res.json();
     } catch (e) {
-        console.error(`Error fetching ${endpoint} from ${API_BASE_URL}:`, e);
+        // Only log warning once when switching to offline state
+        if (!isOffline) {
+            console.warn(`[API] Server unreachable at ${API_BASE_URL}. App is running in Offline Mode.`);
+            isOffline = true;
+        }
         return null;
     }
 };
@@ -67,10 +107,18 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
             return { success: false, message: `Server error (${res.status}): ${errorText}` };
         }
         
+        if (isOffline) {
+            console.log('[API] Connection restored during sync.');
+            isOffline = false;
+        }
+
         return await res.json();
     } catch (e) {
-        console.error(`Error syncing ${endpoint} to ${API_BASE_URL}:`, e);
-        return { success: false, message: `Lỗi mạng (Network Error): Không thể kết nối tới ${API_BASE_URL}. Kiểm tra xem Server đã bật chưa?` };
+        if (!isOffline) {
+            console.warn(`[API] Sync failed. Server unreachable.`);
+            isOffline = true;
+        }
+        return { success: false, message: `Offline Mode: Data saved locally only.`, isNetworkError: true };
     }
 };
 

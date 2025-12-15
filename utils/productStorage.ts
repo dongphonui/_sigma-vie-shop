@@ -163,7 +163,7 @@ export const getProducts = (): Product[] => {
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
       }).catch(err => {
-          console.error("Lỗi kết nối Server khi tải sản phẩm (Background):", err);
+          // Silent catch for background fetch to avoid noisy logs when offline
       });
     }
 
@@ -227,11 +227,12 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
   // Gửi lên Server Postgres (Không chặn UI)
   console.log("Đang gửi sản phẩm mới lên Server:", newProduct.name);
   syncProductToDB(newProduct).then(res => {
-      if (!res || !res.success) {
+      // Check if it's a real server error or just offline/network error
+      if (res && !res.success && !res.isNetworkError) {
           console.error("❌ LƯU SERVER THẤT BẠI. Dữ liệu chỉ nằm ở Local.", res);
-          // Alert user immediately about the failure
+          // Alert only on REAL server errors (like 500, 400), not offline mode
           alert(`CẢNH BÁO LỖI SERVER:\n\nSản phẩm "${newProduct.name}" chỉ được lưu trên máy này và chưa lên Server.\n\nNguyên nhân: ${res?.message || 'Không xác định'}`);
-      } else {
+      } else if (res && res.success) {
           console.log("✅ Đã lưu sản phẩm lên Server thành công.");
       }
   });
@@ -248,7 +249,7 @@ export const updateProduct = (updatedProduct: Product): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
     
     syncProductToDB(updatedProduct).then(res => {
-        if (!res || !res.success) {
+        if (res && !res.success && !res.isNetworkError) {
              alert(`CẢNH BÁO LỖI SERVER:\n\nCập nhật "${updatedProduct.name}" thất bại trên Server.\n\nNguyên nhân: ${res?.message || 'Không xác định'}`);
         }
     });
