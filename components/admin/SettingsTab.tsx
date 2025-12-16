@@ -52,13 +52,19 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   // -- Backup Loading --
   const [isBackupLoading, setIsBackupLoading] = useState(false);
 
+  // GRANULAR PERMISSIONS LIST
   const PERMISSION_OPTIONS = [
-      { id: 'dashboard', label: 'Xem Tổng quan' },
-      { id: 'products', label: 'Quản lý Sản phẩm' },
-      { id: 'orders', label: 'Quản lý Đơn hàng' },
-      { id: 'inventory', label: 'Quản lý Kho' },
-      { id: 'customers', label: 'Quản lý Khách hàng' },
-      { id: 'settings', label: 'Cài đặt Chung' }, // Includes UI editing
+      { id: 'dashboard', label: 'Xem Tổng quan', group: 'Module Chính' },
+      { id: 'products', label: 'Quản lý Sản phẩm', group: 'Module Chính' },
+      { id: 'orders', label: 'Quản lý Đơn hàng', group: 'Module Chính' },
+      { id: 'inventory', label: 'Quản lý Kho', group: 'Module Chính' },
+      { id: 'customers', label: 'Quản lý Khách hàng', group: 'Module Chính' },
+      
+      { id: 'settings_ui', label: 'Sửa Giao diện Web (Home, About, Header)', group: 'Cài đặt' },
+      { id: 'settings_info', label: 'Sửa Thông tin Shop (In bill)', group: 'Cài đặt' },
+      { id: 'settings_shipping', label: 'Cấu hình Vận chuyển', group: 'Cài đặt' },
+      { id: 'settings_data', label: 'Quản lý Dữ liệu (Backup/Reset)', group: 'Cài đặt' },
+      { id: 'settings_logs', label: 'Xem Nhật ký hoạt động', group: 'Cài đặt' },
   ];
 
   useEffect(() => {
@@ -70,13 +76,22 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       setStoreSettings(getStoreSettings());
       setShippingSettings(getShippingSettings());
       
-      fetchAdminLoginLogs().then(logs => { if (logs) setAdminLogs(logs); });
+      if (checkPermission('settings_logs')) {
+          fetchAdminLoginLogs().then(logs => { if (logs) setAdminLogs(logs); });
+      }
 
-      // Load Sub-Admins only if Master
-      if (currentUser?.role === 'MASTER' || currentUser?.username === 'admin') {
+      // Load Sub-Admins only if Master or has specific account permission
+      if (checkPermission('MASTER')) {
           loadSubAdmins();
       }
   }, [currentUser]);
+
+  const checkPermission = (perm: string) => {
+      if (!currentUser) return false;
+      if (currentUser.role === 'MASTER' || currentUser.username === 'admin') return true;
+      if (perm === 'MASTER') return false; // Explicit Master check
+      return currentUser.permissions?.includes(perm) || currentUser.permissions?.includes('ALL');
+  }
 
   const loadSubAdmins = () => {
       fetchAdminUsers().then(users => {
@@ -275,72 +290,76 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
           <div className="space-y-8">
               
-              {/* 1. STORE INFORMATION */}
-              <div>
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <PrinterIcon className="w-5 h-5 text-gray-600" />
-                      Thông tin Cửa hàng (In hóa đơn)
-                  </h4>
-                  {storeSettings && (
-                      <form onSubmit={handleStoreSubmit} className="space-y-4 max-w-lg">
-                          <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">Tên cửa hàng</label>
-                              <input type="text" value={storeSettings.name} onChange={(e) => setStoreSettings({...storeSettings, name: e.target.value})} className="w-full border rounded px-3 py-2" required />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
+              {/* 1. STORE INFORMATION - Permission: settings_info */}
+              {checkPermission('settings_info') && (
+                  <div>
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <PrinterIcon className="w-5 h-5 text-gray-600" />
+                          Thông tin Cửa hàng (In hóa đơn)
+                      </h4>
+                      {storeSettings && (
+                          <form onSubmit={handleStoreSubmit} className="space-y-4 max-w-lg">
                               <div>
-                                  <label className="block text-sm font-medium text-gray-600 mb-1">Hotline</label>
-                                  <input type="text" value={storeSettings.phoneNumber} onChange={(e) => setStoreSettings({...storeSettings, phoneNumber: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">Tên cửa hàng</label>
+                                  <input type="text" value={storeSettings.name} onChange={(e) => setStoreSettings({...storeSettings, name: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">Hotline</label>
+                                      <input type="text" value={storeSettings.phoneNumber} onChange={(e) => setStoreSettings({...storeSettings, phoneNumber: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                                  </div>
+                                  <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">Email liên hệ</label>
+                                      <input type="text" value={storeSettings.email || ''} onChange={(e) => setStoreSettings({...storeSettings, email: e.target.value})} className="w-full border rounded px-3 py-2" />
+                                  </div>
                               </div>
                               <div>
-                                  <label className="block text-sm font-medium text-gray-600 mb-1">Email liên hệ</label>
-                                  <input type="text" value={storeSettings.email || ''} onChange={(e) => setStoreSettings({...storeSettings, email: e.target.value})} className="w-full border rounded px-3 py-2" />
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">Địa chỉ</label>
+                                  <input type="text" value={storeSettings.address} onChange={(e) => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full border rounded px-3 py-2" required />
                               </div>
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">Địa chỉ</label>
-                              <input type="text" value={storeSettings.address} onChange={(e) => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full border rounded px-3 py-2" required />
-                          </div>
-                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu thông tin</button>
-                      </form>
-                  )}
-              </div>
+                              <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu thông tin</button>
+                          </form>
+                      )}
+                  </div>
+              )}
 
-              {/* 2. SHIPPING SETTINGS */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <TruckIcon className="w-5 h-5 text-gray-600" />
-                      Cấu hình Vận chuyển
-                  </h4>
-                  {shippingSettings && (
-                      <form onSubmit={handleShippingSubmit} className="space-y-4 max-w-lg">
-                          <div className="flex items-center gap-2 mb-2">
-                              <input 
-                                type="checkbox" 
-                                id="shippingEnabled" 
-                                checked={shippingSettings.enabled} 
-                                onChange={(e) => setShippingSettings({...shippingSettings, enabled: e.target.checked})} 
-                                className="w-4 h-4 text-[#D4AF37] rounded" 
-                              />
-                              <label htmlFor="shippingEnabled" className="text-sm font-medium text-gray-700">Bật tính phí vận chuyển</label>
-                          </div>
-                          
-                          <div className={`grid grid-cols-2 gap-4 ${!shippingSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-600 mb-1">Phí ship cơ bản</label>
-                                  <input type="number" value={shippingSettings.baseFee} onChange={(e) => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+              {/* 2. SHIPPING SETTINGS - Permission: settings_shipping */}
+              {checkPermission('settings_shipping') && (
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <TruckIcon className="w-5 h-5 text-gray-600" />
+                          Cấu hình Vận chuyển
+                      </h4>
+                      {shippingSettings && (
+                          <form onSubmit={handleShippingSubmit} className="space-y-4 max-w-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                  <input 
+                                    type="checkbox" 
+                                    id="shippingEnabled" 
+                                    checked={shippingSettings.enabled} 
+                                    onChange={(e) => setShippingSettings({...shippingSettings, enabled: e.target.checked})} 
+                                    className="w-4 h-4 text-[#D4AF37] rounded" 
+                                  />
+                                  <label htmlFor="shippingEnabled" className="text-sm font-medium text-gray-700">Bật tính phí vận chuyển</label>
                               </div>
-                              <div>
-                                  <label className="block text-sm font-medium text-gray-600 mb-1">Freeship cho đơn từ</label>
-                                  <input type="number" value={shippingSettings.freeShipThreshold} onChange={(e) => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                              
+                              <div className={`grid grid-cols-2 gap-4 ${!shippingSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                                  <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">Phí ship cơ bản</label>
+                                      <input type="number" value={shippingSettings.baseFee} onChange={(e) => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                                  </div>
+                                  <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">Freeship cho đơn từ</label>
+                                      <input type="number" value={shippingSettings.freeShipThreshold} onChange={(e) => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                                  </div>
                               </div>
-                          </div>
-                          <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu cấu hình</button>
-                      </form>
-                  )}
-              </div>
+                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu cấu hình</button>
+                          </form>
+                      )}
+                  </div>
+              )}
 
-              {/* 3. PASSWORD CHANGE */}
+              {/* 3. PASSWORD CHANGE - Available to ALL logged in admins */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Đổi mật khẩu</h4>
                   {!showPasswordForm ? (
@@ -359,7 +378,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
               </div>
 
               {/* 4. ACCOUNT MANAGEMENT (SUB-ADMINS) - ONLY FOR MASTER */}
-              {(currentUser?.role === 'MASTER' || currentUser?.username === 'admin') && (
+              {checkPermission('MASTER') && (
                   <div className="border-t pt-6">
                       <div className="flex justify-between items-center mb-4">
                           <h4 className="font-bold text-gray-700 flex items-center gap-2">
@@ -383,18 +402,26 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                   <input type="text" placeholder="Họ và tên nhân viên" value={newSubAdmin.fullname} onChange={e => setNewSubAdmin({...newSubAdmin, fullname: e.target.value})} className="border p-2 rounded" required />
                               </div>
                               <div className="mb-4">
-                                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Quyền hạn:</p>
-                                  <div className="flex flex-wrap gap-3">
-                                      {PERMISSION_OPTIONS.map(opt => (
-                                          <label key={opt.id} className="flex items-center gap-2 text-sm bg-white border px-2 py-1 rounded cursor-pointer hover:bg-gray-50">
-                                              <input 
-                                                  type="checkbox" 
-                                                  checked={newSubAdmin.permissions.includes(opt.id)}
-                                                  onChange={() => togglePermission(opt.id)}
-                                                  className="rounded text-[#00695C] focus:ring-[#00695C]"
-                                              />
-                                              {opt.label}
-                                          </label>
+                                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Phân quyền chi tiết:</p>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                      {/* Grouping Permissions */}
+                                      {['Module Chính', 'Cài đặt'].map(groupName => (
+                                          <div key={groupName} className="bg-white p-3 rounded border">
+                                              <p className="text-xs font-bold text-[#00695C] mb-2 uppercase border-b pb-1">{groupName}</p>
+                                              <div className="space-y-2">
+                                                  {PERMISSION_OPTIONS.filter(opt => opt.group === groupName).map(opt => (
+                                                      <label key={opt.id} className="flex items-start gap-2 text-sm cursor-pointer hover:bg-gray-50">
+                                                          <input 
+                                                              type="checkbox" 
+                                                              checked={newSubAdmin.permissions.includes(opt.id)}
+                                                              onChange={() => togglePermission(opt.id)}
+                                                              className="rounded text-[#00695C] focus:ring-[#00695C] mt-0.5"
+                                                          />
+                                                          <span>{opt.label}</span>
+                                                      </label>
+                                                  ))}
+                                              </div>
+                                          </div>
                                       ))}
                                   </div>
                               </div>
@@ -426,7 +453,14 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                           <td className="px-4 py-2 text-gray-500 text-xs">
                                               {user.role === 'MASTER' || user.permissions.includes('ALL') 
                                                   ? 'Toàn quyền' 
-                                                  : user.permissions.map(p => PERMISSION_OPTIONS.find(opt => opt.id === p)?.label || p).join(', ')}
+                                                  : <div className="flex flex-wrap gap-1">
+                                                      {user.permissions.map(p => (
+                                                          <span key={p} className="bg-gray-100 px-1 rounded border border-gray-200">
+                                                              {PERMISSION_OPTIONS.find(opt => opt.id === p)?.label || p}
+                                                          </span>
+                                                      ))}
+                                                    </div>
+                                              }
                                           </td>
                                           <td className="px-4 py-2 text-right">
                                               {user.role !== 'MASTER' && (
@@ -476,112 +510,125 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
 
-              {/* 6. BANK SETTINGS */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4">Thanh toán (VietQR)</h4>
-                  {bankSettings && (
-                      <form onSubmit={handleBankSettingsSubmit} className="space-y-4 max-w-lg">
-                          <select value={bankSettings.bankId} onChange={e => setBankSettings({...bankSettings, bankId: e.target.value})} className="w-full border p-2 rounded">
-                              <option value="">-- Ngân hàng --</option>
-                              {VIET_QR_BANKS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                          </select>
-                          <input type="text" placeholder="Số tài khoản" value={bankSettings.accountNumber} onChange={e => setBankSettings({...bankSettings, accountNumber: e.target.value})} className="w-full border p-2 rounded" />
-                          <input type="text" placeholder="Tên chủ TK (Viết hoa)" value={bankSettings.accountName} onChange={e => setBankSettings({...bankSettings, accountName: e.target.value.toUpperCase()})} className="w-full border p-2 rounded" />
-                          <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded">Lưu thông tin</button>
-                      </form>
-                  )}
-              </div>
+              {/* 6. BANK SETTINGS - Permission: settings_info (Treat as info) or MASTER */}
+              {checkPermission('MASTER') && (
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4">Thanh toán (VietQR)</h4>
+                      {bankSettings && (
+                          <form onSubmit={handleBankSettingsSubmit} className="space-y-4 max-w-lg">
+                              <select value={bankSettings.bankId} onChange={e => setBankSettings({...bankSettings, bankId: e.target.value})} className="w-full border p-2 rounded">
+                                  <option value="">-- Ngân hàng --</option>
+                                  {VIET_QR_BANKS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                              </select>
+                              <input type="text" placeholder="Số tài khoản" value={bankSettings.accountNumber} onChange={e => setBankSettings({...bankSettings, accountNumber: e.target.value})} className="w-full border p-2 rounded" />
+                              <input type="text" placeholder="Tên chủ TK (Viết hoa)" value={bankSettings.accountName} onChange={e => setBankSettings({...bankSettings, accountName: e.target.value.toUpperCase()})} className="w-full border p-2 rounded" />
+                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded">Lưu thông tin</button>
+                          </form>
+                      )}
+                  </div>
+              )}
               
-              {/* 7. ADMIN EMAILS */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4">Email Quản trị (Nhận thông báo)</h4>
-                  <ul className="mb-2 space-y-1">
-                      {adminEmails.map(email => (
-                          <li key={email} className="flex justify-between max-w-sm bg-gray-50 p-2 rounded">
-                              <span>{email}</span>
-                              <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-xs">Xóa</button>
-                          </li>
-                      ))}
-                  </ul>
-                  <form onSubmit={handleAddEmail} className="flex gap-2 max-w-sm">
-                      <input type="email" placeholder="Thêm email..." value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="border p-2 rounded flex-1" />
-                      <button type="submit" className="bg-[#00695C] text-white px-3 rounded">Thêm</button>
-                  </form>
-              </div>
+              {/* 7. ADMIN EMAILS - Permission: MASTER */}
+              {checkPermission('MASTER') && (
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4">Email Quản trị (Nhận thông báo)</h4>
+                      <ul className="mb-2 space-y-1">
+                          {adminEmails.map(email => (
+                              <li key={email} className="flex justify-between max-w-sm bg-gray-50 p-2 rounded">
+                                  <span>{email}</span>
+                                  <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-xs">Xóa</button>
+                              </li>
+                          ))}
+                      </ul>
+                      <form onSubmit={handleAddEmail} className="flex gap-2 max-w-sm">
+                          <input type="email" placeholder="Thêm email..." value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} className="border p-2 rounded flex-1" />
+                          <button type="submit" className="bg-[#00695C] text-white px-3 rounded">Thêm</button>
+                      </form>
+                  </div>
+              )}
 
-              {/* 8. SOCIAL MEDIA */}
-              <div className="border-t pt-6">
-                    <h4 className="font-bold text-gray-700 mb-4">Mạng xã hội</h4>
-                    {socialSettings && (
-                        <form onSubmit={handleSocialSubmit} className="space-y-4 max-w-lg">
-                            <input type="url" placeholder="Facebook URL" value={socialSettings.facebook} onChange={(e) => setSocialSettings({...socialSettings, facebook: e.target.value})} className="w-full border rounded px-3 py-2" />
-                            <input type="url" placeholder="Instagram URL" value={socialSettings.instagram} onChange={(e) => setSocialSettings({...socialSettings, instagram: e.target.value})} className="w-full border rounded px-3 py-2" />
-                            <input type="url" placeholder="TikTok URL" value={socialSettings.tiktok} onChange={(e) => setSocialSettings({...socialSettings, tiktok: e.target.value})} className="w-full border rounded px-3 py-2" />
-                            <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded">Cập nhật</button>
-                        </form>
-                    )}
-              </div>
+              {/* 8. SOCIAL MEDIA - Permission: settings_info */}
+              {checkPermission('settings_info') && (
+                  <div className="border-t pt-6">
+                        <h4 className="font-bold text-gray-700 mb-4">Mạng xã hội</h4>
+                        {socialSettings && (
+                            <form onSubmit={handleSocialSubmit} className="space-y-4 max-w-lg">
+                                <input type="url" placeholder="Facebook URL" value={socialSettings.facebook} onChange={(e) => setSocialSettings({...socialSettings, facebook: e.target.value})} className="w-full border rounded px-3 py-2" />
+                                <input type="url" placeholder="Instagram URL" value={socialSettings.instagram} onChange={(e) => setSocialSettings({...socialSettings, instagram: e.target.value})} className="w-full border rounded px-3 py-2" />
+                                <input type="url" placeholder="TikTok URL" value={socialSettings.tiktok} onChange={(e) => setSocialSettings({...socialSettings, tiktok: e.target.value})} className="w-full border rounded px-3 py-2" />
+                                <button type="submit" className="w-full bg-[#D4AF37] text-white font-bold py-2 rounded">Cập nhật</button>
+                            </form>
+                        )}
+                  </div>
+              )}
 
-              {/* 9. DATA MANAGEMENT (BACKUP / RESET) */}
-              <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                      <ActivityIcon className="w-5 h-5 text-gray-600" />
-                      Quản lý Dữ liệu
-                  </h4>
-                  {isBackupLoading ? (
-                      <p className="text-sm text-gray-500 animate-pulse">Đang xử lý dữ liệu...</p>
-                  ) : (
-                      <div className="space-y-4 max-w-2xl">
-                          <div className="flex flex-col md:flex-row gap-4">
-                              <div className="flex-1 bg-gray-50 p-4 rounded border">
-                                  <h5 className="font-bold text-sm text-gray-700 mb-2">Sao lưu & Khôi phục</h5>
-                                  <button onClick={handleBackup} className="w-full mb-3 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">
-                                      Tải xuống file Backup (.json)
-                                  </button>
-                                  <label className="block w-full text-center bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded text-sm cursor-pointer hover:bg-gray-100">
-                                      Khôi phục từ file...
-                                      <input type="file" accept=".json" className="hidden" onChange={handleRestore} />
-                                  </label>
-                              </div>
-                              <div className="flex-1 bg-red-50 p-4 rounded border border-red-200">
-                                  <h5 className="font-bold text-sm text-red-800 mb-2">Vùng Nguy hiểm (Reset)</h5>
-                                  <div className="space-y-2">
-                                      <button onClick={() => handleFactoryReset('ORDERS')} className="w-full bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50 font-medium">
-                                          Xóa tất cả Đơn hàng
+              {/* 9. DATA MANAGEMENT (BACKUP / RESET) - Permission: settings_data */}
+              {checkPermission('settings_data') && (
+                  <div className="border-t pt-6">
+                      <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                          <ActivityIcon className="w-5 h-5 text-gray-600" />
+                          Quản lý Dữ liệu
+                      </h4>
+                      {isBackupLoading ? (
+                          <p className="text-sm text-gray-500 animate-pulse">Đang xử lý dữ liệu...</p>
+                      ) : (
+                          <div className="space-y-4 max-w-2xl">
+                              <div className="flex flex-col md:flex-row gap-4">
+                                  <div className="flex-1 bg-gray-50 p-4 rounded border">
+                                      <h5 className="font-bold text-sm text-gray-700 mb-2">Sao lưu & Khôi phục</h5>
+                                      <button onClick={handleBackup} className="w-full mb-3 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">
+                                          Tải xuống file Backup (.json)
                                       </button>
-                                      <button onClick={() => handleFactoryReset('PRODUCTS')} className="w-full bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50 font-medium">
-                                          Xóa tất cả Sản phẩm
-                                      </button>
-                                      <button onClick={() => handleFactoryReset('FULL')} className="w-full bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700 font-bold">
-                                          Factory Reset (Xóa trắng)
-                                      </button>
+                                      <label className="block w-full text-center bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded text-sm cursor-pointer hover:bg-gray-100">
+                                          Khôi phục từ file...
+                                          <input type="file" accept=".json" className="hidden" onChange={handleRestore} />
+                                      </label>
+                                  </div>
+                                  <div className="flex-1 bg-red-50 p-4 rounded border border-red-200">
+                                      <h5 className="font-bold text-sm text-red-800 mb-2">Vùng Nguy hiểm (Reset)</h5>
+                                      <div className="space-y-2">
+                                          <button onClick={() => handleFactoryReset('ORDERS')} className="w-full bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50 font-medium">
+                                              Xóa tất cả Đơn hàng
+                                          </button>
+                                          <button onClick={() => handleFactoryReset('PRODUCTS')} className="w-full bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50 font-medium">
+                                              Xóa tất cả Sản phẩm
+                                          </button>
+                                          {/* Only Master can do Full Factory Reset */}
+                                          {checkPermission('MASTER') && (
+                                              <button onClick={() => handleFactoryReset('FULL')} className="w-full bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700 font-bold">
+                                                  Factory Reset (Xóa trắng)
+                                              </button>
+                                          )}
+                                      </div>
                                   </div>
                               </div>
                           </div>
-                      </div>
-                  )}
-              </div>
+                      )}
+                  </div>
+              )}
 
-              {/* 10. LOGS (MOVED TO BOTTOM) */}
-              <div className="border-t pt-6">
-                    <h4 className="font-bold text-gray-700 mb-4">Nhật ký đăng nhập</h4>
-                    <div className="max-h-40 overflow-y-auto border rounded bg-gray-50 text-xs">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-200">
-                                <tr><th className="p-2">Thời gian</th><th className="p-2">User</th><th className="p-2">IP</th></tr>
-                            </thead>
-                            <tbody>
-                                {adminLogs.map(log => (
-                                    <tr key={log.id} className="border-b">
-                                        <td className="p-2">{new Date(log.timestamp).toLocaleString()}</td>
-                                        <td className="p-2">{log.username}</td>
-                                        <td className="p-2">{log.ip_address}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-              </div>
+              {/* 10. LOGS (MOVED TO BOTTOM) - Permission: settings_logs */}
+              {checkPermission('settings_logs') && (
+                  <div className="border-t pt-6">
+                        <h4 className="font-bold text-gray-700 mb-4">Nhật ký đăng nhập</h4>
+                        <div className="max-h-40 overflow-y-auto border rounded bg-gray-50 text-xs">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-200">
+                                    <tr><th className="p-2">Thời gian</th><th className="p-2">User</th><th className="p-2">IP</th></tr>
+                                </thead>
+                                <tbody>
+                                    {adminLogs.map(log => (
+                                        <tr key={log.id} className="border-b">
+                                            <td className="p-2">{new Date(log.timestamp).toLocaleString()}</td>
+                                            <td className="p-2">{log.username}</td>
+                                            <td className="p-2">{log.ip_address}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                  </div>
+              )}
           </div>
 
           {settingsFeedback && (
