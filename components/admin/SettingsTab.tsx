@@ -11,9 +11,9 @@ import {
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
     isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTempTotpToken, verifyTotpToken
 } from '../../utils/adminSettingsStorage';
-import { fetchAdminLoginLogs, changeAdminPassword, fetchAdminUsers, createAdminUser, deleteAdminUser } from '../../utils/apiClient';
+import { fetchAdminLoginLogs, changeAdminPassword, fetchAdminUsers, createAdminUser, deleteAdminUser, updateAdminUser } from '../../utils/apiClient';
 import { VIET_QR_BANKS } from '../../utils/constants';
-import { ShieldCheckIcon, CheckIcon, ActivityIcon, TruckIcon, PrinterIcon, UsersIcon, Trash2Icon } from '../Icons';
+import { ShieldCheckIcon, CheckIcon, ActivityIcon, TruckIcon, PrinterIcon, UsersIcon, Trash2Icon, EditIcon } from '../Icons';
 
 interface SettingsTabProps {
     currentUser: AdminUser | null;
@@ -47,6 +47,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   // -- Sub-Admin Management --
   const [subAdmins, setSubAdmins] = useState<AdminUser[]>([]);
   const [newSubAdmin, setNewSubAdmin] = useState({ username: '', password: '', fullname: '', permissions: [] as string[] });
+  const [editingSubAdminId, setEditingSubAdminId] = useState<string | null>(null);
   const [showSubAdminForm, setShowSubAdminForm] = useState(false);
   const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
   const [createAdminFeedback, setCreateAdminFeedback] = useState(''); // NEW: Local feedback
@@ -117,14 +118,36 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   };
 
   // ... Sub Admin Handlers ...
-  const handleAddSubAdmin = async (e: React.FormEvent) => {
+  const handleEditSubAdmin = (user: AdminUser) => {
+      setEditingSubAdminId(user.id);
+      setNewSubAdmin({
+          username: user.username,
+          password: '', // Reset password field
+          fullname: user.fullname,
+          permissions: user.permissions || []
+      });
+      setShowSubAdminForm(true);
+      setCreateAdminFeedback('');
+      // Scroll to form
+      const formElement = document.getElementById('sub-admin-form');
+      if (formElement) formElement.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSaveSubAdmin = async (e: React.FormEvent) => {
       e.preventDefault();
       setCreateAdminFeedback('');
       
-      if (!newSubAdmin.username || !newSubAdmin.password || !newSubAdmin.fullname) {
-          setCreateAdminFeedback('Vui lòng điền đầy đủ thông tin tài khoản.');
+      if (!newSubAdmin.username || !newSubAdmin.fullname) {
+          setCreateAdminFeedback('Vui lòng điền đầy đủ thông tin.');
           return;
       }
+      
+      // Password validation: Required for Create, Optional for Update
+      if (!editingSubAdminId && !newSubAdmin.password) {
+          setCreateAdminFeedback('Vui lòng nhập mật khẩu cho tài khoản mới.');
+          return;
+      }
+
       if (newSubAdmin.permissions.length === 0) {
           setCreateAdminFeedback('Vui lòng chọn ít nhất một quyền hạn.');
           return;
@@ -132,17 +155,30 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
 
       setIsSubmittingAdmin(true);
       try {
-          const res = await createAdminUser(newSubAdmin);
+          let res;
+          if (editingSubAdminId) {
+              // Update
+              res = await updateAdminUser(editingSubAdminId, {
+                  fullname: newSubAdmin.fullname,
+                  permissions: newSubAdmin.permissions,
+                  ...(newSubAdmin.password ? { password: newSubAdmin.password } : {})
+              });
+          } else {
+              // Create
+              res = await createAdminUser(newSubAdmin);
+          }
+
           if (res && res.success) {
-              setCreateAdminFeedback('✅ Tạo tài khoản phụ thành công!');
-              setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
+              setCreateAdminFeedback(editingSubAdminId ? '✅ Cập nhật thành công!' : '✅ Tạo tài khoản thành công!');
               setTimeout(() => {
+                  setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
+                  setEditingSubAdminId(null);
                   setShowSubAdminForm(false);
                   setCreateAdminFeedback('');
-              }, 2000);
+              }, 1500);
               loadSubAdmins();
           } else {
-              setCreateAdminFeedback(`❌ ${res.message || 'Lỗi khi tạo tài khoản.'}`);
+              setCreateAdminFeedback(`❌ ${res.message || 'Lỗi xử lý.'}`);
           }
       } catch (err) {
           setCreateAdminFeedback('❌ Lỗi kết nối Server.');
@@ -150,11 +186,19 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       setIsSubmittingAdmin(false);
   };
 
+  const resetSubAdminForm = () => {
+      setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
+      setEditingSubAdminId(null);
+      setShowSubAdminForm(false);
+      setCreateAdminFeedback('');
+  };
+
   const handleDeleteSubAdmin = async (id: string, username: string) => {
       if (confirm(`Bạn có chắc muốn xóa tài khoản "${username}"?`)) {
           const res = await deleteAdminUser(id);
           if (res && res.success) {
               loadSubAdmins();
+              if (editingSubAdminId === id) resetSubAdminForm();
           } else {
               alert('Lỗi khi xóa tài khoản.');
           }
@@ -409,7 +453,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                   Làm mới danh sách
                               </button>
                               <button 
-                                  onClick={() => setShowSubAdminForm(!showSubAdminForm)}
+                                  onClick={() => {
+                                      if(showSubAdminForm) resetSubAdminForm();
+                                      else setShowSubAdminForm(true);
+                                  }}
                                   className="text-sm bg-[#D4AF37] text-white px-3 py-1 rounded hover:bg-[#b89b31]"
                               >
                                   {showSubAdminForm ? 'Hủy' : '+ Thêm nhân viên'}
@@ -418,12 +465,36 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                       </div>
 
                       {showSubAdminForm && (
-                          <form onSubmit={handleAddSubAdmin} className="bg-gray-50 p-4 rounded border mb-6 animate-fade-in-up">
-                              <h5 className="font-bold text-sm mb-3">Tạo tài khoản mới</h5>
+                          <form id="sub-admin-form" onSubmit={handleSaveSubAdmin} className="bg-gray-50 p-4 rounded border mb-6 animate-fade-in-up">
+                              <h5 className="font-bold text-sm mb-3 text-[#00695C] uppercase">
+                                  {editingSubAdminId ? 'Chỉnh sửa tài khoản' : 'Tạo tài khoản mới'}
+                              </h5>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                  <input type="text" placeholder="Tên đăng nhập" value={newSubAdmin.username} onChange={e => setNewSubAdmin({...newSubAdmin, username: e.target.value})} className="border p-2 rounded" required />
-                                  <input type="password" placeholder="Mật khẩu" value={newSubAdmin.password} onChange={e => setNewSubAdmin({...newSubAdmin, password: e.target.value})} className="border p-2 rounded" required />
-                                  <input type="text" placeholder="Họ và tên nhân viên" value={newSubAdmin.fullname} onChange={e => setNewSubAdmin({...newSubAdmin, fullname: e.target.value})} className="border p-2 rounded" required />
+                                  <input 
+                                    type="text" 
+                                    placeholder="Tên đăng nhập" 
+                                    value={newSubAdmin.username} 
+                                    onChange={e => setNewSubAdmin({...newSubAdmin, username: e.target.value})} 
+                                    className="border p-2 rounded disabled:bg-gray-200 disabled:text-gray-500" 
+                                    required 
+                                    disabled={!!editingSubAdminId} 
+                                  />
+                                  <input 
+                                    type="password" 
+                                    placeholder={editingSubAdminId ? "Mật khẩu (để trống nếu không đổi)" : "Mật khẩu"} 
+                                    value={newSubAdmin.password} 
+                                    onChange={e => setNewSubAdmin({...newSubAdmin, password: e.target.value})} 
+                                    className="border p-2 rounded" 
+                                    required={!editingSubAdminId}
+                                  />
+                                  <input 
+                                    type="text" 
+                                    placeholder="Họ và tên nhân viên" 
+                                    value={newSubAdmin.fullname} 
+                                    onChange={e => setNewSubAdmin({...newSubAdmin, fullname: e.target.value})} 
+                                    className="border p-2 rounded" 
+                                    required 
+                                  />
                               </div>
                               <div className="mb-4">
                                   <p className="text-xs font-bold text-gray-500 uppercase mb-2">Phân quyền chi tiết:</p>
@@ -450,13 +521,20 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                   </div>
                               </div>
                               
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 border-t pt-3">
+                                  <button 
+                                    type="button"
+                                    onClick={resetSubAdminForm}
+                                    className="px-4 py-2 border rounded text-sm hover:bg-gray-100"
+                                  >
+                                      Hủy
+                                  </button>
                                   <button 
                                     type="submit" 
                                     disabled={isSubmittingAdmin}
                                     className="bg-[#00695C] text-white px-6 py-2 rounded text-sm font-bold disabled:opacity-50 hover:bg-[#004d40]"
                                   >
-                                      {isSubmittingAdmin ? 'Đang xử lý...' : 'Tạo tài khoản'}
+                                      {isSubmittingAdmin ? 'Đang xử lý...' : (editingSubAdminId ? 'Lưu thay đổi' : 'Tạo tài khoản')}
                                   </button>
                                   
                                   {createAdminFeedback && (
@@ -503,9 +581,14 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                           </td>
                                           <td className="px-4 py-2 text-right">
                                               {user.role !== 'MASTER' && (
-                                                  <button onClick={() => handleDeleteSubAdmin(user.id, user.username)} className="text-red-500 hover:bg-red-50 p-1 rounded">
-                                                      <Trash2Icon className="w-4 h-4" />
-                                                  </button>
+                                                  <div className="flex justify-end gap-1">
+                                                      <button onClick={() => handleEditSubAdmin(user)} className="text-blue-500 hover:bg-blue-50 p-1 rounded" title="Sửa quyền">
+                                                          <EditIcon className="w-4 h-4" />
+                                                      </button>
+                                                      <button onClick={() => handleDeleteSubAdmin(user.id, user.username)} className="text-red-500 hover:bg-red-50 p-1 rounded" title="Xóa">
+                                                          <Trash2Icon className="w-4 h-4" />
+                                                      </button>
+                                                  </div>
                                               )}
                                           </td>
                                       </tr>
