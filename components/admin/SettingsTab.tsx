@@ -11,9 +11,9 @@ import {
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
     isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTempTotpToken, verifyTotpToken
 } from '../../utils/adminSettingsStorage';
-import { fetchAdminLoginLogs, changeAdminPassword } from '../../utils/apiClient';
+import { fetchAdminLoginLogs, changeAdminPassword, fetchAdminUsers, createAdminUser, deleteAdminUser } from '../../utils/apiClient';
 import { VIET_QR_BANKS } from '../../utils/constants';
-import { ShieldCheckIcon, CheckIcon, ActivityIcon, TruckIcon, PrinterIcon } from '../Icons';
+import { ShieldCheckIcon, CheckIcon, ActivityIcon, TruckIcon, PrinterIcon, UsersIcon, Trash2Icon } from '../Icons';
 
 interface SettingsTabProps {
     currentUser: AdminUser | null;
@@ -44,8 +44,22 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [showBankSecurityModal, setShowBankSecurityModal] = useState(false);
   const [securityCode, setSecurityCode] = useState('');
 
+  // -- Sub-Admin Management --
+  const [subAdmins, setSubAdmins] = useState<AdminUser[]>([]);
+  const [newSubAdmin, setNewSubAdmin] = useState({ username: '', password: '', fullname: '', permissions: [] as string[] });
+  const [showSubAdminForm, setShowSubAdminForm] = useState(false);
+
   // -- Backup Loading --
   const [isBackupLoading, setIsBackupLoading] = useState(false);
+
+  const PERMISSION_OPTIONS = [
+      { id: 'dashboard', label: 'Xem Tổng quan' },
+      { id: 'products', label: 'Quản lý Sản phẩm' },
+      { id: 'orders', label: 'Quản lý Đơn hàng' },
+      { id: 'inventory', label: 'Quản lý Kho' },
+      { id: 'customers', label: 'Quản lý Khách hàng' },
+      { id: 'settings', label: 'Cài đặt Chung' }, // Includes UI editing
+  ];
 
   useEffect(() => {
       // Load all settings
@@ -57,7 +71,18 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       setShippingSettings(getShippingSettings());
       
       fetchAdminLoginLogs().then(logs => { if (logs) setAdminLogs(logs); });
+
+      // Load Sub-Admins only if Master
+      if (currentUser?.role === 'MASTER' || currentUser?.username === 'admin') {
+          loadSubAdmins();
+      }
   }, [currentUser]);
+
+  const loadSubAdmins = () => {
+      fetchAdminUsers().then(users => {
+          if (users) setSubAdmins(users);
+      });
+  };
 
   // --- Handlers ---
   
@@ -67,6 +92,55 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       if (passwordData.new !== passwordData.confirm) { setSettingsFeedback('Mật khẩu không khớp'); return; }
       const res = await changeAdminPassword({ id: currentUser.id, oldPassword: passwordData.old, newPassword: passwordData.new });
       if(res.success) { setSettingsFeedback('Đổi mật khẩu thành công'); setShowPasswordForm(false); } else { setSettingsFeedback(res.message); }
+  };
+
+  // ... Sub Admin Handlers ...
+  const handleAddSubAdmin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newSubAdmin.username || !newSubAdmin.password || !newSubAdmin.fullname) {
+          setSettingsFeedback('Vui lòng điền đầy đủ thông tin tài khoản.');
+          return;
+      }
+      if (newSubAdmin.permissions.length === 0) {
+          setSettingsFeedback('Vui lòng chọn ít nhất một quyền hạn.');
+          return;
+      }
+
+      const res = await createAdminUser(newSubAdmin);
+      if (res && res.success) {
+          setSettingsFeedback('Tạo tài khoản phụ thành công.');
+          setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
+          setShowSubAdminForm(false);
+          loadSubAdmins();
+      } else {
+          setSettingsFeedback(res.message || 'Lỗi khi tạo tài khoản.');
+      }
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleDeleteSubAdmin = async (id: string, username: string) => {
+      if (confirm(`Bạn có chắc muốn xóa tài khoản "${username}"?`)) {
+          const res = await deleteAdminUser(id);
+          if (res && res.success) {
+              setSettingsFeedback('Đã xóa tài khoản.');
+              loadSubAdmins();
+          } else {
+              setSettingsFeedback('Lỗi khi xóa tài khoản.');
+          }
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const togglePermission = (permId: string) => {
+      setNewSubAdmin(prev => {
+          const exists = prev.permissions.includes(permId);
+          return {
+              ...prev,
+              permissions: exists 
+                  ? prev.permissions.filter(p => p !== permId)
+                  : [...prev.permissions, permId]
+          };
+      });
   };
 
   const handleStoreSubmit = (e: React.FormEvent) => {
@@ -284,7 +358,92 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
 
-              {/* 4. 2FA (GOOGLE AUTHENTICATOR) */}
+              {/* 4. ACCOUNT MANAGEMENT (SUB-ADMINS) - ONLY FOR MASTER */}
+              {(currentUser?.role === 'MASTER' || currentUser?.username === 'admin') && (
+                  <div className="border-t pt-6">
+                      <div className="flex justify-between items-center mb-4">
+                          <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                              <UsersIcon className="w-5 h-5 text-gray-600" />
+                              Quản lý Tài khoản & Phân quyền
+                          </h4>
+                          <button 
+                              onClick={() => setShowSubAdminForm(!showSubAdminForm)}
+                              className="text-sm bg-[#D4AF37] text-white px-3 py-1 rounded hover:bg-[#b89b31]"
+                          >
+                              {showSubAdminForm ? 'Hủy' : '+ Thêm nhân viên'}
+                          </button>
+                      </div>
+
+                      {showSubAdminForm && (
+                          <form onSubmit={handleAddSubAdmin} className="bg-gray-50 p-4 rounded border mb-6 animate-fade-in-up">
+                              <h5 className="font-bold text-sm mb-3">Tạo tài khoản mới</h5>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                  <input type="text" placeholder="Tên đăng nhập" value={newSubAdmin.username} onChange={e => setNewSubAdmin({...newSubAdmin, username: e.target.value})} className="border p-2 rounded" required />
+                                  <input type="password" placeholder="Mật khẩu" value={newSubAdmin.password} onChange={e => setNewSubAdmin({...newSubAdmin, password: e.target.value})} className="border p-2 rounded" required />
+                                  <input type="text" placeholder="Họ và tên nhân viên" value={newSubAdmin.fullname} onChange={e => setNewSubAdmin({...newSubAdmin, fullname: e.target.value})} className="border p-2 rounded" required />
+                              </div>
+                              <div className="mb-4">
+                                  <p className="text-xs font-bold text-gray-500 uppercase mb-2">Quyền hạn:</p>
+                                  <div className="flex flex-wrap gap-3">
+                                      {PERMISSION_OPTIONS.map(opt => (
+                                          <label key={opt.id} className="flex items-center gap-2 text-sm bg-white border px-2 py-1 rounded cursor-pointer hover:bg-gray-50">
+                                              <input 
+                                                  type="checkbox" 
+                                                  checked={newSubAdmin.permissions.includes(opt.id)}
+                                                  onChange={() => togglePermission(opt.id)}
+                                                  className="rounded text-[#00695C] focus:ring-[#00695C]"
+                                              />
+                                              {opt.label}
+                                          </label>
+                                      ))}
+                                  </div>
+                              </div>
+                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded text-sm font-bold">Tạo tài khoản</button>
+                          </form>
+                      )}
+
+                      <div className="bg-white border rounded-lg overflow-hidden">
+                          <table className="min-w-full text-sm text-left">
+                              <thead className="bg-gray-100">
+                                  <tr>
+                                      <th className="px-4 py-2">Tên đăng nhập</th>
+                                      <th className="px-4 py-2">Họ tên</th>
+                                      <th className="px-4 py-2">Vai trò</th>
+                                      <th className="px-4 py-2">Quyền hạn</th>
+                                      <th className="px-4 py-2 text-right">Thao tác</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                  {subAdmins.map(user => (
+                                      <tr key={user.id}>
+                                          <td className="px-4 py-2 font-medium">{user.username}</td>
+                                          <td className="px-4 py-2">{user.fullname}</td>
+                                          <td className="px-4 py-2">
+                                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${user.role === 'MASTER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                  {user.role}
+                                              </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-gray-500 text-xs">
+                                              {user.role === 'MASTER' || user.permissions.includes('ALL') 
+                                                  ? 'Toàn quyền' 
+                                                  : user.permissions.map(p => PERMISSION_OPTIONS.find(opt => opt.id === p)?.label || p).join(', ')}
+                                          </td>
+                                          <td className="px-4 py-2 text-right">
+                                              {user.role !== 'MASTER' && (
+                                                  <button onClick={() => handleDeleteSubAdmin(user.id, user.username)} className="text-red-500 hover:bg-red-50 p-1 rounded">
+                                                      <Trash2Icon className="w-4 h-4" />
+                                                  </button>
+                                              )}
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              )}
+
+              {/* 5. 2FA (GOOGLE AUTHENTICATOR) */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
@@ -317,7 +476,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
 
-              {/* 5. BANK SETTINGS */}
+              {/* 6. BANK SETTINGS */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Thanh toán (VietQR)</h4>
                   {bankSettings && (
@@ -333,7 +492,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
               
-              {/* 6. ADMIN EMAILS */}
+              {/* 7. ADMIN EMAILS */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Email Quản trị (Nhận thông báo)</h4>
                   <ul className="mb-2 space-y-1">
@@ -350,7 +509,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   </form>
               </div>
 
-              {/* 7. SOCIAL MEDIA */}
+              {/* 8. SOCIAL MEDIA */}
               <div className="border-t pt-6">
                     <h4 className="font-bold text-gray-700 mb-4">Mạng xã hội</h4>
                     {socialSettings && (
@@ -363,7 +522,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                     )}
               </div>
 
-              {/* 8. DATA MANAGEMENT (BACKUP / RESET) */}
+              {/* 9. DATA MANAGEMENT (BACKUP / RESET) */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
                       <ActivityIcon className="w-5 h-5 text-gray-600" />
@@ -403,7 +562,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
 
-              {/* 9. LOGS (MOVED TO BOTTOM) */}
+              {/* 10. LOGS (MOVED TO BOTTOM) */}
               <div className="border-t pt-6">
                     <h4 className="font-bold text-gray-700 mb-4">Nhật ký đăng nhập</h4>
                     <div className="max-h-40 overflow-y-auto border rounded bg-gray-50 text-xs">
