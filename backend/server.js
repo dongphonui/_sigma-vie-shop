@@ -307,9 +307,11 @@ app.post('/api/admin/login-auth', async (req, res) => {
         if (result.rows.length > 0) {
             const user = result.rows[0];
             await pool.query(`INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) VALUES ($1, $2, $3, $4, $5, $6)`, [username, 'PASSWORD', 'SUCCESS', req.ip, req.get('User-Agent'), Date.now()]);
+            // Format permissions for login response too
+            const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions || '[]') : (user.permissions || []);
             res.json({ 
                 success: true, 
-                user: { id: user.id, username: user.username, fullname: user.fullname, role: user.role, permissions: user.permissions, is_totp_enabled: user.is_totp_enabled, totp_secret: user.totp_secret }
+                user: { id: user.id, username: user.username, fullname: user.fullname, role: user.role, permissions: permissions, is_totp_enabled: user.is_totp_enabled, totp_secret: user.totp_secret }
             });
         } else {
             res.json({ success: false, message: 'Sai tên đăng nhập hoặc mật khẩu' });
@@ -333,7 +335,20 @@ app.post('/api/admin/change-password', async (req, res) => {
 app.get('/api/admin/users', async (req, res) => {
     try {
         const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at, is_totp_enabled FROM admin_users ORDER BY created_at DESC');
-        res.json(result.rows);
+        // FIX: Ensure permissions is always an array, even if DB returns string/null
+        const users = result.rows.map(user => {
+            let parsedPerms = [];
+            try {
+                if (typeof user.permissions === 'string') {
+                    parsedPerms = JSON.parse(user.permissions);
+                } else if (Array.isArray(user.permissions)) {
+                    parsedPerms = user.permissions;
+                }
+            } catch (e) { console.warn("Failed to parse permissions for user:", user.username); }
+            
+            return { ...user, permissions: parsedPerms };
+        });
+        res.json(users);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

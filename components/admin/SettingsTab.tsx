@@ -149,9 +149,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       if (confirm(`Bạn có chắc muốn xóa tài khoản "${username}"?`)) {
           const res = await deleteAdminUser(id);
           if (res && res.success) {
-              // Refresh list directly without global toast for better locality if desired, 
-              // but here user just wants creation feedback near button.
-              // We'll stick to refresh logic.
               loadSubAdmins();
           } else {
               alert('Lỗi khi xóa tài khoản.');
@@ -398,12 +395,21 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                               <UsersIcon className="w-5 h-5 text-gray-600" />
                               Quản lý Tài khoản & Phân quyền
                           </h4>
-                          <button 
-                              onClick={() => setShowSubAdminForm(!showSubAdminForm)}
-                              className="text-sm bg-[#D4AF37] text-white px-3 py-1 rounded hover:bg-[#b89b31]"
-                          >
-                              {showSubAdminForm ? 'Hủy' : '+ Thêm nhân viên'}
-                          </button>
+                          <div className="flex gap-2">
+                              <button 
+                                  onClick={() => loadSubAdmins()}
+                                  className="text-sm bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 flex items-center gap-1"
+                              >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                                  Làm mới danh sách
+                              </button>
+                              <button 
+                                  onClick={() => setShowSubAdminForm(!showSubAdminForm)}
+                                  className="text-sm bg-[#D4AF37] text-white px-3 py-1 rounded hover:bg-[#b89b31]"
+                              >
+                                  {showSubAdminForm ? 'Hủy' : '+ Thêm nhân viên'}
+                              </button>
+                          </div>
                       </div>
 
                       {showSubAdminForm && (
@@ -499,6 +505,11 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                           </td>
                                       </tr>
                                   ))}
+                                  {subAdmins.length === 0 && (
+                                      <tr>
+                                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Chưa có nhân viên nào.</td>
+                                      </tr>
+                                  )}
                               </tbody>
                           </table>
                       </div>
