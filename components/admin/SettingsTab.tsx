@@ -1,28 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { SocialSettings, BankSettings, AdminLoginLog, AdminUser } from '../../types';
+import type { SocialSettings, BankSettings, AdminLoginLog, AdminUser, StoreSettings, ShippingSettings } from '../../types';
 import { getBankSettings, updateBankSettings } from '../../utils/bankSettingsStorage';
 import { getSocialSettings, updateSocialSettings } from '../../utils/socialSettingsStorage';
+import { getStoreSettings, updateStoreSettings } from '../../utils/storeSettingsStorage';
+import { getShippingSettings, updateShippingSettings } from '../../utils/shippingSettingsStorage';
+import { downloadBackup, restoreBackup, performFactoryReset } from '../../utils/backupHelper';
 import { 
     getAdminEmails, addAdminEmail, removeAdminEmail, getPrimaryAdminEmail,
     isTotpEnabled, generateTotpSecret, getTotpUri, enableTotp, disableTotp, verifyTempTotpToken, verifyTotpToken
 } from '../../utils/adminSettingsStorage';
 import { fetchAdminLoginLogs, changeAdminPassword } from '../../utils/apiClient';
 import { VIET_QR_BANKS } from '../../utils/constants';
-import { ShieldCheckIcon, CheckIcon, ActivityIcon } from '../Icons';
+import { ShieldCheckIcon, CheckIcon, ActivityIcon, TruckIcon, PrinterIcon } from '../Icons';
 
 interface SettingsTabProps {
     currentUser: AdminUser | null;
 }
 
 const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
-  // Removed SubTabs logic since Home/Header/About are now in main sidebar
   
   // -- General Settings State --
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [socialSettings, setSocialSettings] = useState<SocialSettings | null>(null);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   const [settingsFeedback, setSettingsFeedback] = useState('');
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
@@ -40,12 +44,18 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [showBankSecurityModal, setShowBankSecurityModal] = useState(false);
   const [securityCode, setSecurityCode] = useState('');
 
+  // -- Backup Loading --
+  const [isBackupLoading, setIsBackupLoading] = useState(false);
+
   useEffect(() => {
       // Load all settings
       setAdminEmails(getAdminEmails());
       setSocialSettings(getSocialSettings());
       setTotpEnabled(isTotpEnabled());
       setBankSettings(getBankSettings());
+      setStoreSettings(getStoreSettings());
+      setShippingSettings(getShippingSettings());
+      
       fetchAdminLoginLogs().then(logs => { if (logs) setAdminLogs(logs); });
   }, [currentUser]);
 
@@ -57,6 +67,24 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       if (passwordData.new !== passwordData.confirm) { setSettingsFeedback('Mật khẩu không khớp'); return; }
       const res = await changeAdminPassword({ id: currentUser.id, oldPassword: passwordData.old, newPassword: passwordData.new });
       if(res.success) { setSettingsFeedback('Đổi mật khẩu thành công'); setShowPasswordForm(false); } else { setSettingsFeedback(res.message); }
+  };
+
+  const handleStoreSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (storeSettings) {
+          updateStoreSettings(storeSettings);
+          setSettingsFeedback('Đã lưu thông tin cửa hàng.');
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
+  };
+
+  const handleShippingSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (shippingSettings) {
+          updateShippingSettings(shippingSettings);
+          setSettingsFeedback('Đã lưu cấu hình vận chuyển.');
+          setTimeout(() => setSettingsFeedback(''), 3000);
+      }
   };
 
   const handleBankSettingsSubmit = (e: React.FormEvent) => {
@@ -121,11 +149,125 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       }
   }
 
+  // --- Backup & Restore Handlers ---
+  const handleBackup = () => {
+      downloadBackup();
+      setSettingsFeedback('Đang tải xuống file sao lưu...');
+      setTimeout(() => setSettingsFeedback(''), 3000);
+  };
+
+  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      if (confirm("CẢNH BÁO: Việc khôi phục sẽ ghi đè dữ liệu hiện tại. Bạn có chắc chắn không?")) {
+          setIsBackupLoading(true);
+          const result = await restoreBackup(file);
+          setIsBackupLoading(false);
+          alert(result.message);
+          if (result.success) {
+              window.location.reload();
+          }
+      }
+      e.target.value = ''; // Reset input
+  };
+
+  const handleFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS') => {
+      const message = scope === 'FULL' 
+          ? "CẢNH BÁO NGUY HIỂM: Bạn đang thực hiện khôi phục cài đặt gốc. TOÀN BỘ SẢN PHẨM, ĐƠN HÀNG, KHÁCH HÀNG sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác."
+          : (scope === 'ORDERS' 
+              ? "Bạn có chắc chắn muốn xóa TOÀN BỘ ĐƠN HÀNG và lịch sử kho không?" 
+              : "Bạn có chắc chắn muốn xóa TOÀN BỘ SẢN PHẨM không?");
+      
+      if (confirm(message)) {
+          // Double confirm for full reset
+          if (scope === 'FULL') {
+              const confirmText = prompt("Để xác nhận xóa toàn bộ, hãy nhập chữ 'DELETE' vào ô bên dưới:");
+              if (confirmText !== 'DELETE') return;
+          }
+
+          setIsBackupLoading(true);
+          const result = await performFactoryReset(scope);
+          setIsBackupLoading(false);
+          
+          alert(result.message);
+          if (result.success) {
+              window.location.reload();
+          }
+      }
+  };
+
   return (
       <div className="bg-white p-6 rounded-lg shadow-md animate-fade-in-up">
           <div className="space-y-8">
-              {/* Password Change */}
+              
+              {/* 1. STORE INFORMATION */}
               <div>
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <PrinterIcon className="w-5 h-5 text-gray-600" />
+                      Thông tin Cửa hàng (In hóa đơn)
+                  </h4>
+                  {storeSettings && (
+                      <form onSubmit={handleStoreSubmit} className="space-y-4 max-w-lg">
+                          <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-1">Tên cửa hàng</label>
+                              <input type="text" value={storeSettings.name} onChange={(e) => setStoreSettings({...storeSettings, name: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">Hotline</label>
+                                  <input type="text" value={storeSettings.phoneNumber} onChange={(e) => setStoreSettings({...storeSettings, phoneNumber: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">Email liên hệ</label>
+                                  <input type="text" value={storeSettings.email || ''} onChange={(e) => setStoreSettings({...storeSettings, email: e.target.value})} className="w-full border rounded px-3 py-2" />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-1">Địa chỉ</label>
+                              <input type="text" value={storeSettings.address} onChange={(e) => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full border rounded px-3 py-2" required />
+                          </div>
+                          <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu thông tin</button>
+                      </form>
+                  )}
+              </div>
+
+              {/* 2. SHIPPING SETTINGS */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <TruckIcon className="w-5 h-5 text-gray-600" />
+                      Cấu hình Vận chuyển
+                  </h4>
+                  {shippingSettings && (
+                      <form onSubmit={handleShippingSubmit} className="space-y-4 max-w-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                              <input 
+                                type="checkbox" 
+                                id="shippingEnabled" 
+                                checked={shippingSettings.enabled} 
+                                onChange={(e) => setShippingSettings({...shippingSettings, enabled: e.target.checked})} 
+                                className="w-4 h-4 text-[#D4AF37] rounded" 
+                              />
+                              <label htmlFor="shippingEnabled" className="text-sm font-medium text-gray-700">Bật tính phí vận chuyển</label>
+                          </div>
+                          
+                          <div className={`grid grid-cols-2 gap-4 ${!shippingSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">Phí ship cơ bản</label>
+                                  <input type="number" value={shippingSettings.baseFee} onChange={(e) => setShippingSettings({...shippingSettings, baseFee: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                              </div>
+                              <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">Freeship cho đơn từ</label>
+                                  <input type="number" value={shippingSettings.freeShipThreshold} onChange={(e) => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
+                              </div>
+                          </div>
+                          <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu cấu hình</button>
+                      </form>
+                  )}
+              </div>
+
+              {/* 3. PASSWORD CHANGE */}
+              <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Đổi mật khẩu</h4>
                   {!showPasswordForm ? (
                       <button onClick={() => setShowPasswordForm(true)} className="text-blue-600 text-sm hover:underline">Thay đổi mật khẩu đăng nhập</button>
@@ -142,9 +284,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
 
-              {/* 2FA Section */}
+              {/* 4. 2FA (GOOGLE AUTHENTICATOR) */}
               <div className="border-t pt-6">
-                  <h4 className="font-bold text-gray-700 mb-4">Bảo mật 2 lớp (Google Authenticator)</h4>
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <ShieldCheckIcon className="w-5 h-5 text-gray-600" />
+                      Bảo mật 2 lớp (Google Authenticator)
+                  </h4>
                   {totpEnabled ? (
                       <div className="flex items-center gap-4">
                           <span className="text-green-600 font-bold flex items-center gap-1"><CheckIcon className="w-4 h-4"/> Đã kích hoạt</span>
@@ -172,7 +317,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
 
-              {/* Bank Settings */}
+              {/* 5. BANK SETTINGS */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Thanh toán (VietQR)</h4>
                   {bankSettings && (
@@ -188,7 +333,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   )}
               </div>
               
-              {/* Admin Emails */}
+              {/* 6. ADMIN EMAILS */}
               <div className="border-t pt-6">
                   <h4 className="font-bold text-gray-700 mb-4">Email Quản trị (Nhận thông báo)</h4>
                   <ul className="mb-2 space-y-1">
@@ -205,7 +350,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                   </form>
               </div>
 
-              {/* Social Media */}
+              {/* 7. SOCIAL MEDIA */}
               <div className="border-t pt-6">
                     <h4 className="font-bold text-gray-700 mb-4">Mạng xã hội</h4>
                     {socialSettings && (
@@ -218,7 +363,47 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                     )}
               </div>
 
-              {/* Logs */}
+              {/* 8. DATA MANAGEMENT (BACKUP / RESET) */}
+              <div className="border-t pt-6">
+                  <h4 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                      <ActivityIcon className="w-5 h-5 text-gray-600" />
+                      Quản lý Dữ liệu
+                  </h4>
+                  {isBackupLoading ? (
+                      <p className="text-sm text-gray-500 animate-pulse">Đang xử lý dữ liệu...</p>
+                  ) : (
+                      <div className="space-y-4 max-w-2xl">
+                          <div className="flex flex-col md:flex-row gap-4">
+                              <div className="flex-1 bg-gray-50 p-4 rounded border">
+                                  <h5 className="font-bold text-sm text-gray-700 mb-2">Sao lưu & Khôi phục</h5>
+                                  <button onClick={handleBackup} className="w-full mb-3 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">
+                                      Tải xuống file Backup (.json)
+                                  </button>
+                                  <label className="block w-full text-center bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded text-sm cursor-pointer hover:bg-gray-100">
+                                      Khôi phục từ file...
+                                      <input type="file" accept=".json" className="hidden" onChange={handleRestore} />
+                                  </label>
+                              </div>
+                              <div className="flex-1 bg-red-50 p-4 rounded border border-red-200">
+                                  <h5 className="font-bold text-sm text-red-800 mb-2">Vùng Nguy hiểm (Reset)</h5>
+                                  <div className="space-y-2">
+                                      <button onClick={() => handleFactoryReset('ORDERS')} className="w-full bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50 font-medium">
+                                          Xóa tất cả Đơn hàng
+                                      </button>
+                                      <button onClick={() => handleFactoryReset('PRODUCTS')} className="w-full bg-white border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50 font-medium">
+                                          Xóa tất cả Sản phẩm
+                                      </button>
+                                      <button onClick={() => handleFactoryReset('FULL')} className="w-full bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700 font-bold">
+                                          Factory Reset (Xóa trắng)
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+              </div>
+
+              {/* 9. LOGS (MOVED TO BOTTOM) */}
               <div className="border-t pt-6">
                     <h4 className="font-bold text-gray-700 mb-4">Nhật ký đăng nhập</h4>
                     <div className="max-h-40 overflow-y-auto border rounded bg-gray-50 text-xs">
