@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { AdminUser } from '../types';
 import { BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, EditIcon, LayersIcon, UserIcon, ImagePlus } from '../components/Icons';
+import { checkServerConnection } from '../utils/apiClient';
 
 // Import Components
 import DashboardTab from '../components/admin/DashboardTab';
@@ -19,6 +20,10 @@ import AboutPageSettingsTab from '../components/admin/settings/AboutPageSettings
 const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'settings' | 'home' | 'header' | 'about'>('dashboard');
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
+  
+  // Server Connection State
+  const [isServerOnline, setIsServerOnline] = useState(true);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
 
   useEffect(() => {
     // 1. Try to get detailed user info
@@ -27,7 +32,6 @@ const AdminPage: React.FC = () => {
         setCurrentAdminUser(JSON.parse(userStr));
     } else {
         // 2. FALLBACK for Legacy Login (Fixes "Empty Menu" issue)
-        // If authenticated but no user object exists, assume it's the local Master Admin
         const isAuth = sessionStorage.getItem('isAuthenticated') === 'true';
         if (isAuth) {
             setCurrentAdminUser({
@@ -39,7 +43,28 @@ const AdminPage: React.FC = () => {
             });
         }
     }
+
+    // 3. Start Connection Check Loop
+    checkStatus();
+    const interval = setInterval(checkStatus, 30000); // Check every 30s
+    return () => clearInterval(interval);
   }, []);
+
+  const checkStatus = async () => {
+      setIsCheckingConnection(true);
+      try {
+          const online = await checkServerConnection();
+          setIsServerOnline(online);
+      } catch (e) {
+          setIsServerOnline(false);
+      } finally {
+          setIsCheckingConnection(false);
+      }
+  };
+
+  const handleRetryConnection = () => {
+      checkStatus();
+  };
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
@@ -82,14 +107,37 @@ const AdminPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row">
-      <aside className="bg-[#111827] text-white w-full md:w-64 flex-shrink-0">
+      
+      {/* Offline Warning Banner */}
+      {!isServerOnline && (
+        <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-2 px-4 text-sm font-bold shadow-md flex items-center justify-center gap-3 z-[100]">
+            <span className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Mất kết nối Server! Chế độ Offline.
+            </span>
+            <button 
+                onClick={handleRetryConnection} 
+                disabled={isCheckingConnection}
+                className="bg-white text-red-600 px-3 py-0.5 rounded text-xs hover:bg-gray-100 disabled:opacity-70 flex items-center gap-1"
+            >
+                {isCheckingConnection ? (
+                    <svg className="animate-spin h-3 w-3 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                )}
+                {isCheckingConnection ? 'Đang thử...' : 'Kết nối lại'}
+            </button>
+        </div>
+      )}
+
+      <aside className={`bg-[#111827] text-white w-full md:w-64 flex-shrink-0 ${!isServerOnline ? 'pt-8 md:pt-0' : ''}`}>
         <div className="p-6 border-b border-gray-700 flex items-center gap-3">
           <div className="bg-[#D4AF37] p-2 rounded-lg">
              <BarChart2 className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-xl font-bold font-serif tracking-wider">Sigma Admin</h1>
         </div>
-        <nav className="p-4 space-y-2 overflow-y-auto max-h-[calc(100vh-180px)]">
+        <nav className="p-4 space-y-2 overflow-y-auto max-h-[calc(100vh-200px)]">
            {hasPermission('dashboard') && (
                <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
                 <BarChart2 className="w-5 h-5" /> Tổng quan
@@ -142,12 +190,23 @@ const AdminPage: React.FC = () => {
         </nav>
         
         <div className="p-4 mt-auto border-t border-gray-700">
+             {/* Connection Status Indicator */}
+             <div className="mb-4 px-4 flex items-center gap-3 text-xs" title="Trạng thái kết nối Server Database">
+                 <span className="relative flex h-3 w-3">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isCheckingConnection ? 'bg-yellow-400' : (isServerOnline ? 'bg-green-400' : 'bg-red-400')}`}></span>
+                    <span className={`relative inline-flex rounded-full h-3 w-3 ${isCheckingConnection ? 'bg-yellow-500' : (isServerOnline ? 'bg-green-500' : 'bg-red-500')}`}></span>
+                 </span>
+                 <span className={`font-medium ${isServerOnline ? 'text-green-400' : (isCheckingConnection ? 'text-yellow-400' : 'text-red-400')}`}>
+                     {isCheckingConnection ? 'Đang kiểm tra...' : (isServerOnline ? 'Hệ thống Online' : 'Mất kết nối')}
+                 </span>
+             </div>
+
              <a href="#/" className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 px-4 text-sm">← Về Cửa hàng</a>
              <button onClick={handleLogout} className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors font-medium text-sm">Đăng xuất</button>
         </div>
       </aside>
 
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isServerOnline ? 'pt-12 md:pt-12' : ''}`}>
         <header className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-bold text-gray-800 font-serif">
                 {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
