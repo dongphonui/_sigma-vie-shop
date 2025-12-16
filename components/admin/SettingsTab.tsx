@@ -553,6 +553,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                       <th className="px-4 py-2">Tên đăng nhập</th>
                                       <th className="px-4 py-2">Họ tên</th>
                                       <th className="px-4 py-2">Vai trò</th>
+                                      <th className="px-4 py-2 text-center">Bảo mật (2FA)</th>
                                       <th className="px-4 py-2">Quyền hạn</th>
                                       <th className="px-4 py-2 text-right">Thao tác</th>
                                   </tr>
@@ -566,6 +567,18 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                               <span className={`px-2 py-0.5 rounded text-xs font-bold ${user.role === 'MASTER' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                                   {user.role}
                                               </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-center">
+                                                {user.is_totp_enabled ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                                                        <ShieldCheckIcon className="w-3 h-3" />
+                                                        Đã bật
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">
+                                                        Chưa bật
+                                                    </span>
+                                                )}
                                           </td>
                                           <td className="px-4 py-2 text-gray-500 text-xs">
                                               {user.role === 'MASTER' || (Array.isArray(user.permissions) && user.permissions.includes('ALL'))
@@ -595,7 +608,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                   ))}
                                   {subAdmins.length === 0 && (
                                       <tr>
-                                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Chưa có nhân viên nào.</td>
+                                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">Chưa có nhân viên nào.</td>
                                       </tr>
                                   )}
                               </tbody>
