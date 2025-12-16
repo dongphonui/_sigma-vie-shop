@@ -754,7 +754,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                         <div className="max-h-40 overflow-y-auto border rounded bg-gray-50 text-xs">
                             <table className="w-full text-left">
                                 <thead className="bg-gray-200">
-                                    <tr><th className="p-2">Thời gian</th><th className="p-2">User</th><th className="p-2">IP</th></tr>
+                                    <tr>
+                                        <th className="p-2">Thời gian</th>
+                                        <th className="p-2">User</th>
+                                        <th className="p-2">IP</th>
+                                        <th className="p-2">Trạng thái</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {adminLogs.map(log => (
@@ -762,6 +767,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                             <td className="p-2">{new Date(log.timestamp).toLocaleString()}</td>
                                             <td className="p-2">{log.username}</td>
                                             <td className="p-2">{log.ip_address}</td>
+                                            <td className="p-2">
+                                                {log.status === 'SUCCESS' ? 
+                                                    <span className="text-green-600 font-bold">Thành công</span> : 
+                                                    <span className="text-red-600 font-bold">Thất bại</span>
+                                                }
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
