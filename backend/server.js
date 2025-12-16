@@ -20,6 +20,10 @@ process.on('unhandledRejection', (reason, promise) => {
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Increase timeout to prevent premature socket closure
+app.keepAliveTimeout = 65000;
+app.headersTimeout = 66000;
+
 // Middleware
 app.use(cors()); // Allow all origins
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -28,7 +32,6 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // Check Database Config
 if (!process.env.DATABASE_URL) {
     console.error("❌ FATAL ERROR: DATABASE_URL is missing in .env file.");
-    // Do not exit, let it run so frontend can at least connect (though API will fail)
 }
 
 // Database Connection
@@ -70,7 +73,6 @@ const initDb = async () => {
     await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS data JSONB;`);
     await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at BIGINT;`);
     
-    // Fix: Handle legacy 'sku' column
     try {
         const checkSku = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name='products' AND column_name='sku';`);
         if (checkSku.rows.length > 0) {
@@ -110,6 +112,7 @@ const initDb = async () => {
         created_at BIGINT
       );
     `);
+    // Ensure permissions exists as JSONB. If it was TEXT, this might warn but won't crash.
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS permissions JSONB;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
@@ -349,7 +352,10 @@ app.get('/api/admin/users', async (req, res) => {
             return { ...user, permissions: parsedPerms };
         });
         res.json(users);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error("Fetch Users Error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 app.post('/api/admin/users', async (req, res) => {
@@ -357,8 +363,7 @@ app.post('/api/admin/users', async (req, res) => {
     console.log("Creating user:", username);
     try {
         const id = 'admin_' + Date.now();
-        // SAFE FIX: Send JSON string without ::jsonb cast. Postgres usually handles string -> jsonb assignment automatically if the column is jsonb.
-        // If the column is text (old DB), it also works.
+        // FIX: Remove ::jsonb cast. Postgres will auto-cast if column is JSONB.
         const permissionsJson = JSON.stringify(permissions || []);
         
         await pool.query(
@@ -369,10 +374,11 @@ app.post('/api/admin/users', async (req, res) => {
         res.json({ success: true });
     } catch (err) { 
         console.error("Create User Error:", err);
+        // Important: Return JSON error so frontend doesn't show 'Offline Mode'
         if (err.code === '23505') {
             res.json({ success: false, message: 'Tên đăng nhập đã tồn tại' });
         } else {
-            res.status(500).json({ error: err.message });
+            res.json({ success: false, message: 'Lỗi Database: ' + err.message });
         }
     }
 });
@@ -387,7 +393,7 @@ app.put('/api/admin/users/:id', async (req, res) => {
 
         if (password) { query += `password=$${idx++}, `; values.push(password); }
         if (fullname) { query += `fullname=$${idx++}, `; values.push(fullname); }
-        // Safe update without cast
+        // FIX: Remove ::jsonb cast
         if (permissions) { query += `permissions=$${idx++}, `; values.push(JSON.stringify(permissions)); }
         if (totp_secret !== undefined) { query += `totp_secret=$${idx++}, `; values.push(totp_secret); }
         if (is_totp_enabled !== undefined) { query += `is_totp_enabled=$${idx++}, `; values.push(is_totp_enabled); }

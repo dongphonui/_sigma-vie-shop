@@ -97,7 +97,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
 
   const loadSubAdmins = () => {
       fetchAdminUsers().then(users => {
-          if (users) setSubAdmins(users);
+          if (users) {
+              setSubAdmins(users);
+          } else {
+              // Handle case where server returns null/error
+              console.warn("Could not fetch sub-admins (Offline or Error)");
+          }
       });
   };
 
@@ -488,11 +493,11 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                               {user.role === 'MASTER' || (Array.isArray(user.permissions) && user.permissions.includes('ALL'))
                                                   ? 'Toàn quyền' 
                                                   : <div className="flex flex-wrap gap-1">
-                                                      {Array.isArray(user.permissions) && user.permissions.map(p => (
+                                                      {Array.isArray(user.permissions) ? user.permissions.map(p => (
                                                           <span key={p} className="bg-gray-100 px-1 rounded border border-gray-200">
                                                               {PERMISSION_OPTIONS.find(opt => opt.id === p)?.label || p}
                                                           </span>
-                                                      ))}
+                                                      )) : <span>Lỗi định dạng quyền</span>}
                                                     </div>
                                               }
                                           </td>
