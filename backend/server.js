@@ -522,20 +522,20 @@ app.post('/api/admin/users', async (req, res) => {
     const { username, password, fullname, permissions } = req.body;
     try {
         const id = 'admin_' + Date.now();
-        // IMPORTANT: Explicitly stringify the array for JSONB column to avoid Type mismatch error (text[] vs jsonb)
-        const permissionsJson = JSON.stringify(permissions);
+        // IMPORTANT: Explicitly stringify and cast to JSONB in SQL to prevent type errors
+        const permissionsJson = JSON.stringify(permissions || []);
         
         await pool.query(
             `INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at)
-             VALUES ($1, $2, $3, $4, 'STAFF', $5, $6)`,
+             VALUES ($1, $2, $3, $4, 'STAFF', $5::jsonb, $6)`,
             [id, username, password, fullname, permissionsJson, Date.now()]
         );
         res.json({ success: true });
     } catch (err) { 
+        console.error("Create User Error:", err);
         if (err.code === '23505') {
             res.json({ success: false, message: 'Tên đăng nhập đã tồn tại' });
         } else {
-            console.error("Create User Error:", err);
             res.status(500).json({ error: err.message });
         }
     }
@@ -551,8 +551,8 @@ app.put('/api/admin/users/:id', async (req, res) => {
 
         if (password) { query += `password=$${idx++}, `; values.push(password); }
         if (fullname) { query += `fullname=$${idx++}, `; values.push(fullname); }
-        // Ensure permissions are stringified if present
-        if (permissions) { query += `permissions=$${idx++}, `; values.push(JSON.stringify(permissions)); }
+        // Explicit cast for update as well
+        if (permissions) { query += `permissions=$${idx++}::jsonb, `; values.push(JSON.stringify(permissions)); }
         if (totp_secret !== undefined) { query += `totp_secret=$${idx++}, `; values.push(totp_secret); }
         if (is_totp_enabled !== undefined) { query += `is_totp_enabled=$${idx++}, `; values.push(is_totp_enabled); }
 

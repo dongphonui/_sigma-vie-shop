@@ -49,6 +49,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [newSubAdmin, setNewSubAdmin] = useState({ username: '', password: '', fullname: '', permissions: [] as string[] });
   const [showSubAdminForm, setShowSubAdminForm] = useState(false);
   const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
+  const [createAdminFeedback, setCreateAdminFeedback] = useState(''); // NEW: Local feedback
 
   // -- Backup Loading --
   const [isBackupLoading, setIsBackupLoading] = useState(false);
@@ -113,12 +114,14 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   // ... Sub Admin Handlers ...
   const handleAddSubAdmin = async (e: React.FormEvent) => {
       e.preventDefault();
+      setCreateAdminFeedback('');
+      
       if (!newSubAdmin.username || !newSubAdmin.password || !newSubAdmin.fullname) {
-          setSettingsFeedback('Vui lòng điền đầy đủ thông tin tài khoản.');
+          setCreateAdminFeedback('Vui lòng điền đầy đủ thông tin tài khoản.');
           return;
       }
       if (newSubAdmin.permissions.length === 0) {
-          setSettingsFeedback('Vui lòng chọn ít nhất một quyền hạn.');
+          setCreateAdminFeedback('Vui lòng chọn ít nhất một quyền hạn.');
           return;
       }
 
@@ -126,30 +129,33 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       try {
           const res = await createAdminUser(newSubAdmin);
           if (res && res.success) {
-              setSettingsFeedback('Tạo tài khoản phụ thành công.');
+              setCreateAdminFeedback('✅ Tạo tài khoản phụ thành công!');
               setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
-              setShowSubAdminForm(false);
+              setTimeout(() => {
+                  setShowSubAdminForm(false);
+                  setCreateAdminFeedback('');
+              }, 2000);
               loadSubAdmins();
           } else {
-              setSettingsFeedback(res.message || 'Lỗi khi tạo tài khoản. Vui lòng thử lại.');
+              setCreateAdminFeedback(`❌ ${res.message || 'Lỗi khi tạo tài khoản.'}`);
           }
       } catch (err) {
-          setSettingsFeedback('Lỗi kết nối Server.');
+          setCreateAdminFeedback('❌ Lỗi kết nối Server.');
       }
       setIsSubmittingAdmin(false);
-      setTimeout(() => setSettingsFeedback(''), 3000);
   };
 
   const handleDeleteSubAdmin = async (id: string, username: string) => {
       if (confirm(`Bạn có chắc muốn xóa tài khoản "${username}"?`)) {
           const res = await deleteAdminUser(id);
           if (res && res.success) {
-              setSettingsFeedback('Đã xóa tài khoản.');
+              // Refresh list directly without global toast for better locality if desired, 
+              // but here user just wants creation feedback near button.
+              // We'll stick to refresh logic.
               loadSubAdmins();
           } else {
-              setSettingsFeedback('Lỗi khi xóa tài khoản.');
+              alert('Lỗi khi xóa tài khoản.');
           }
-          setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
@@ -432,13 +438,22 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                       ))}
                                   </div>
                               </div>
-                              <button 
-                                type="submit" 
-                                disabled={isSubmittingAdmin}
-                                className="bg-[#00695C] text-white px-4 py-2 rounded text-sm font-bold disabled:opacity-50"
-                              >
-                                  {isSubmittingAdmin ? 'Đang tạo...' : 'Tạo tài khoản'}
-                              </button>
+                              
+                              <div className="flex items-center gap-3">
+                                  <button 
+                                    type="submit" 
+                                    disabled={isSubmittingAdmin}
+                                    className="bg-[#00695C] text-white px-6 py-2 rounded text-sm font-bold disabled:opacity-50 hover:bg-[#004d40]"
+                                  >
+                                      {isSubmittingAdmin ? 'Đang xử lý...' : 'Tạo tài khoản'}
+                                  </button>
+                                  
+                                  {createAdminFeedback && (
+                                      <span className={`text-sm font-medium animate-pulse ${createAdminFeedback.includes('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>
+                                          {createAdminFeedback}
+                                      </span>
+                                  )}
+                              </div>
                           </form>
                       )}
 
@@ -464,10 +479,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                               </span>
                                           </td>
                                           <td className="px-4 py-2 text-gray-500 text-xs">
-                                              {user.role === 'MASTER' || user.permissions.includes('ALL') 
+                                              {user.role === 'MASTER' || (Array.isArray(user.permissions) && user.permissions.includes('ALL'))
                                                   ? 'Toàn quyền' 
                                                   : <div className="flex flex-wrap gap-1">
-                                                      {user.permissions.map(p => (
+                                                      {Array.isArray(user.permissions) && user.permissions.map(p => (
                                                           <span key={p} className="bg-gray-100 px-1 rounded border border-gray-200">
                                                               {PERMISSION_OPTIONS.find(opt => opt.id === p)?.label || p}
                                                           </span>
