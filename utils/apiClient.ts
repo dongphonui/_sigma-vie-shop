@@ -18,19 +18,25 @@ export const API_BASE_URL = (() => {
         // Ignore errors if import.meta is not supported
     }
     
-    // 3. Fallback: Automatically determine hostname
-    let host = 'localhost';
+    // 3. Smart Fallback: Determine if Local or Production
+    let isLocalhost = false;
     try {
         if (typeof window !== 'undefined' && window.location && window.location.hostname) {
-            const h = window.location.hostname.trim();
-            if (h !== '') {
-                host = h;
+            const h = window.location.hostname;
+            if (h === 'localhost' || h === '127.0.0.1') {
+                isLocalhost = true;
             }
         }
-    } catch (e) {
-        // Fallback to localhost on error
+    } catch (e) { }
+
+    if (isLocalhost) {
+        // Local Development
+        return 'http://localhost:3000/api';
+    } else {
+        // Production Deployment (Render)
+        // Using the URL found in your deployment logs
+        return 'https://sigmavie-backend.onrender.com/api';
     }
-    return `http://${host}:3000/api`;
 })();
 
 // Track offline status to reduce console noise
@@ -38,16 +44,26 @@ let isOffline = false;
 
 export const checkServerConnection = async (): Promise<boolean> => {
     try {
+        // Add timestamp to bypass cache
         const res = await fetch(`${API_BASE_URL}/health?t=${Date.now()}`, { 
             method: 'GET',
-            signal: AbortSignal.timeout(3000) 
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(5000) // Increase timeout to 5s for slower cold starts
         });
+        
         if (res.ok) {
-            isOffline = false;
+            if (isOffline) {
+                console.log('[API] Connection restored.');
+                isOffline = false;
+            }
             return true;
         }
         return false;
     } catch (e) {
+        if (!isOffline) {
+            console.warn(`[API] Health check failed at ${API_BASE_URL}.`, e);
+            isOffline = true;
+        }
         return false;
     }
 };
