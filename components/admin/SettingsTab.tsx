@@ -48,6 +48,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [subAdmins, setSubAdmins] = useState<AdminUser[]>([]);
   const [newSubAdmin, setNewSubAdmin] = useState({ username: '', password: '', fullname: '', permissions: [] as string[] });
   const [showSubAdminForm, setShowSubAdminForm] = useState(false);
+  const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
 
   // -- Backup Loading --
   const [isBackupLoading, setIsBackupLoading] = useState(false);
@@ -121,15 +122,21 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
           return;
       }
 
-      const res = await createAdminUser(newSubAdmin);
-      if (res && res.success) {
-          setSettingsFeedback('Tạo tài khoản phụ thành công.');
-          setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
-          setShowSubAdminForm(false);
-          loadSubAdmins();
-      } else {
-          setSettingsFeedback(res.message || 'Lỗi khi tạo tài khoản.');
+      setIsSubmittingAdmin(true);
+      try {
+          const res = await createAdminUser(newSubAdmin);
+          if (res && res.success) {
+              setSettingsFeedback('Tạo tài khoản phụ thành công.');
+              setNewSubAdmin({ username: '', password: '', fullname: '', permissions: [] });
+              setShowSubAdminForm(false);
+              loadSubAdmins();
+          } else {
+              setSettingsFeedback(res.message || 'Lỗi khi tạo tài khoản. Vui lòng thử lại.');
+          }
+      } catch (err) {
+          setSettingsFeedback('Lỗi kết nối Server.');
       }
+      setIsSubmittingAdmin(false);
       setTimeout(() => setSettingsFeedback(''), 3000);
   };
 
@@ -425,7 +432,13 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                       ))}
                                   </div>
                               </div>
-                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded text-sm font-bold">Tạo tài khoản</button>
+                              <button 
+                                type="submit" 
+                                disabled={isSubmittingAdmin}
+                                className="bg-[#00695C] text-white px-4 py-2 rounded text-sm font-bold disabled:opacity-50"
+                              >
+                                  {isSubmittingAdmin ? 'Đang tạo...' : 'Tạo tài khoản'}
+                              </button>
                           </form>
                       )}
 

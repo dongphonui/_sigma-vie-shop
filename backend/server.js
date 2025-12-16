@@ -520,16 +520,18 @@ app.post('/api/admin/users', async (req, res) => {
     const { username, password, fullname, permissions } = req.body;
     try {
         const id = 'admin_' + Date.now();
+        // NOTE: permissions passed directly. pg handles JSON array conversion.
         await pool.query(
             `INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at)
              VALUES ($1, $2, $3, $4, 'STAFF', $5, $6)`,
-            [id, username, password, fullname, JSON.stringify(permissions), Date.now()]
+            [id, username, password, fullname, permissions, Date.now()]
         );
         res.json({ success: true });
     } catch (err) { 
         if (err.code === '23505') {
             res.json({ success: false, message: 'Tên đăng nhập đã tồn tại' });
         } else {
+            console.error("Create User Error:", err);
             res.status(500).json({ error: err.message });
         }
     }
