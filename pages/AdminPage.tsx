@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { AdminUser } from '../types';
-import { BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, EditIcon, LayersIcon, UserIcon, ImagePlus } from '../components/Icons';
+import { BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, EditIcon, LayersIcon, UserIcon, ImagePlus, FileTextIcon } from '../components/Icons';
 import { checkServerConnection } from '../utils/apiClient';
 
 // Import Components
@@ -11,6 +11,7 @@ import OrderTab from '../components/admin/OrderTab';
 import InventoryTab from '../components/admin/InventoryTab';
 import CustomerTab from '../components/admin/CustomerTab';
 import SettingsTab from '../components/admin/SettingsTab';
+import ReportsTab from '../components/admin/ReportsTab';
 
 // Import Setting Components Directly
 import HomePageSettingsTab from '../components/admin/settings/HomePageSettingsTab';
@@ -18,7 +19,7 @@ import HeaderSettingsTab from '../components/admin/settings/HeaderSettingsTab';
 import AboutPageSettingsTab from '../components/admin/settings/AboutPageSettingsTab';
 
 const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'settings' | 'home' | 'header' | 'about'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reports' | 'settings' | 'home' | 'header' | 'about'>('dashboard');
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   
   // Server Connection State
@@ -97,9 +98,10 @@ const AdminPage: React.FC = () => {
       case 'orders': return <OrderTab />;
       case 'inventory': return <InventoryTab />;
       case 'customers': return <CustomerTab />;
-      case 'home': return <HomePageSettingsTab />;     // New Tab
-      case 'header': return <HeaderSettingsTab />;     // New Tab
-      case 'about': return <AboutPageSettingsTab />;   // New Tab
+      case 'reports': return <ReportsTab />; // NEW Reports Tab
+      case 'home': return <HomePageSettingsTab />;     
+      case 'header': return <HeaderSettingsTab />;     
+      case 'about': return <AboutPageSettingsTab />;   
       case 'settings': return <SettingsTab currentUser={currentAdminUser} />;
       default: return <DashboardTab />;
     }
@@ -130,7 +132,7 @@ const AdminPage: React.FC = () => {
         </div>
       )}
 
-      <aside className={`bg-[#111827] text-white w-full md:w-64 flex-shrink-0 ${!isServerOnline ? 'pt-8 md:pt-0' : ''}`}>
+      <aside className={`bg-[#111827] text-white w-full md:w-64 flex-shrink-0 ${!isServerOnline ? 'pt-8 md:pt-0' : ''} print:hidden`}>
         <div className="p-6 border-b border-gray-700 flex items-center gap-3">
           <div className="bg-[#D4AF37] p-2 rounded-lg">
              <BarChart2 className="w-6 h-6 text-white" />
@@ -161,6 +163,13 @@ const AdminPage: React.FC = () => {
            {hasPermission('customers') && (
                <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
                 <UsersIcon className="w-5 h-5" /> Khách hàng
+              </button>
+           )}
+           
+           {/* REPORTS SECTION - NEW */}
+           {hasPermission('reports') && (
+               <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'reports' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
+                <FileTextIcon className="w-5 h-5" /> Báo cáo
               </button>
            )}
            
@@ -206,14 +215,15 @@ const AdminPage: React.FC = () => {
         </div>
       </aside>
 
-      <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isServerOnline ? 'pt-12 md:pt-12' : ''}`}>
-        <header className="flex justify-between items-center mb-8">
+      <main className={`flex-1 p-4 md:p-8 overflow-y-auto ${!isServerOnline ? 'pt-12 md:pt-12' : ''} print:p-0 print:overflow-visible`}>
+        <header className="flex justify-between items-center mb-8 print:hidden">
             <h2 className="text-2xl font-bold text-gray-800 font-serif">
                 {activeTab === 'dashboard' ? 'Tổng quan Hệ thống' : 
                  activeTab === 'products' ? 'Quản lý Sản phẩm' : 
                  activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
                  activeTab === 'inventory' ? 'Nhập xuất Kho' : 
                  activeTab === 'customers' ? 'Danh sách Khách hàng' : 
+                 activeTab === 'reports' ? 'Báo cáo & Thống kê' : 
                  activeTab === 'home' ? 'Cấu hình Trang chủ' :
                  activeTab === 'header' ? 'Cấu hình Header & Logo' :
                  activeTab === 'about' ? 'Nội dung trang Giới thiệu' :

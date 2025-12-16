@@ -62,6 +62,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       { id: 'orders', label: 'Quản lý Đơn hàng', group: 'Module Chính' },
       { id: 'inventory', label: 'Quản lý Kho', group: 'Module Chính' },
       { id: 'customers', label: 'Quản lý Khách hàng', group: 'Module Chính' },
+      { id: 'reports', label: 'Xem Báo cáo', group: 'Module Chính' }, // NEW REPORT PERMISSION
       
       { id: 'settings_ui', label: 'Sửa Giao diện Web (Home, About, Header)', group: 'Cài đặt' },
       { id: 'settings_info', label: 'Sửa Thông tin Shop (In bill)', group: 'Cài đặt' },
