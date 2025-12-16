@@ -153,6 +153,8 @@ const initDb = async () => {
         created_at BIGINT
       );
     `);
+    // SELF HEALING: Ensure 'permissions' column exists for older DBs
+    await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS permissions JSONB;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
 
@@ -520,11 +522,13 @@ app.post('/api/admin/users', async (req, res) => {
     const { username, password, fullname, permissions } = req.body;
     try {
         const id = 'admin_' + Date.now();
-        // NOTE: permissions passed directly. pg handles JSON array conversion.
+        // IMPORTANT: Explicitly stringify the array for JSONB column to avoid Type mismatch error (text[] vs jsonb)
+        const permissionsJson = JSON.stringify(permissions);
+        
         await pool.query(
             `INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at)
              VALUES ($1, $2, $3, $4, 'STAFF', $5, $6)`,
-            [id, username, password, fullname, permissions, Date.now()]
+            [id, username, password, fullname, permissionsJson, Date.now()]
         );
         res.json({ success: true });
     } catch (err) { 
@@ -547,6 +551,7 @@ app.put('/api/admin/users/:id', async (req, res) => {
 
         if (password) { query += `password=$${idx++}, `; values.push(password); }
         if (fullname) { query += `fullname=$${idx++}, `; values.push(fullname); }
+        // Ensure permissions are stringified if present
         if (permissions) { query += `permissions=$${idx++}, `; values.push(JSON.stringify(permissions)); }
         if (totp_secret !== undefined) { query += `totp_secret=$${idx++}, `; values.push(totp_secret); }
         if (is_totp_enabled !== undefined) { query += `is_totp_enabled=$${idx++}, `; values.push(is_totp_enabled); }
