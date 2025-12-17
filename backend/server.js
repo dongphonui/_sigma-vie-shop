@@ -84,8 +84,11 @@ const initDb = async () => {
     await client.query(`CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT);`);
     await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS data JSONB;`);
 
-    // 3. Customers
-    await client.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT);`);
+    // 3. Customers - FIX MISSING COLUMNS HERE
+    await client.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT);`);
+    // Ensure these columns exist even if table was created previously
+    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT;`);
+    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS email TEXT;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS data JSONB;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_at BIGINT;`);
 
@@ -249,17 +252,22 @@ app.delete('/api/customers/:id', async (req, res) => {
 });
 
 // NEW: CUSTOMER LOGIN VERIFICATION (Server-Side)
+// FIXED: Queries JSONB to prevent column errors and support both phone/email
 app.post('/api/customers/login', async (req, res) => {
     const { identifier, passwordHash } = req.body;
     try {
-        // Query by phone or email
+        // Query matching phoneNumber OR email inside the JSONB data
+        // Also checks top-level 'phone' and 'email' columns if they exist and are populated
         const result = await pool.query(
-            `SELECT data FROM customers WHERE phone = $1 OR email = $1`, 
+            `SELECT data FROM customers 
+             WHERE data->>'phoneNumber' = $1 
+                OR data->>'email' = $1 
+                OR phone = $1 
+                OR email = $1`, 
             [identifier]
         );
         
         if (result.rows.length > 0) {
-            // Found customer, check password
             const customer = result.rows[0].data;
             if (customer && customer.passwordHash === passwordHash) {
                 res.json({ success: true, customer: customer });
@@ -270,7 +278,13 @@ app.post('/api/customers/login', async (req, res) => {
             res.json({ success: false, message: 'Tài khoản không tồn tại trên hệ thống.' });
         }
     } catch (err) { 
-        res.status(500).json({ error: err.message }); 
+        console.error("Login Error:", err);
+        // Fallback friendly error
+        if (err.message.includes('does not exist')) {
+             res.status(500).json({ error: "Lỗi cấu trúc Database (Thiếu cột). Vui lòng báo Admin reset server." });
+        } else {
+             res.status(500).json({ error: err.message }); 
+        }
     }
 });
 
