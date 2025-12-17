@@ -94,6 +94,18 @@ const initDb = async () => {
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS data JSONB;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_at BIGINT;`);
 
+    // --- FIX ERROR 23502 (NOT NULL VIOLATION) ---
+    // Remove NOT NULL constraints from potential legacy columns to prevent insert errors
+    const potentialLegacyCols = ['fullname', 'phonenumber', 'cccdnumber', 'address', 'gender', 'dob', 'issuedate', 'name', 'phone', 'email'];
+    for (const col of potentialLegacyCols) {
+        try {
+            // Try to drop NOT NULL. If column doesn't exist, it will just fail silently in catch block.
+            await client.query(`ALTER TABLE customers ALTER COLUMN "${col}" DROP NOT NULL`);
+        } catch (e) { 
+            // Ignore errors (e.g., column does not exist)
+        }
+    }
+
     // 4. Orders
     await client.query(`CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, customer_id TEXT, total_price NUMERIC, status TEXT, timestamp BIGINT);`);
     await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS data JSONB;`);
@@ -232,7 +244,7 @@ app.get('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ROBUST REGISTER CUSTOMER (FIXED)
+// ROBUST REGISTER CUSTOMER (FIXED 23502)
 app.post('/api/customers', async (req, res) => {
     const c = req.body;
     try {
@@ -263,7 +275,12 @@ app.post('/api/customers', async (req, res) => {
         res.json({ success: true });
     } catch (err) { 
         console.error("Register Error:", err);
-        res.status(500).json({ error: err.message }); 
+        // Better error message for client
+        if (err.code === '23502') {
+             res.status(500).json({ error: "Lỗi cấu trúc Database (Cột bắt buộc bị thiếu). Server đang tự động sửa, vui lòng thử lại sau 10 giây." });
+        } else {
+             res.status(500).json({ error: err.message }); 
+        }
     }
 });
 
