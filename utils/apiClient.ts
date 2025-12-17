@@ -34,7 +34,6 @@ export const API_BASE_URL = (() => {
         return 'http://localhost:3000/api';
     } else {
         // Production Deployment (Render)
-        // Using the URL found in your deployment logs
         return 'https://sigmavie-backend.onrender.com/api';
     }
 })();
@@ -153,6 +152,7 @@ export const fetchCustomersFromDB = () => fetchData('customers');
 export const syncCustomerToDB = (customer: any) => syncData('customers', customer);
 export const updateCustomerInDB = (customer: any) => syncData(`customers/${customer.id}`, customer, 'PUT');
 export const deleteCustomerFromDB = (id: string) => syncData(`customers/${id}`, {}, 'DELETE');
+export const verifyCustomerLoginOnServer = (identifier: string, passwordHash: string) => syncData('customers/login', { identifier, passwordHash }, 'POST');
 
 // Orders
 export const fetchOrdersFromDB = () => fetchData('orders');

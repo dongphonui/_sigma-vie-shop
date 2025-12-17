@@ -1,6 +1,6 @@
 
 import type { Customer } from '../types';
-import { fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, deleteCustomerFromDB } from './apiClient';
+import { fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, deleteCustomerFromDB, verifyCustomerLoginOnServer } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_customers';
 const SESSION_KEY = 'sigma_vie_current_customer';
@@ -182,19 +182,48 @@ export const deleteCustomer = async (id: string): Promise<boolean> => {
     }
 };
 
-export const loginCustomer = (identifier: string, password: string): { success: boolean; message: string; customer?: Customer } => {
-  const customers = getCustomers();
+// UPDATED: Server-Aware Login Logic
+export const loginCustomer = async (identifier: string, password: string): Promise<{ success: boolean; message: string; customer?: Customer }> => {
   const hash = simpleHash(password);
-
-  // STRICT LOGIN: Only check phoneNumber
-  const customer = customers.find(c => 
+  
+  // 1. LOCAL CHECK FIRST (Fast)
+  // Logic: Check local storage first.
+  const customers = getCustomers();
+  const localCustomer = customers.find(c => 
     c.phoneNumber === identifier && 
     c.passwordHash === hash
   );
 
-  if (customer) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(customer));
-    return { success: true, message: 'Đăng nhập thành công!', customer };
+  if (localCustomer) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(localCustomer));
+    return { success: true, message: 'Đăng nhập thành công!', customer: localCustomer };
+  }
+
+  // 2. SERVER CHECK (Slow, but necessary for multi-device)
+  // Logic: If local fails, maybe this is a new PC. Ask server directly.
+  try {
+      console.log("Không thấy ở Local, đang kiểm tra Server...");
+      const serverRes = await verifyCustomerLoginOnServer(identifier, hash);
+      
+      if (serverRes && serverRes.success && serverRes.customer) {
+          const remoteCustomer = serverRes.customer;
+          
+          // 3. SYNC DOWN TO LOCAL
+          // Add this customer to local storage so next time it's fast
+          const currentList = getCustomers();
+          if (!currentList.some(c => c.id === remoteCustomer.id)) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify([remoteCustomer, ...currentList]));
+              dispatchCustomerUpdate();
+          }
+          
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(remoteCustomer));
+          return { success: true, message: 'Đăng nhập thành công (từ Server)!', customer: remoteCustomer };
+      } else if (serverRes && !serverRes.success) {
+          return { success: false, message: serverRes.message || 'Tài khoản hoặc mật khẩu không đúng.' };
+      }
+  } catch (e) {
+      console.error("Lỗi kết nối Server khi login:", e);
+      return { success: false, message: 'Lỗi kết nối Server. Vui lòng kiểm tra mạng.' };
   }
 
   return { success: false, message: 'Số điện thoại hoặc mật khẩu không đúng.' };

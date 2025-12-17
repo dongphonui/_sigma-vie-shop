@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { loginCustomer, registerCustomer } from '../utils/customerStorage';
 import { parseCCCDQrCode } from '../utils/cccdHelper';
@@ -22,9 +23,9 @@ const UserCircleIcon: React.FC<{className?: string}> = ({className}) => (
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, initialMode = 'LOGIN' }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(initialMode);
   const [showScanner, setShowScanner] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Generate random field names ONCE when component mounts or mode changes
-  // to completely baffle browser autofill heuristics on mobile
   const randomNames = useMemo(() => ({
       cccd: `f_${Math.random().toString(36).substring(7)}`,
       dob: `f_${Math.random().toString(36).substring(7)}`,
@@ -110,19 +111,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
       }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
+    setIsProcessing(true);
 
     if (mode === 'REGISTER') {
         if (formData.password !== formData.confirmPassword) {
             setError('Mật khẩu xác nhận không khớp.');
+            setIsProcessing(false);
             return;
         }
         
         if (!formData.email || !formData.phoneNumber || !formData.cccdNumber || !formData.issueDate) {
              setError('Vui lòng nhập đầy đủ thông tin (Quét CCCD để tự động điền).');
+             setIsProcessing(false);
              return;
         }
 
@@ -147,14 +151,21 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
         } else {
             setError(result.message);
         }
+        setIsProcessing(false);
     } else {
-        // Login Logic
-        const result = loginCustomer(formData.identifier, formData.password);
-        if (result.success && result.customer) {
-            onLoginSuccess(result.customer);
-            onClose();
-        } else {
-            setError(result.message);
+        // Login Logic (Async)
+        try {
+            const result = await loginCustomer(formData.identifier, formData.password);
+            if (result.success && result.customer) {
+                onLoginSuccess(result.customer);
+                onClose();
+            } else {
+                setError(result.message);
+            }
+        } catch (err) {
+            setError("Lỗi xử lý đăng nhập.");
+        } finally {
+            setIsProcessing(false);
         }
     }
   };
@@ -168,12 +179,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             <button 
                 onClick={() => setMode('LOGIN')}
                 className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${mode === 'LOGIN' ? 'text-[#00695C] border-b-2 border-[#00695C] bg-teal-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                disabled={isProcessing}
             >
                 Đăng Nhập
             </button>
             <button 
                 onClick={() => setMode('REGISTER')}
                 className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${mode === 'REGISTER' ? 'text-[#00695C] border-b-2 border-[#00695C] bg-teal-50' : 'text-gray-500 hover:bg-gray-50'}`}
+                disabled={isProcessing}
             >
                 Đăng Ký
             </button>
@@ -328,6 +341,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             placeholder="Nhập số điện thoại"
                             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-[#D4AF37] focus:border-[#D4AF37]" 
                             autoComplete="tel"
+                            disabled={isProcessing}
                         />
                     </div>
                 )}
@@ -343,6 +357,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                             onChange={handleChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" 
                             autoComplete="new-password"
+                            disabled={isProcessing}
                         />
                     </div>
                     {mode === 'REGISTER' && (
@@ -366,8 +381,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
 
                 <button 
                     type="submit" 
-                    className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors font-bold uppercase"
+                    disabled={isProcessing}
+                    className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors font-bold uppercase disabled:opacity-70 flex items-center justify-center gap-2"
                 >
+                    {isProcessing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                     {mode === 'LOGIN' ? 'Đăng Nhập' : 'Hoàn tất Đăng Ký'}
                 </button>
             </form>
@@ -375,6 +392,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             <button 
                 onClick={onClose}
                 className="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700"
+                disabled={isProcessing}
             >
                 Đóng
             </button>

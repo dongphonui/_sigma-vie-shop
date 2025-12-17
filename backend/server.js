@@ -237,7 +237,6 @@ app.post('/api/customers', async (req, res) => {
 app.put('/api/customers/:id', async (req, res) => {
     const c = req.body;
     try {
-        // IMPORTANT: Ensure 'c' is treated as the JSONB payload for column 'data'
         await pool.query(`UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, [c.fullName, c.phoneNumber, c.email, c, req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -247,6 +246,32 @@ app.delete('/api/customers/:id', async (req, res) => {
         await pool.query('DELETE FROM customers WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// NEW: CUSTOMER LOGIN VERIFICATION (Server-Side)
+app.post('/api/customers/login', async (req, res) => {
+    const { identifier, passwordHash } = req.body;
+    try {
+        // Query by phone or email
+        const result = await pool.query(
+            `SELECT data FROM customers WHERE phone = $1 OR email = $1`, 
+            [identifier]
+        );
+        
+        if (result.rows.length > 0) {
+            // Found customer, check password
+            const customer = result.rows[0].data;
+            if (customer && customer.passwordHash === passwordHash) {
+                res.json({ success: true, customer: customer });
+            } else {
+                res.json({ success: false, message: 'Sai mật khẩu.' });
+            }
+        } else {
+            res.json({ success: false, message: 'Tài khoản không tồn tại trên hệ thống.' });
+        }
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 app.get('/api/orders', async (req, res) => {
@@ -306,7 +331,6 @@ app.post('/api/settings/about-content', handleSetting('about_content').post);
 app.get('/api/settings/about-settings', handleSetting('about_settings').get);
 app.post('/api/settings/about-settings', handleSetting('about_settings').post);
 
-// NEW: Store & Bank Settings Routes
 app.get('/api/settings/store', handleSetting('store_settings').get);
 app.post('/api/settings/store', handleSetting('store_settings').post);
 
@@ -323,7 +347,6 @@ app.post('/api/admin/login-auth', async (req, res) => {
         if (result.rows.length > 0) {
             const user = result.rows[0];
             await pool.query(`INSERT INTO admin_logs (username, method, status, ip_address, user_agent, timestamp) VALUES ($1, $2, $3, $4, $5, $6)`, [username, 'PASSWORD', 'SUCCESS', req.ip, req.get('User-Agent'), Date.now()]);
-            // Format permissions for login response too
             const permissions = typeof user.permissions === 'string' ? JSON.parse(user.permissions || '[]') : (user.permissions || []);
             res.json({ 
                 success: true, 
@@ -351,7 +374,6 @@ app.post('/api/admin/change-password', async (req, res) => {
 app.get('/api/admin/users', async (req, res) => {
     try {
         const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at, is_totp_enabled FROM admin_users ORDER BY created_at DESC');
-        // FIX: Ensure permissions is always an array, even if DB returns string/null
         const users = result.rows.map(user => {
             let parsedPerms = [];
             try {
@@ -376,7 +398,6 @@ app.post('/api/admin/users', async (req, res) => {
     console.log("Creating user:", username);
     try {
         const id = 'admin_' + Date.now();
-        // FIX: Remove ::jsonb cast. Postgres will auto-cast if column is JSONB.
         const permissionsJson = JSON.stringify(permissions || []);
         
         await pool.query(
@@ -387,7 +408,6 @@ app.post('/api/admin/users', async (req, res) => {
         res.json({ success: true });
     } catch (err) { 
         console.error("Create User Error:", err);
-        // Important: Return JSON error so frontend doesn't show 'Offline Mode'
         if (err.code === '23505') {
             res.json({ success: false, message: 'Tên đăng nhập đã tồn tại' });
         } else {
@@ -406,7 +426,6 @@ app.put('/api/admin/users/:id', async (req, res) => {
 
         if (password) { query += `password=$${idx++}, `; values.push(password); }
         if (fullname) { query += `fullname=$${idx++}, `; values.push(fullname); }
-        // FIX: Remove ::jsonb cast
         if (permissions) { query += `permissions=$${idx++}, `; values.push(JSON.stringify(permissions)); }
         if (totp_secret !== undefined) { query += `totp_secret=$${idx++}, `; values.push(totp_secret); }
         if (is_totp_enabled !== undefined) { query += `is_totp_enabled=$${idx++}, `; values.push(is_totp_enabled); }
