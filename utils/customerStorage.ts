@@ -28,9 +28,9 @@ export const getCustomers = (): Customer[] => {
 
     if (!hasLoadedFromDB) {
         hasLoadedFromDB = true;
+        // Background sync
         fetchCustomersFromDB().then(dbCustomers => {
             if (dbCustomers && Array.isArray(dbCustomers)) {
-                // Merge logic could go here, but for customers, Server is usually master
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
                 dispatchCustomerUpdate();
             }
@@ -43,21 +43,26 @@ export const getCustomers = (): Customer[] => {
   }
 };
 
-// NEW: Force Reload from Server
+// NEW: Force Reload from Server (Updated to return data)
 export const forceReloadCustomers = async (): Promise<Customer[]> => {
     try {
         console.log("Đang tải lại danh sách khách hàng từ Server...");
         const dbCustomers = await fetchCustomersFromDB();
         
         if (dbCustomers && Array.isArray(dbCustomers)) {
+            // Success: Update Local Storage with Server Data (Source of Truth)
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
             dispatchCustomerUpdate();
             hasLoadedFromDB = true;
+            console.log(`Đã tải ${dbCustomers.length} khách hàng từ Server.`);
             return dbCustomers;
+        } else {
+            console.warn("Server trả về rỗng hoặc lỗi, dùng dữ liệu Local.");
         }
     } catch (e) {
         console.error("Lỗi force reload customers:", e);
     }
+    // Fallback: Return current local data
     return getCustomers();
 };
 
@@ -105,12 +110,14 @@ export const registerCustomer = (data: {
     createdAt: Date.now()
   };
 
-  const updatedCustomers = [...customers, newCustomer];
+  const updatedCustomers = [newCustomer, ...customers]; // Add to top
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
   dispatchCustomerUpdate();
   
   // Sync to DB
-  syncCustomerToDB(newCustomer);
+  syncCustomerToDB(newCustomer).then(res => {
+      if(!res?.success) console.error("Lỗi lưu khách hàng lên server:", res);
+  });
   
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(newCustomer));
   
