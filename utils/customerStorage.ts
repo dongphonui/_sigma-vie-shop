@@ -1,3 +1,4 @@
+
 import type { Customer } from '../types';
 import { fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, deleteCustomerFromDB } from './apiClient';
 
@@ -15,25 +16,49 @@ const simpleHash = (s: string) => {
   return hash.toString();
 };
 
+// Helper to trigger UI update
+const dispatchCustomerUpdate = () => {
+    window.dispatchEvent(new Event('sigma_vie_customers_update'));
+};
+
 export const getCustomers = (): Customer[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     let localData = stored ? JSON.parse(stored) : [];
 
     if (!hasLoadedFromDB) {
-        fetchCustomersFromDB().then(dbCustomers => {
-            if (dbCustomers && dbCustomers.length > 0) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
-                hasLoadedFromDB = true;
-            }
-        });
         hasLoadedFromDB = true;
+        fetchCustomersFromDB().then(dbCustomers => {
+            if (dbCustomers && Array.isArray(dbCustomers)) {
+                // Merge logic could go here, but for customers, Server is usually master
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
+                dispatchCustomerUpdate();
+            }
+        }).catch(err => console.error("Lỗi tải khách hàng bg:", err));
     }
 
     return localData;
   } catch (error) {
     return [];
   }
+};
+
+// NEW: Force Reload from Server
+export const forceReloadCustomers = async (): Promise<Customer[]> => {
+    try {
+        console.log("Đang tải lại danh sách khách hàng từ Server...");
+        const dbCustomers = await fetchCustomersFromDB();
+        
+        if (dbCustomers && Array.isArray(dbCustomers)) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
+            dispatchCustomerUpdate();
+            hasLoadedFromDB = true;
+            return dbCustomers;
+        }
+    } catch (e) {
+        console.error("Lỗi force reload customers:", e);
+    }
+    return getCustomers();
 };
 
 export const registerCustomer = (data: { 
@@ -82,6 +107,7 @@ export const registerCustomer = (data: {
 
   const updatedCustomers = [...customers, newCustomer];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
+  dispatchCustomerUpdate();
   
   // Sync to DB
   syncCustomerToDB(newCustomer);
@@ -97,6 +123,7 @@ export const updateCustomer = (updatedCustomer: Customer): void => {
     if (index !== -1) {
         customers[index] = updatedCustomer;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+        dispatchCustomerUpdate();
         updateCustomerInDB(updatedCustomer);
         
         const currentUser = getCurrentCustomer();
@@ -110,6 +137,7 @@ export const deleteCustomer = (id: string): void => {
     const customers = getCustomers();
     const updatedCustomers = customers.filter(c => c.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
+    dispatchCustomerUpdate();
     deleteCustomerFromDB(id);
 };
 
