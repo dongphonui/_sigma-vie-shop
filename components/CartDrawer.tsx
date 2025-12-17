@@ -33,11 +33,22 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
   const [lastOrderId, setLastOrderId] = useState('');
   const [shippingSettings, setShippingSettings] = useState(getShippingSettings());
 
+  // Shipping Info State
+  const [shipName, setShipName] = useState('');
+  const [shipPhone, setShipPhone] = useState('');
+  const [shipAddress, setShipAddress] = useState('');
+  const [shipNote, setShipNote] = useState('');
+
   useEffect(() => {
       if (isOpen) {
           setShippingSettings(getShippingSettings());
+          if (currentUser) {
+              setShipName(currentUser.fullName);
+              setShipPhone(currentUser.phoneNumber || '');
+              setShipAddress(currentUser.address || '');
+          }
       }
-  }, [isOpen]);
+  }, [isOpen, currentUser]);
 
   const subtotal = useMemo(() => {
     return items.reduce((sum, item) => sum + (item.selectedPrice * item.quantity), 0);
@@ -57,6 +68,11 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
           return;
       }
 
+      if (!shipName || !shipPhone || !shipAddress) {
+          alert('Vui lòng điền đầy đủ thông tin giao hàng.');
+          return;
+      }
+
       setIsProcessing(true);
       const successfulOrders: string[] = [];
       const failedItems: string[] = [];
@@ -64,10 +80,26 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       
       let isFirstItem = true;
 
+      const shippingInfo = {
+          name: shipName,
+          phone: shipPhone,
+          address: shipAddress,
+          note: shipNote
+      };
+
       for (const item of items) {
           const feeForItem = isFirstItem ? shippingFee : 0;
           // Pass selectedSize and selectedColor to createOrder
-          const result = createOrder(currentUser, item, item.quantity, paymentMethod, feeForItem, item.selectedSize, item.selectedColor);
+          const result = createOrder(
+              currentUser, 
+              item, 
+              item.quantity, 
+              paymentMethod, 
+              feeForItem, 
+              item.selectedSize, 
+              item.selectedColor,
+              shippingInfo // Pass Custom Shipping Info
+          );
           
           if (result.success && result.order) {
               const variants = [];
@@ -221,6 +253,40 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
 
         {items.length > 0 && (
             <div className="p-4 border-t border-gray-200 bg-gray-50">
+                
+                {/* Shipping Form */}
+                <div className="mb-4 space-y-2 border-b border-gray-200 pb-4">
+                    <p className="text-sm font-bold text-[#00695C]">Thông tin nhận hàng:</p>
+                    <input 
+                        type="text" 
+                        placeholder="Tên người nhận" 
+                        value={shipName}
+                        onChange={(e) => setShipName(e.target.value)}
+                        className="w-full text-sm border rounded px-2 py-1.5 focus:ring-[#00695C]"
+                    />
+                    <input 
+                        type="tel" 
+                        placeholder="Số điện thoại" 
+                        value={shipPhone}
+                        onChange={(e) => setShipPhone(e.target.value)}
+                        className="w-full text-sm border rounded px-2 py-1.5 focus:ring-[#00695C]"
+                    />
+                    <input 
+                        type="text" 
+                        placeholder="Địa chỉ giao hàng" 
+                        value={shipAddress}
+                        onChange={(e) => setShipAddress(e.target.value)}
+                        className="w-full text-sm border rounded px-2 py-1.5 focus:ring-[#00695C]"
+                    />
+                    <textarea 
+                        placeholder="Ghi chú (Tùy chọn)" 
+                        value={shipNote}
+                        onChange={(e) => setShipNote(e.target.value)}
+                        rows={1}
+                        className="w-full text-sm border rounded px-2 py-1.5 focus:ring-[#00695C]"
+                    />
+                </div>
+
                 <div className="mb-4">
                     <p className="text-sm font-medium text-gray-700 mb-2">Phương thức thanh toán:</p>
                     <div className="grid grid-cols-2 gap-2">

@@ -125,7 +125,13 @@ export const createOrder = (
     paymentMethod: 'COD' | 'BANK_TRANSFER' = 'COD',
     shippingFee: number = 0,
     size?: string, // NEW Param
-    color?: string // NEW Param
+    color?: string, // NEW Param
+    shippingInfo?: { // NEW Param: Custom Shipping Info
+        name: string;
+        phone: string;
+        address: string;
+        note?: string;
+    }
 ): { success: boolean; message: string; order?: Order } => {
     
     // Check stock for specific variant
@@ -149,9 +155,16 @@ export const createOrder = (
     const newOrder: Order = {
         id: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         customerId: customer.id,
-        customerName: customer.fullName,
-        customerContact: customer.email || customer.phoneNumber || 'N/A',
-        customerAddress: customer.address || 'Chưa cung cấp',
+        customerName: customer.fullName, // Account Name
+        customerContact: customer.email || customer.phoneNumber || 'N/A', // Account Contact
+        
+        // Use provided shipping info or fallback to customer info
+        shippingName: shippingInfo?.name || customer.fullName,
+        shippingPhone: shippingInfo?.phone || customer.phoneNumber || '',
+        shippingAddress: shippingInfo?.address || customer.address || 'Chưa cung cấp',
+        note: shippingInfo?.note || '',
+        customerAddress: customer.address || 'Chưa cung cấp', // Legacy field backup
+
         productId: product.id,
         productName: product.name,
         productSize: size, 

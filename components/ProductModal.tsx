@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import type { Product, Order } from '../types';
+import type { Product, Order, Customer } from '../types';
 import { getPrimaryAdminEmail } from '../utils/adminSettingsStorage';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
@@ -69,11 +69,27 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   const [showQrModal, setShowQrModal] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
+  // Shipping Info State
+  const [shipName, setShipName] = useState('');
+  const [shipPhone, setShipPhone] = useState('');
+  const [shipAddress, setShipAddress] = useState('');
+  const [shipNote, setShipNote] = useState('');
+
   // Product QR Code State
   const [showProductQr, setShowProductQr] = useState(false);
 
   // NEW: Current Stock state for variants
   const [currentStock, setCurrentStock] = useState(product.stock);
+
+  // Load user data if logged in
+  useEffect(() => {
+      const customer = getCurrentCustomer();
+      if (customer) {
+          setShipName(customer.fullName);
+          setShipPhone(customer.phoneNumber || '');
+          setShipAddress(customer.address || '');
+      }
+  }, [isLoggedIn]);
 
   // Effect to update current stock when selection changes
   useEffect(() => {
@@ -91,8 +107,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
               if ((!needsSize || selectedSize) && (!needsColor || selectedColor)) {
                   setCurrentStock(variant ? variant.stock : 0);
               } else {
-                  // Fallback to general stock or 0? 
-                  // Better UX: Show total stock of product, or hint to select options
                   setCurrentStock(product.stock); 
               }
           } else {
@@ -180,6 +194,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
           return;
       }
 
+      if (!shipName || !shipPhone || !shipAddress) {
+          setFeedbackMsg('Vui lòng điền đủ thông tin giao hàng.');
+          setTimeout(() => setFeedbackMsg(''), 2000);
+          return;
+      }
+
       setOrderStatus('PROCESSING');
 
       const productForOrder = { ...product };
@@ -191,8 +211,24 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       const subtotal = pricePerUnit * quantity;
       const shippingFee = calculateShippingFee(subtotal);
 
+      const shippingInfo = {
+          name: shipName,
+          phone: shipPhone,
+          address: shipAddress,
+          note: shipNote
+      };
+
       // Pass selectedSize and selectedColor
-      const result = createOrder(customer, productForOrder, quantity, paymentMethod, shippingFee, selectedSize, selectedColor);
+      const result = createOrder(
+          customer, 
+          productForOrder, 
+          quantity, 
+          paymentMethod, 
+          shippingFee, 
+          selectedSize, 
+          selectedColor,
+          shippingInfo
+      );
 
       if (result.success && result.order) {
           setCreatedOrder(result.order);
@@ -336,25 +372,61 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
             {/* Payment Method Selector */}
             {isLoggedIn && (
-                <div className="mb-6">
-                    <p className="text-sm font-medium text-gray-700 mb-2 text-left">Phương thức thanh toán:</p>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button 
-                            onClick={() => setPaymentMethod('COD')}
-                            className={`flex flex-col items-center justify-center py-2 px-2 border rounded-lg transition-all ${paymentMethod === 'COD' ? 'bg-orange-50 border-[#D4AF37] text-[#D4AF37] ring-1 ring-[#D4AF37]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <DollarSignIcon className="w-5 h-5 mb-1" />
-                            <span className="text-xs font-bold">Tiền mặt (COD)</span>
-                        </button>
-                        <button 
-                            onClick={() => setPaymentMethod('BANK_TRANSFER')}
-                            className={`flex flex-col items-center justify-center py-2 px-2 border rounded-lg transition-all ${paymentMethod === 'BANK_TRANSFER' ? 'bg-teal-50 border-[#00695C] text-[#00695C] ring-1 ring-[#00695C]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <CreditCardIcon className="w-5 h-5 mb-1" />
-                            <span className="text-xs font-bold">Chuyển khoản (QR)</span>
-                        </button>
+                <>
+                    <div className="mb-4 text-left">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Thông tin người nhận:</p>
+                        <div className="space-y-2">
+                            <input 
+                                type="text" 
+                                placeholder="Họ tên người nhận" 
+                                value={shipName}
+                                onChange={(e) => setShipName(e.target.value)}
+                                className="w-full text-sm border rounded px-2 py-1.5"
+                            />
+                            <input 
+                                type="tel" 
+                                placeholder="Số điện thoại" 
+                                value={shipPhone}
+                                onChange={(e) => setShipPhone(e.target.value)}
+                                className="w-full text-sm border rounded px-2 py-1.5"
+                            />
+                            <input 
+                                type="text" 
+                                placeholder="Địa chỉ giao hàng" 
+                                value={shipAddress}
+                                onChange={(e) => setShipAddress(e.target.value)}
+                                className="w-full text-sm border rounded px-2 py-1.5"
+                            />
+                            <textarea 
+                                placeholder="Ghi chú (Tùy chọn)" 
+                                value={shipNote}
+                                onChange={(e) => setShipNote(e.target.value)}
+                                rows={1}
+                                className="w-full text-sm border rounded px-2 py-1.5"
+                            />
+                        </div>
                     </div>
-                </div>
+
+                    <div className="mb-6">
+                        <p className="text-sm font-medium text-gray-700 mb-2 text-left">Phương thức thanh toán:</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                                onClick={() => setPaymentMethod('COD')}
+                                className={`flex flex-col items-center justify-center py-2 px-2 border rounded-lg transition-all ${paymentMethod === 'COD' ? 'bg-orange-50 border-[#D4AF37] text-[#D4AF37] ring-1 ring-[#D4AF37]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                                <DollarSignIcon className="w-5 h-5 mb-1" />
+                                <span className="text-xs font-bold">Tiền mặt (COD)</span>
+                            </button>
+                            <button 
+                                onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                                className={`flex flex-col items-center justify-center py-2 px-2 border rounded-lg transition-all ${paymentMethod === 'BANK_TRANSFER' ? 'bg-teal-50 border-[#00695C] text-[#00695C] ring-1 ring-[#00695C]' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                            >
+                                <CreditCardIcon className="w-5 h-5 mb-1" />
+                                <span className="text-xs font-bold">Chuyển khoản (QR)</span>
+                            </button>
+                        </div>
+                    </div>
+                </>
             )}
 
             <div className="flex flex-col gap-3">

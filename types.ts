@@ -70,9 +70,18 @@ export interface Customer {
 export interface Order {
   id: string;
   customerId: string;
-  customerName: string;
-  customerContact: string; 
-  customerAddress: string;
+  customerName: string; // Tên tài khoản đặt (Người mua)
+  customerContact: string; // Liên hệ tài khoản đặt
+  
+  // Shipping Info (Người nhận thực tế)
+  shippingName: string;
+  shippingPhone: string;
+  shippingAddress: string;
+  note?: string;
+
+  // Legacy fallback (Optional now, mapped to shipping fields usually)
+  customerAddress: string; 
+
   productId: number;
   productName: string;
   productSize?: string; // NEW: Size khách chọn

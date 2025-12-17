@@ -78,12 +78,16 @@ const OrderTab: React.FC = () => {
                     <p>Đ/C: ${storeAddress}</p>
                 </div>
                 <div class="box">
-                    <h3>NGƯỜI NHẬN</h3>
-                    <p><strong>${order.customerName}</strong></p>
-                    <p>SĐT: <strong>${order.customerContact}</strong></p>
-                    <p>Đ/C: ${order.customerAddress}</p>
+                    <h3>NGƯỜI NHẬN (Delivery To)</h3>
+                    <p><strong>${order.shippingName || order.customerName}</strong></p>
+                    <p>SĐT: <strong>${order.shippingPhone || order.customerContact}</strong></p>
+                    <p>Đ/C: ${order.shippingAddress || order.customerAddress}</p>
+                    ${order.note ? `<p style="margin-top:5px; font-style:italic;">Ghi chú: ${order.note}</p>` : ''}
                 </div>
             </div>
+            ${order.shippingName && order.shippingName !== order.customerName ? 
+                `<p style="font-size:12px; margin-bottom:10px;">* Đơn hàng được đặt bởi tài khoản: ${order.customerName} (${order.customerContact})</p>` 
+            : ''}
             <table class="order-details">
                 <thead><tr><th>Sản phẩm</th><th>Phân loại</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
                 <tbody>
@@ -155,7 +159,10 @@ const OrderTab: React.FC = () => {
                       {orders
                           .filter(order => 
                               (orderFilterStatus === 'all' || order.status === orderFilterStatus) &&
-                              (order.id.toLowerCase().includes(orderSearch.toLowerCase()) || order.customerName.toLowerCase().includes(orderSearch.toLowerCase()))
+                              (order.id.toLowerCase().includes(orderSearch.toLowerCase()) || 
+                               order.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
+                               order.shippingName?.toLowerCase().includes(orderSearch.toLowerCase()) // Search by recipient too
+                              )
                           )
                           .sort((a, b) => b.timestamp - a.timestamp)
                           .slice((orderCurrentPage - 1) * ordersPerPage, orderCurrentPage * ordersPerPage)
@@ -163,8 +170,11 @@ const OrderTab: React.FC = () => {
                           <tr key={order.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 font-mono text-xs">{order.id}</td>
                               <td className="px-4 py-3">
-                                  <div className="font-medium text-gray-900">{order.customerName}</div>
-                                  <div className="text-xs text-gray-400">{order.customerContact}</div>
+                                  <div className="font-medium text-gray-900">{order.shippingName || order.customerName}</div>
+                                  <div className="text-xs text-gray-400">{order.shippingPhone || order.customerContact}</div>
+                                  {order.shippingName !== order.customerName && (
+                                      <div className="text-[10px] text-gray-400 italic mt-1">Đặt bởi: {order.customerName}</div>
+                                  )}
                               </td>
                               <td className="px-4 py-3">
                                   <div>{order.productName}</div>
