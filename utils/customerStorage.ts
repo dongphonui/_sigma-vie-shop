@@ -43,7 +43,7 @@ export const getCustomers = (): Customer[] => {
   }
 };
 
-// NEW: Force Reload from Server (Updated to return data)
+// Force Reload from Server (Updated to return data)
 export const forceReloadCustomers = async (): Promise<Customer[]> => {
     try {
         console.log("Đang tải lại danh sách khách hàng từ Server...");
@@ -124,28 +124,62 @@ export const registerCustomer = (data: {
   return { success: true, message: 'Đăng ký thành công!', customer: newCustomer };
 };
 
-export const updateCustomer = (updatedCustomer: Customer): void => {
+// UPDATED: Async Update
+export const updateCustomer = async (updatedCustomer: Customer): Promise<boolean> => {
     const customers = getCustomers();
     const index = customers.findIndex(c => c.id === updatedCustomer.id);
+    
+    // 1. Optimistic Update (Local)
     if (index !== -1) {
         customers[index] = updatedCustomer;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
         dispatchCustomerUpdate();
-        updateCustomerInDB(updatedCustomer);
         
         const currentUser = getCurrentCustomer();
         if (currentUser && currentUser.id === updatedCustomer.id) {
              sessionStorage.setItem(SESSION_KEY, JSON.stringify(updatedCustomer));
         }
     }
+
+    // 2. Server Sync (Wait for response)
+    try {
+        const res = await updateCustomerInDB(updatedCustomer);
+        if (res && res.success) {
+            console.log("Cập nhật khách hàng lên Server thành công.");
+            return true;
+        } else {
+            console.error("Lỗi cập nhật Server:", res);
+            return false;
+        }
+    } catch (e) {
+        console.error("Lỗi mạng khi cập nhật:", e);
+        return false;
+    }
 };
 
-export const deleteCustomer = (id: string): void => {
+// UPDATED: Async Delete
+export const deleteCustomer = async (id: string): Promise<boolean> => {
     const customers = getCustomers();
+    
+    // 1. Optimistic Delete (Local)
     const updatedCustomers = customers.filter(c => c.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
     dispatchCustomerUpdate();
-    deleteCustomerFromDB(id);
+
+    // 2. Server Sync (Wait for response)
+    try {
+        const res = await deleteCustomerFromDB(id);
+        if (res && res.success) {
+            console.log("Xóa khách hàng trên Server thành công.");
+            return true;
+        } else {
+            console.error("Lỗi xóa trên Server:", res);
+            return false;
+        }
+    } catch (e) {
+        console.error("Lỗi mạng khi xóa:", e);
+        return false;
+    }
 };
 
 export const loginCustomer = (identifier: string, password: string): { success: boolean; message: string; customer?: Customer } => {

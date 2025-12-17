@@ -237,6 +237,7 @@ app.post('/api/customers', async (req, res) => {
 app.put('/api/customers/:id', async (req, res) => {
     const c = req.body;
     try {
+        // IMPORTANT: Ensure 'c' is treated as the JSONB payload for column 'data'
         await pool.query(`UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, [c.fullName, c.phoneNumber, c.email, c, req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
