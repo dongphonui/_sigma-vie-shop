@@ -117,7 +117,7 @@ const CustomerTab: React.FC = () => {
               setIsEditingCustomer(false);
               setEditingCustomer(null);
           } else {
-              setCustomerFeedback('Cảnh báo: Chỉ cập nhật cục bộ. Lỗi kết nối Server.');
+              setCustomerFeedback('Lỗi: Server từ chối cập nhật (Kiểm tra lại dữ liệu đầu vào hoặc kết nối).');
               setIsEditingCustomer(false);
               setEditingCustomer(null);
           }

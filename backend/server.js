@@ -237,13 +237,29 @@ app.post('/api/customers', async (req, res) => {
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// UPDATED CUSTOMER PUT ROUTE (FIXED)
 app.put('/api/customers/:id', async (req, res) => {
     const c = req.body;
+    const id = req.params.id;
     try {
-        await pool.query(`UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, [c.fullName, c.phoneNumber, c.email, c, req.params.id]);
+        // Safe mapping with defaults to avoid "undefined" errors in SQL
+        const name = c.fullName || '';
+        const phone = c.phoneNumber || '';
+        const email = c.email || '';
+        const data = c; // Save full object as JSON
+
+        await pool.query(
+            `UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, 
+            [name, phone, email, data, id]
+        );
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error("Update Customer Error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
 });
+
 app.delete('/api/customers/:id', async (req, res) => {
     try {
         await pool.query('DELETE FROM customers WHERE id = $1', [req.params.id]);
