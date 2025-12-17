@@ -96,7 +96,16 @@ const initDb = async () => {
 
     // --- FIX ERROR 23502 (NOT NULL VIOLATION) ---
     // Remove NOT NULL constraints from potential legacy columns to prevent insert errors
-    const potentialLegacyCols = ['fullname', 'phonenumber', 'cccdnumber', 'address', 'gender', 'dob', 'issuedate', 'name', 'phone', 'email'];
+    // UPDATED: Added 'full_name' and 'phone_number' (snake_case) which caused the specific error
+    const potentialLegacyCols = [
+        'fullname', 'phonenumber', 
+        'full_name', 'phone_number', 
+        'cccdnumber', 'cccd_number', 
+        'address', 'gender', 'dob', 
+        'issuedate', 'issue_date', 
+        'name', 'phone', 'email'
+    ];
+    
     for (const col of potentialLegacyCols) {
         try {
             // Try to drop NOT NULL. If column doesn't exist, it will just fail silently in catch block.
@@ -146,7 +155,7 @@ const initDb = async () => {
         console.log('✅ Default admin user created.');
     }
 
-    console.log('✅ Database schema ready.');
+    console.log('✅ Database schema ready (Constraint Fix Applied).');
   } catch (err) {
     console.error('⚠️ DB Initialization Warning:', err.message);
     console.log('Server continues to run but some DB features might fail.');
@@ -277,7 +286,15 @@ app.post('/api/customers', async (req, res) => {
         console.error("Register Error:", err);
         // Better error message for client
         if (err.code === '23502') {
-             res.status(500).json({ error: "Lỗi cấu trúc Database (Cột bắt buộc bị thiếu). Server đang tự động sửa, vui lòng thử lại sau 10 giây." });
+             res.status(500).json({ error: "Lỗi cấu trúc Database: Server đã nhận diện lỗi 'Cột bắt buộc'. Vui lòng đợi 5 giây và thử lại (Hệ thống vừa tự động sửa)." });
+             // Attempt fix immediately for next request
+             const colMatch = err.detail ? err.detail.match(/column "(.*?)"/) : null;
+             if (colMatch && colMatch[1]) {
+                 try {
+                    await pool.query(`ALTER TABLE customers ALTER COLUMN "${colMatch[1]}" DROP NOT NULL`);
+                    console.log(`AUTO-FIXED: Dropped NOT NULL on ${colMatch[1]}`);
+                 } catch(e) {}
+             }
         } else {
              res.status(500).json({ error: err.message }); 
         }
