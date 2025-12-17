@@ -85,8 +85,10 @@ const initDb = async () => {
     await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS data JSONB;`);
 
     // 3. Customers - FIX MISSING COLUMNS HERE
-    await client.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT);`);
-    // Ensure these columns exist even if table was created previously
+    await client.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY);`); // Removed name from here to force add via ALTER below
+    
+    // CRITICAL FIX: Ensure 'name' column exists even if table was created previously without it
+    await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS name TEXT;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS email TEXT;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS data JSONB;`);
@@ -233,6 +235,7 @@ app.get('/api/customers', async (req, res) => {
 app.post('/api/customers', async (req, res) => {
     const c = req.body;
     try {
+        // Explicitly map fullName to name column
         await pool.query(`INSERT INTO customers (id, name, phone, email, data, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET name=$2, phone=$3, email=$4, data=$5`, [c.id, c.fullName, c.phoneNumber, c.email, c, c.createdAt || Date.now()]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -256,6 +259,7 @@ app.put('/api/customers/:id', async (req, res) => {
         res.json({ success: true });
     } catch (err) { 
         console.error("Update Customer Error:", err);
+        // Better error response
         res.status(500).json({ error: err.message }); 
     }
 });
@@ -268,7 +272,6 @@ app.delete('/api/customers/:id', async (req, res) => {
 });
 
 // NEW: CUSTOMER LOGIN VERIFICATION (Server-Side)
-// FIXED: Queries JSONB to prevent column errors and support both phone/email
 app.post('/api/customers/login', async (req, res) => {
     const { identifier, passwordHash } = req.body;
     try {
