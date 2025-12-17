@@ -66,7 +66,7 @@ export const forceReloadCustomers = async (): Promise<Customer[]> => {
     return getCustomers();
 };
 
-export const registerCustomer = (data: { 
+export const registerCustomer = async (data: { 
     fullName: string; 
     password: string; 
     email: string; 
@@ -76,7 +76,7 @@ export const registerCustomer = (data: {
     gender: string;
     dob: string;
     issueDate: string;
-}): { success: boolean; message: string; customer?: Customer } => {
+}): Promise<{ success: boolean; message: string; customer?: Customer }> => {
   const customers = getCustomers();
   
   // 1. Validate Required Fields
@@ -84,7 +84,7 @@ export const registerCustomer = (data: {
       return { success: false, message: 'Vui lòng điền đầy đủ thông tin (bao gồm cả CCCD).' };
   }
 
-  // 2. Check Duplicates
+  // 2. Check Duplicates (Local Check for speed)
   if (customers.some(c => c.email === data.email)) {
     return { success: false, message: 'Email này đã được đăng ký.' };
   }
@@ -110,14 +110,28 @@ export const registerCustomer = (data: {
     createdAt: Date.now()
   };
 
+  // 4. Sync to DB (BLOCKING to ensure server save)
+  try {
+      const res = await syncCustomerToDB(newCustomer);
+      
+      // If server explicitly fails (e.g., DB constraint unique violation not caught locally)
+      if (res && !res.success && !res.isNetworkError) {
+          console.error("Server registration failed:", res);
+          return { success: false, message: res.message || 'Đăng ký thất bại trên Server.' };
+      }
+      // If network error (offline), we proceed to save locally (Offline First strategy)
+      if (res && res.isNetworkError) {
+          console.warn("Network error, saving locally only.");
+      }
+  } catch (e) {
+      console.error("Sync Error:", e);
+      // Proceed if likely network error
+  }
+
+  // 5. Save Local
   const updatedCustomers = [newCustomer, ...customers]; // Add to top
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
   dispatchCustomerUpdate();
-  
-  // Sync to DB
-  syncCustomerToDB(newCustomer).then(res => {
-      if(!res?.success) console.error("Lỗi lưu khách hàng lên server:", res);
-  });
   
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(newCustomer));
   
@@ -187,7 +201,6 @@ export const loginCustomer = async (identifier: string, password: string): Promi
   const hash = simpleHash(password);
   
   // 1. LOCAL CHECK FIRST (Fast)
-  // Logic: Check local storage first.
   const customers = getCustomers();
   const localCustomer = customers.find(c => 
     c.phoneNumber === identifier && 
@@ -200,7 +213,6 @@ export const loginCustomer = async (identifier: string, password: string): Promi
   }
 
   // 2. SERVER CHECK (Slow, but necessary for multi-device)
-  // Logic: If local fails, maybe this is a new PC. Ask server directly.
   try {
       console.log("Không thấy ở Local, đang kiểm tra Server...");
       const serverRes = await verifyCustomerLoginOnServer(identifier, hash);
@@ -209,7 +221,6 @@ export const loginCustomer = async (identifier: string, password: string): Promi
           const remoteCustomer = serverRes.customer;
           
           // 3. SYNC DOWN TO LOCAL
-          // Add this customer to local storage so next time it's fast
           const currentList = getCustomers();
           if (!currentList.some(c => c.id === remoteCustomer.id)) {
               localStorage.setItem(STORAGE_KEY, JSON.stringify([remoteCustomer, ...currentList]));

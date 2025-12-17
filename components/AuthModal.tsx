@@ -130,7 +130,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
              return;
         }
 
-        const result = registerCustomer({
+        const result = await registerCustomer({
             fullName: formData.fullName,
             password: formData.password,
             email: formData.email,
