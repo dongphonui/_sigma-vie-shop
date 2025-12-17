@@ -292,14 +292,26 @@ const handleSetting = (key) => ({
     }
 });
 
+// Settings Routes
 app.get('/api/settings/shipping', handleSetting('shipping').get);
 app.post('/api/settings/shipping', handleSetting('shipping').post);
+
 app.get('/api/settings/home', handleSetting('home_page').get);
 app.post('/api/settings/home', handleSetting('home_page').post);
+
 app.get('/api/settings/about-content', handleSetting('about_content').get);
 app.post('/api/settings/about-content', handleSetting('about_content').post);
+
 app.get('/api/settings/about-settings', handleSetting('about_settings').get);
 app.post('/api/settings/about-settings', handleSetting('about_settings').post);
+
+// NEW: Store & Bank Settings Routes
+app.get('/api/settings/store', handleSetting('store_settings').get);
+app.post('/api/settings/store', handleSetting('store_settings').post);
+
+app.get('/api/settings/bank', handleSetting('bank_settings').get);
+app.post('/api/settings/bank', handleSetting('bank_settings').post);
+
 
 // 7. ADMIN & SUB-ADMINS (CRITICAL FIXES HERE)
 

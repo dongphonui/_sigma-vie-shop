@@ -179,6 +179,14 @@ export const changeAdminPassword = (data: any) => syncData('admin/change-passwor
 export const fetchShippingSettingsFromDB = () => fetchData('settings/shipping');
 export const syncShippingSettingsToDB = (settings: any) => syncData('settings/shipping', settings);
 
+// Store Settings (NEW)
+export const fetchStoreSettingsFromDB = () => fetchData('settings/store');
+export const syncStoreSettingsToDB = (settings: any) => syncData('settings/store', settings);
+
+// Bank Settings (NEW)
+export const fetchBankSettingsFromDB = () => fetchData('settings/bank');
+export const syncBankSettingsToDB = (settings: any) => syncData('settings/bank', settings);
+
 // Home Page Settings
 export const fetchHomePageSettingsFromDB = () => fetchData('settings/home');
 export const syncHomePageSettingsToDB = (settings: any) => syncData('settings/home', settings);
