@@ -147,7 +147,7 @@ const OrderTab: React.FC = () => {
                   <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
                       <tr>
                           <th className="px-4 py-3">Mã Đơn</th>
-                          <th className="px-4 py-3">Khách hàng</th>
+                          <th className="px-4 py-3">Thông tin Giao hàng</th>
                           <th className="px-4 py-3">Sản phẩm</th>
                           <th className="px-4 py-3">Tổng tiền</th>
                           <th className="px-4 py-3">Thanh toán</th>
@@ -170,11 +170,28 @@ const OrderTab: React.FC = () => {
                           <tr key={order.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 font-mono text-xs">{order.id}</td>
                               <td className="px-4 py-3">
-                                  <div className="font-medium text-gray-900">{order.shippingName || order.customerName}</div>
-                                  <div className="text-xs text-gray-400">{order.shippingPhone || order.customerContact}</div>
-                                  {order.shippingName !== order.customerName && (
-                                      <div className="text-[10px] text-gray-400 italic mt-1">Đặt bởi: {order.customerName}</div>
-                                  )}
+                                  {/* HIỂN THỊ RÕ NGƯỜI NHẬN vs NGƯỜI ĐẶT */}
+                                  <div className="space-y-1">
+                                      <div className="flex items-center gap-1">
+                                          <span className="bg-blue-100 text-blue-800 text-[10px] px-1 rounded font-bold uppercase">Nhận:</span>
+                                          <span className="font-bold text-gray-900">{order.shippingName || order.customerName}</span>
+                                      </div>
+                                      <div className="text-xs text-gray-600 pl-8">{order.shippingPhone || order.customerContact}</div>
+                                      <div className="text-xs text-gray-500 pl-8 truncate max-w-[200px]" title={order.shippingAddress}>{order.shippingAddress}</div>
+                                      
+                                      {/* Nếu người đặt khác người nhận, hiển thị thêm */}
+                                      {(order.shippingName !== order.customerName || order.shippingPhone !== order.customerContact) && (
+                                          <div className="text-[10px] text-gray-400 italic border-t mt-1 pt-1">
+                                              TK Đặt: {order.customerName} ({order.customerContact})
+                                          </div>
+                                      )}
+                                      
+                                      {order.note && (
+                                          <div className="text-[10px] bg-yellow-50 p-1 rounded text-yellow-800 mt-1 border border-yellow-100">
+                                              📝 {order.note}
+                                          </div>
+                                      )}
+                                  </div>
                               </td>
                               <td className="px-4 py-3">
                                   <div>{order.productName}</div>

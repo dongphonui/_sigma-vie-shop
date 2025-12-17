@@ -98,10 +98,17 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                     ) : (
                         orders.map(order => (
                             <div key={order.id} className="bg-white p-6 rounded-lg shadow-sm animate-fade-in-up">
-                                <div className="flex justify-between items-start mb-4">
+                                <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-4">
                                     <div>
                                         <p className="font-bold text-gray-800">Đơn hàng #{order.id}</p>
                                         <p className="text-sm text-gray-500">{new Date(order.timestamp).toLocaleString('vi-VN')}</p>
+                                        {/* SHOW RECIPIENT INFO */}
+                                        <div className="mt-2 text-sm bg-gray-50 p-2 rounded border border-gray-100">
+                                            <p className="font-medium text-gray-700">Người nhận:</p>
+                                            <p className="text-gray-600">{order.shippingName} - {order.shippingPhone}</p>
+                                            <p className="text-gray-500 text-xs italic">{order.shippingAddress}</p>
+                                            {order.note && <p className="text-gray-500 text-xs mt-1">Ghi chú: {order.note}</p>}
+                                        </div>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold 
                                         ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
