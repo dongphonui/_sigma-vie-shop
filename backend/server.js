@@ -232,7 +232,7 @@ app.get('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ROBUST REGISTER CUSTOMER
+// ROBUST REGISTER CUSTOMER (FIXED)
 app.post('/api/customers', async (req, res) => {
     const c = req.body;
     try {
@@ -252,6 +252,7 @@ app.post('/api/customers', async (req, res) => {
             email: email
         };
 
+        // Use safe mapping for columns
         await pool.query(
             `INSERT INTO customers (id, name, phone, email, data, created_at) 
              VALUES ($1, $2, $3, $4, $5, $6) 
