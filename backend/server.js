@@ -85,9 +85,9 @@ const initDb = async () => {
     await client.query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS data JSONB;`);
 
     // 3. Customers - FIX MISSING COLUMNS HERE
-    await client.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY);`); // Removed name from here to force add via ALTER below
+    await client.query(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY);`); 
     
-    // CRITICAL FIX: Ensure 'name' column exists even if table was created previously without it
+    // CRITICAL FIX: Ensure columns exist
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS name TEXT;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone TEXT;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS email TEXT;`);
@@ -117,7 +117,6 @@ const initDb = async () => {
         created_at BIGINT
       );
     `);
-    // Ensure permissions exists as JSONB. If it was TEXT, this might warn but won't crash.
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS permissions JSONB;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret TEXT;`);
     await client.query(`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS is_totp_enabled BOOLEAN DEFAULT FALSE;`);
@@ -211,7 +210,7 @@ app.delete('/api/products/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 2. CATEGORIES, CUSTOMERS, ORDERS, INVENTORY (Generic Pattern)
+// 2. CATEGORIES, CUSTOMERS, ORDERS, INVENTORY
 app.get('/api/categories', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM categories');
@@ -232,34 +231,66 @@ app.get('/api/customers', async (req, res) => {
         res.json(result.rows.map(row => row.data).filter(d => d));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ROBUST REGISTER CUSTOMER
 app.post('/api/customers', async (req, res) => {
     const c = req.body;
     try {
-        // Explicitly map fullName to name column
-        await pool.query(`INSERT INTO customers (id, name, phone, email, data, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET name=$2, phone=$3, email=$4, data=$5`, [c.id, c.fullName, c.phoneNumber, c.email, c, c.createdAt || Date.now()]);
+        // Data Normalization: Handle undefined/null to prevent SQL constraint errors
+        const id = c.id;
+        // Try multiple field names for robustness
+        const name = c.fullName || c.name || 'Khách hàng'; 
+        const phone = c.phoneNumber || c.phone || '';
+        const email = c.email || '';
+        const createdAt = c.createdAt || Date.now();
+        
+        // IMPORTANT: Ensure the JSON blob contains the standardized fields needed for Login
+        const customerData = {
+            ...c,
+            fullName: name,
+            phoneNumber: phone,
+            email: email
+        };
+
+        await pool.query(
+            `INSERT INTO customers (id, name, phone, email, data, created_at) 
+             VALUES ($1, $2, $3, $4, $5, $6) 
+             ON CONFLICT (id) DO UPDATE 
+             SET name=$2, phone=$3, email=$4, data=$5`,
+            [id, name, phone, email, customerData, createdAt]
+        );
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error("Register Error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
-// UPDATED CUSTOMER PUT ROUTE (FIXED)
+// ROBUST UPDATE CUSTOMER
 app.put('/api/customers/:id', async (req, res) => {
     const c = req.body;
     const id = req.params.id;
     try {
         // Safe mapping with defaults to avoid "undefined" errors in SQL
-        const name = c.fullName || '';
-        const phone = c.phoneNumber || '';
+        const name = c.fullName || c.name || '';
+        const phone = c.phoneNumber || c.phone || '';
         const email = c.email || '';
-        const data = c; // Save full object as JSON
+        
+        // Ensure data blob has consistent keys for login
+        const customerData = {
+            ...c,
+            fullName: name,
+            phoneNumber: phone,
+            email: email
+        };
 
         await pool.query(
             `UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, 
-            [name, phone, email, data, id]
+            [name, phone, email, customerData, id]
         );
         res.json({ success: true });
     } catch (err) { 
         console.error("Update Customer Error:", err);
-        // Better error response
         res.status(500).json({ error: err.message }); 
     }
 });
@@ -271,39 +302,39 @@ app.delete('/api/customers/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// NEW: CUSTOMER LOGIN VERIFICATION (Server-Side)
+// ROBUST LOGIN VERIFICATION
 app.post('/api/customers/login', async (req, res) => {
     const { identifier, passwordHash } = req.body;
+    
+    // Debug log
+    console.log(`[LOGIN ATTEMPT] Identifier: ${identifier}`);
+
     try {
-        // Query matching phoneNumber OR email inside the JSONB data
-        // Also checks top-level 'phone' and 'email' columns if they exist and are populated
+        // Comprehensive query checking both top-level columns and JSON fields
         const result = await pool.query(
             `SELECT data FROM customers 
-             WHERE data->>'phoneNumber' = $1 
-                OR data->>'email' = $1 
-                OR phone = $1 
-                OR email = $1`, 
+             WHERE phone = $1 
+                OR email = $1 
+                OR data->>'phoneNumber' = $1 
+                OR data->>'phone' = $1
+                OR data->>'email' = $1`, 
             [identifier]
         );
         
         if (result.rows.length > 0) {
             const customer = result.rows[0].data;
+            // Check password hash
             if (customer && customer.passwordHash === passwordHash) {
                 res.json({ success: true, customer: customer });
             } else {
                 res.json({ success: false, message: 'Sai mật khẩu.' });
             }
         } else {
-            res.json({ success: false, message: 'Tài khoản không tồn tại trên hệ thống.' });
+            res.json({ success: false, message: 'Tài khoản không tồn tại trên hệ thống (Vui lòng đăng ký lại nếu bạn vừa Reset).' });
         }
     } catch (err) { 
         console.error("Login Error:", err);
-        // Fallback friendly error
-        if (err.message.includes('does not exist')) {
-             res.status(500).json({ error: "Lỗi cấu trúc Database (Thiếu cột). Vui lòng báo Admin reset server." });
-        } else {
-             res.status(500).json({ error: err.message }); 
-        }
+        res.status(500).json({ error: err.message }); 
     }
 });
 
