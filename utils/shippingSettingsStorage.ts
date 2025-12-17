@@ -45,17 +45,22 @@ export const getShippingSettings = (): ShippingSettings => {
   }
 };
 
-export const updateShippingSettings = (settings: ShippingSettings): void => {
+export const updateShippingSettings = async (settings: ShippingSettings): Promise<{ success: boolean; message?: string }> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   
   // Sync to DB
-  syncShippingSettingsToDB(settings).then(res => {
+  try {
+      const res = await syncShippingSettingsToDB(settings);
       if (res && res.success) {
           console.log("Shipping settings synced to server.");
+          return { success: true };
       } else {
           console.warn("Failed to sync shipping settings:", res);
+          return { success: false, message: res?.message || 'Lỗi Server' };
       }
-  });
+  } catch (e: any) {
+      return { success: false, message: e.message || 'Lỗi mạng' };
+  }
 };
 
 export const calculateShippingFee = (subtotal: number): number => {

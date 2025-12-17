@@ -218,20 +218,38 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       });
   };
 
-  const handleStoreSubmit = (e: React.FormEvent) => {
+  const handleStoreSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (storeSettings) {
-          updateStoreSettings(storeSettings);
-          setSettingsFeedback('Đã lưu thông tin cửa hàng.');
+          setSettingsFeedback('⏳ Đang lưu thông tin...');
+          try {
+              const res = await updateStoreSettings(storeSettings);
+              if (res && res.success) {
+                  setSettingsFeedback('✅ Đã cập nhật Thông tin Cửa hàng!');
+              } else {
+                  setSettingsFeedback(`⚠️ Đã lưu offline (Lỗi Server: ${res.message})`);
+              }
+          } catch (e) {
+              setSettingsFeedback('❌ Lỗi không xác định.');
+          }
           setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
 
-  const handleShippingSubmit = (e: React.FormEvent) => {
+  const handleShippingSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (shippingSettings) {
-          updateShippingSettings(shippingSettings);
-          setSettingsFeedback('Đã lưu cấu hình vận chuyển.');
+          setSettingsFeedback('⏳ Đang lưu cấu hình...');
+          try {
+              const res = await updateShippingSettings(shippingSettings);
+              if (res && res.success) {
+                  setSettingsFeedback('✅ Đã cập nhật Cấu hình Vận chuyển!');
+              } else {
+                  setSettingsFeedback(`⚠️ Đã lưu offline (Lỗi Server: ${res.message})`);
+              }
+          } catch (e) {
+              setSettingsFeedback('❌ Lỗi không xác định.');
+          }
           setTimeout(() => setSettingsFeedback(''), 3000);
       }
   };
@@ -784,7 +802,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
           </div>
 
           {settingsFeedback && (
-                 <div className={`fixed bottom-4 right-4 z-50 p-3 rounded text-center font-medium animate-bounce shadow-lg ${settingsFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                 <div className={`fixed bottom-4 right-4 z-50 p-3 rounded text-center font-medium animate-bounce shadow-lg ${settingsFeedback.includes('Lỗi') || settingsFeedback.includes('⚠️') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                      {settingsFeedback}
                  </div>
             )}

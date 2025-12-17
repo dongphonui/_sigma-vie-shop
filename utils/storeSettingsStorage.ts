@@ -34,8 +34,6 @@ export const getStoreSettings = (): StoreSettings => {
                 
                 if (currentStr !== newStr) {
                     localStorage.setItem(STORAGE_KEY, newStr);
-                    // Dispatch update event if necessary, or just rely on react re-render on next refresh
-                    // For settings, often a refresh is okay, but let's log it
                     console.log("Store settings updated from Server.");
                 }
             }
@@ -50,15 +48,20 @@ export const getStoreSettings = (): StoreSettings => {
   }
 };
 
-export const updateStoreSettings = (settings: StoreSettings): void => {
+export const updateStoreSettings = async (settings: StoreSettings): Promise<{ success: boolean; message?: string }> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   
-  // Sync to DB
-  syncStoreSettingsToDB(settings).then(res => {
+  // Sync to DB and return result
+  try {
+      const res = await syncStoreSettingsToDB(settings);
       if (res && res.success) {
           console.log("Store settings synced to server.");
+          return { success: true };
       } else {
           console.warn("Failed to sync store settings:", res);
+          return { success: false, message: res?.message || 'Lỗi Server' };
       }
-  });
+  } catch (e: any) {
+      return { success: false, message: e.message || 'Lỗi mạng' };
+  }
 };
