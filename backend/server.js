@@ -96,14 +96,15 @@ const initDb = async () => {
 
     // --- FIX ERROR 23502 (NOT NULL VIOLATION) ---
     // Remove NOT NULL constraints from potential legacy columns to prevent insert errors
-    // UPDATED: Added 'full_name' and 'phone_number' (snake_case) which caused the specific error
+    // UPDATED: Added 'password_hash' to the list
     const potentialLegacyCols = [
         'fullname', 'phonenumber', 
         'full_name', 'phone_number', 
         'cccdnumber', 'cccd_number', 
         'address', 'gender', 'dob', 
         'issuedate', 'issue_date', 
-        'name', 'phone', 'email'
+        'name', 'phone', 'email',
+        'password_hash', 'password' // Add password fields
     ];
     
     for (const col of potentialLegacyCols) {
@@ -286,15 +287,25 @@ app.post('/api/customers', async (req, res) => {
         console.error("Register Error:", err);
         // Better error message for client
         if (err.code === '23502') {
-             res.status(500).json({ error: "Lỗi cấu trúc Database: Server đã nhận diện lỗi 'Cột bắt buộc'. Vui lòng đợi 5 giây và thử lại (Hệ thống vừa tự động sửa)." });
              // Attempt fix immediately for next request
-             const colMatch = err.detail ? err.detail.match(/column "(.*?)"/) : null;
-             if (colMatch && colMatch[1]) {
-                 try {
-                    await pool.query(`ALTER TABLE customers ALTER COLUMN "${colMatch[1]}" DROP NOT NULL`);
-                    console.log(`AUTO-FIXED: Dropped NOT NULL on ${colMatch[1]}`);
-                 } catch(e) {}
+             // Use err.column if available (Node Postgres specific) or regex fallback
+             let faultyColumn = err.column;
+             if (!faultyColumn && err.detail) {
+                 const colMatch = err.detail.match(/column "(.*?)"/);
+                 if (colMatch) faultyColumn = colMatch[1];
              }
+
+             if (faultyColumn) {
+                 console.log(`AUTO-FIX ATTEMPT: Dropping NOT NULL on column '${faultyColumn}'`);
+                 try {
+                    await pool.query(`ALTER TABLE customers ALTER COLUMN "${faultyColumn}" DROP NOT NULL`);
+                    res.status(500).json({ error: `Lỗi cấu trúc Database: Đã phát hiện và tự động sửa cột '${faultyColumn}'. Vui lòng bấm 'Hoàn tất Đăng ký' lại lần nữa.` });
+                    return;
+                 } catch(e) {
+                     console.error("Auto-fix failed:", e);
+                 }
+             }
+             res.status(500).json({ error: "Lỗi cấu trúc Database: Cột bắt buộc bị thiếu. Vui lòng thử lại sau 5 giây (Hệ thống đang tự sửa)." });
         } else {
              res.status(500).json({ error: err.message }); 
         }
