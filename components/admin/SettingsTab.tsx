@@ -27,7 +27,13 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [socialSettings, setSocialSettings] = useState<SocialSettings | null>(null);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
-  const [settingsFeedback, setSettingsFeedback] = useState('');
+  
+  // Specific Feedback States
+  const [storeMsg, setStoreMsg] = useState('');
+  const [shippingMsg, setShippingMsg] = useState('');
+  const [bankMsg, setBankMsg] = useState('');
+  const [settingsFeedback, setSettingsFeedback] = useState(''); // Global feedback for other sections
+
   const [adminLogs, setAdminLogs] = useState<AdminLoginLog[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
   
@@ -221,48 +227,60 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const handleStoreSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (storeSettings) {
-          setSettingsFeedback('⏳ Đang lưu thông tin...');
+          setStoreMsg('⏳ Đang lưu...');
           try {
               const res = await updateStoreSettings(storeSettings);
               if (res && res.success) {
-                  setSettingsFeedback('✅ Đã cập nhật Thông tin Cửa hàng!');
+                  setStoreMsg('✅ Đã lưu!');
               } else {
-                  setSettingsFeedback(`⚠️ Đã lưu offline (Lỗi Server: ${res.message})`);
+                  setStoreMsg(`⚠️ Lưu offline (${res.message})`);
               }
           } catch (e) {
-              setSettingsFeedback('❌ Lỗi không xác định.');
+              setStoreMsg('❌ Lỗi.');
           }
-          setTimeout(() => setSettingsFeedback(''), 3000);
+          setTimeout(() => setStoreMsg(''), 3000);
       }
   };
 
   const handleShippingSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (shippingSettings) {
-          setSettingsFeedback('⏳ Đang lưu cấu hình...');
+          setShippingMsg('⏳ Đang lưu...');
           try {
               const res = await updateShippingSettings(shippingSettings);
               if (res && res.success) {
-                  setSettingsFeedback('✅ Đã cập nhật Cấu hình Vận chuyển!');
+                  setShippingMsg('✅ Đã lưu!');
               } else {
-                  setSettingsFeedback(`⚠️ Đã lưu offline (Lỗi Server: ${res.message})`);
+                  setShippingMsg(`⚠️ Lưu offline (${res.message})`);
               }
           } catch (e) {
-              setSettingsFeedback('❌ Lỗi không xác định.');
+              setShippingMsg('❌ Lỗi.');
           }
-          setTimeout(() => setSettingsFeedback(''), 3000);
+          setTimeout(() => setShippingMsg(''), 3000);
       }
   };
 
   const handleBankSettingsSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if(isTotpEnabled()) { setShowBankSecurityModal(true); setSecurityCode(''); } 
-      else if(confirm('Lưu không 2FA?')) { if(bankSettings) updateBankSettings(bankSettings); }
+      else if(confirm('Lưu không 2FA?')) { if(bankSettings) executeBankUpdate(); }
+  };
+
+  const executeBankUpdate = () => {
+      if (bankSettings) {
+          setBankMsg('⏳ Đang lưu...');
+          updateBankSettings(bankSettings);
+          setBankMsg('✅ Đã lưu!');
+          setTimeout(() => setBankMsg(''), 3000);
+      }
   };
 
   const handleVerifyBankUpdate = (e: React.FormEvent) => {
       e.preventDefault();
-      if(verifyTotpToken(securityCode)) { if(bankSettings) updateBankSettings(bankSettings); setShowBankSecurityModal(false); setSettingsFeedback('Đã lưu NH'); } else alert('Sai mã');
+      if(verifyTotpToken(securityCode)) { 
+          executeBankUpdate(); 
+          setShowBankSecurityModal(false); 
+      } else alert('Sai mã');
   };
 
   const handleAddEmail = (e: React.FormEvent) => {
@@ -395,7 +413,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                   <label className="block text-sm font-medium text-gray-600 mb-1">Địa chỉ</label>
                                   <input type="text" value={storeSettings.address} onChange={(e) => setStoreSettings({...storeSettings, address: e.target.value})} className="w-full border rounded px-3 py-2" required />
                               </div>
-                              <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu thông tin</button>
+                              <div className="flex items-center gap-3">
+                                  <button type="submit" className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31]">Lưu thông tin</button>
+                                  {storeMsg && <span className={`text-sm font-medium animate-pulse ${storeMsg.includes('Lỗi') || storeMsg.includes('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{storeMsg}</span>}
+                              </div>
                           </form>
                       )}
                   </div>
@@ -431,7 +452,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                                       <input type="number" value={shippingSettings.freeShipThreshold} onChange={(e) => setShippingSettings({...shippingSettings, freeShipThreshold: parseInt(e.target.value) || 0})} className="w-full border rounded px-3 py-2" />
                                   </div>
                               </div>
-                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu cấu hình</button>
+                              <div className="flex items-center gap-3">
+                                  <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded font-bold hover:bg-[#004d40]">Lưu cấu hình</button>
+                                  {shippingMsg && <span className={`text-sm font-medium animate-pulse ${shippingMsg.includes('Lỗi') || shippingMsg.includes('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{shippingMsg}</span>}
+                              </div>
                           </form>
                       )}
                   </div>
@@ -681,7 +705,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                               </select>
                               <input type="text" placeholder="Số tài khoản" value={bankSettings.accountNumber} onChange={e => setBankSettings({...bankSettings, accountNumber: e.target.value})} className="w-full border p-2 rounded" />
                               <input type="text" placeholder="Tên chủ TK (Viết hoa)" value={bankSettings.accountName} onChange={e => setBankSettings({...bankSettings, accountName: e.target.value.toUpperCase()})} className="w-full border p-2 rounded" />
-                              <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded">Lưu thông tin</button>
+                              <div className="flex items-center gap-3">
+                                  <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded">Lưu thông tin</button>
+                                  {bankMsg && <span className={`text-sm font-medium animate-pulse ${bankMsg.includes('Lỗi') || bankMsg.includes('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{bankMsg}</span>}
+                              </div>
                           </form>
                       )}
                   </div>
