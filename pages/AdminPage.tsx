@@ -98,7 +98,7 @@ const AdminPage: React.FC = () => {
       case 'orders': return <OrderTab />;
       case 'inventory': return <InventoryTab />;
       case 'customers': return <CustomerTab />;
-      case 'reports': return <ReportsTab />; // NEW Reports Tab
+      case 'reports': return <ReportsTab />; 
       case 'home': return <HomePageSettingsTab />;     
       case 'header': return <HeaderSettingsTab />;     
       case 'about': return <AboutPageSettingsTab />;   
@@ -160,20 +160,22 @@ const AdminPage: React.FC = () => {
                 <BarChart2 className="w-5 h-5" /> Kho hàng
               </button>
            )}
+           
+           {/* CUSTOMERS TAB */}
            {hasPermission('customers') && (
                <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
                 <UsersIcon className="w-5 h-5" /> Khách hàng
               </button>
            )}
            
-           {/* REPORTS SECTION - NEW */}
+           {/* REPORTS TAB */}
            {hasPermission('reports') && (
                <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'reports' ? 'bg-[#D4AF37] text-white font-bold' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
                 <FileTextIcon className="w-5 h-5" /> Báo cáo
               </button>
            )}
            
-           {/* GIAO DIỆN SECTION - Checked by 'settings_ui' */}
+           {/* GIAO DIỆN SECTION */}
            {(hasPermission('settings_ui') || hasPermission('ALL')) && (
                <div className="pt-4 mt-4 border-t border-gray-700">
                     <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Giao diện Web</p>
@@ -199,7 +201,6 @@ const AdminPage: React.FC = () => {
         </nav>
         
         <div className="p-4 mt-auto border-t border-gray-700">
-             {/* Connection Status Indicator */}
              <div className="mb-4 px-4 flex items-center gap-3 text-xs" title="Trạng thái kết nối Server Database">
                  <span className="relative flex h-3 w-3">
                     <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isCheckingConnection ? 'bg-yellow-400' : (isServerOnline ? 'bg-green-400' : 'bg-red-400')}`}></span>
