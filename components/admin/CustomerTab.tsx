@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Customer } from '../../types';
-import { getCustomers, updateCustomer, deleteCustomer, forceReloadCustomers } from '../../utils/customerStorage';
+import { getCustomers, updateCustomer, deleteCustomer, forceReloadCustomers, registerCustomer } from '../../utils/customerStorage';
 import { getOrders } from '../../utils/orderStorage';
 import { SearchIcon, EditIcon, Trash2Icon, UserIcon, RefreshIcon } from '../Icons';
+import { syncCustomerToDB } from '../../utils/apiClient';
 
 const CustomerTab: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isProcessingAction, setIsProcessingAction] = useState(false); // New loading state for actions
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -19,14 +20,9 @@ const CustomerTab: React.FC = () => {
   const [editCustAddress, setEditCustAddress] = useState('');
   const [customerFeedback, setCustomerFeedback] = useState('');
 
-  // Initial Load
   useEffect(() => {
     handleRefresh();
-
-    // Listen for background updates
-    const handleUpdate = () => {
-        setCustomers(getCustomers());
-    };
+    const handleUpdate = () => setCustomers(getCustomers());
     window.addEventListener('sigma_vie_customers_update', handleUpdate);
     return () => window.removeEventListener('sigma_vie_customers_update', handleUpdate);
   }, []);
@@ -34,28 +30,40 @@ const CustomerTab: React.FC = () => {
   const handleRefresh = async () => {
       setIsLoading(true);
       try {
+          // 1. Tải khách hàng chính thức từ Server
           const dbCustomers = await forceReloadCustomers();
           
-          // Merge logic similar to before
+          // 2. Tìm khách hàng từ Đơn hàng (Khách chưa đăng ký hoặc dữ liệu cũ)
           const orders = getOrders();
           const customerMap = new Map<string, Customer>();
-          dbCustomers.forEach(c => customerMap.set(c.id, c));
+          dbCustomers.forEach(c => customerMap.set(String(c.id), c));
+
+          const newRecoveredCustomers: Customer[] = [];
 
           orders.forEach(order => {
-              if (!customerMap.has(order.customerId)) {
+              const cid = String(order.customerId);
+              if (!customerMap.has(cid)) {
                   const isEmail = order.customerContact.includes('@');
                   const recoveredCustomer: Customer = {
-                      id: order.customerId,
+                      id: cid,
                       fullName: order.customerName,
                       email: isEmail ? order.customerContact : undefined,
                       phoneNumber: !isEmail ? order.customerContact : undefined,
                       address: order.shippingAddress || order.customerAddress,
-                      passwordHash: 'recovered_from_order',
+                      passwordHash: 'recovered', // Placeholder
                       createdAt: order.timestamp,
                   };
-                  customerMap.set(order.customerId, recoveredCustomer);
+                  customerMap.set(cid, recoveredCustomer);
+                  newRecoveredCustomers.push(recoveredCustomer);
               }
           });
+
+          // 3. TỰ ĐỘNG ĐỒNG BỘ LÊN SERVER (Nếu phát hiện khách từ đơn hàng chưa có trên Server)
+          if (newRecoveredCustomers.length > 0) {
+              console.log(`Phát hiện ${newRecoveredCustomers.length} khách hàng từ đơn hàng chưa có trên Server. Đang đồng bộ...`);
+              // Gửi ngầm không chặn UI
+              newRecoveredCustomers.forEach(c => syncCustomerToDB(c));
+          }
 
           const mergedList = Array.from(customerMap.values()).sort((a, b) => b.createdAt - a.createdAt);
           setCustomers(mergedList);
@@ -77,20 +85,16 @@ const CustomerTab: React.FC = () => {
   };
 
   const handleDeleteCustomer = async (id: string, name: string) => {
-      if(window.confirm(`Bạn có chắc muốn xóa khách hàng "${name}"? Hành động này sẽ xóa dữ liệu trên Server.`)) {
+      if(window.confirm(`Bạn có chắc muốn xóa khách hàng "${name}"?`)) {
           setIsProcessingAction(true);
           setCustomerFeedback(`Đang xóa ${name}...`);
-          
-          // Await the server deletion
           const success = await deleteCustomer(id);
-          
           if (success) {
               setCustomerFeedback(`Đã xóa khách hàng ${name}.`);
-              await handleRefresh(); // Sync from server to be sure
+              await handleRefresh(); 
           } else {
-              setCustomerFeedback(`Lỗi: Không thể xóa ${name} trên Server.`);
+              setCustomerFeedback(`Lỗi: Không thể xóa trên Server.`);
           }
-          
           setIsProcessingAction(false);
           setTimeout(() => setCustomerFeedback(''), 3000);
       }
@@ -108,31 +112,27 @@ const CustomerTab: React.FC = () => {
               address: editCustAddress
           };
           
-          // Await server update
           const success = await updateCustomer(updated);
           
           if (success) {
-              setCustomerFeedback('Cập nhật thành công trên Server.');
-              await handleRefresh(); // Re-fetch to ensure data integrity
+              setCustomerFeedback('✅ Cập nhật thành công lên Server.');
+              await handleRefresh(); 
               setIsEditingCustomer(false);
               setEditingCustomer(null);
           } else {
-              setCustomerFeedback('Lỗi: Server từ chối cập nhật (Kiểm tra lại dữ liệu đầu vào hoặc kết nối).');
-              setIsEditingCustomer(false);
-              setEditingCustomer(null);
+              setCustomerFeedback('❌ Lỗi Server: Có thể do cột bắt buộc bị thiếu. Vui lòng thử lại.');
+              // Không đóng modal để user thử lại
           }
           
           setIsProcessingAction(false);
-          setTimeout(() => setCustomerFeedback(''), 3000);
+          setTimeout(() => setCustomerFeedback(''), 4000);
       }
   }
 
-  // Filter logic
   const filteredCustomers = customers.filter(c => 
       c.fullName.toLowerCase().includes(customerSearch.toLowerCase()) || 
       c.email?.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phoneNumber?.includes(customerSearch) ||
-      c.cccdNumber?.includes(customerSearch)
+      c.phoneNumber?.includes(customerSearch)
   );
 
   return (
@@ -142,7 +142,7 @@ const CustomerTab: React.FC = () => {
                   <SearchIcon className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                   <input 
                       type="text" 
-                      placeholder="Tìm tên, email, sđt, cccd..." 
+                      placeholder="Tìm tên, email, sđt..." 
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
                       className="pl-9 pr-4 py-2 border rounded-md focus:ring-[#D4AF37] focus:border-[#D4AF37] w-full md:w-64"
@@ -155,7 +155,7 @@ const CustomerTab: React.FC = () => {
                       disabled={isLoading || isProcessingAction}
                       className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2 disabled:opacity-70 flex-1 md:flex-none transition-colors"
                   >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isLoading ? 'animate-spin' : ''}><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                      <RefreshIcon className={isLoading ? 'animate-spin' : ''} />
                       {isLoading ? 'Đang đồng bộ...' : 'Làm mới & Quét lại'}
                   </button>
               </div>
@@ -185,8 +185,8 @@ const CustomerTab: React.FC = () => {
                       <tbody className="divide-y divide-gray-200">
                           {filteredCustomers.map((c) => (
                               <tr key={c.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-mono text-xs text-gray-400" title={c.id}>
-                                      {c.id.startsWith('CUST') ? c.id.substring(0, 10) : 'Guest/Recovered'}
+                                  <td className="px-4 py-3 font-mono text-xs text-gray-400">
+                                      {c.id.substring(0, 10)}
                                   </td>
                                   <td className="px-4 py-3">
                                       <div className="flex items-center gap-2">
@@ -221,27 +221,11 @@ const CustomerTab: React.FC = () => {
                
                {filteredCustomers.length === 0 && (
                   <div className="p-12 text-center text-gray-500 bg-gray-50 flex flex-col items-center">
-                      {isLoading ? (
-                          <>
-                              <div className="w-8 h-8 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin mb-4"></div>
-                              <p>Đang tải dữ liệu từ máy chủ...</p>
-                          </>
-                      ) : (
-                          <>
-                              <div className="bg-gray-100 p-4 rounded-full mb-3">
-                                  <UserIcon className="w-8 h-8 text-gray-400" />
-                              </div>
-                              <p className="font-medium text-lg">Chưa tìm thấy khách hàng.</p>
-                              <p className="text-sm mt-1 max-w-xs">
-                                  Nếu bạn thấy đơn hàng nhưng không thấy khách, hãy nhấn nút <strong>"Làm mới & Quét lại"</strong> để hệ thống tự động đồng bộ từ đơn hàng.
-                              </p>
-                          </>
-                      )}
+                      <p className="font-medium text-lg">Chưa tìm thấy khách hàng.</p>
                   </div>
                )}
           </div>
 
-          {/* Edit Modal */}
           {isEditingCustomer && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white p-6 rounded-lg w-full max-w-md animate-fade-in-up">
@@ -264,20 +248,10 @@ const CustomerTab: React.FC = () => {
                               <input type="text" value={editCustAddress} onChange={(e) => setEditCustAddress(e.target.value)} className="w-full border rounded px-3 py-2 focus:ring-[#00695C]" />
                           </div>
                           <div className="flex justify-end gap-2 mt-6">
-                              <button 
-                                type="button" 
-                                onClick={() => { setIsEditingCustomer(false); setEditingCustomer(null); }} 
-                                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300"
-                                disabled={isProcessingAction}
-                              >
-                                Hủy
-                              </button>
-                              <button 
-                                type="submit" 
-                                disabled={isProcessingAction}
-                                className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] disabled:opacity-70 flex items-center gap-2"
-                              >
-                                {isProcessingAction ? 'Đang lưu...' : 'Lưu thay đổi'}
+                              <button type="button" onClick={() => { setIsEditingCustomer(false); setEditingCustomer(null); }} className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300" disabled={isProcessingAction}>Hủy</button>
+                              <button type="submit" disabled={isProcessingAction} className="bg-[#D4AF37] text-white px-4 py-2 rounded font-bold hover:bg-[#b89b31] flex items-center gap-2">
+                                {isProcessingAction && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                                Lưu thay đổi
                               </button>
                           </div>
                       </form>
@@ -286,7 +260,7 @@ const CustomerTab: React.FC = () => {
           )}
            
            {customerFeedback && (
-             <div className="fixed bottom-4 right-4 bg-green-100 text-green-800 px-4 py-2 rounded shadow-lg animate-fade-in-up z-50 border border-green-200">
+             <div className={`fixed bottom-4 right-4 p-4 rounded shadow-lg animate-fade-in-up z-50 border ${customerFeedback.includes('✅') ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
                  {customerFeedback}
              </div>
            )}
