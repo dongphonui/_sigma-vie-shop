@@ -29,7 +29,7 @@ const KEYS = {
     bankSettings: 'sigma_vie_bank_settings',
     storeSettings: 'sigma_vie_store_settings',
     shippingSettings: 'sigma_vie_shipping_settings',
-    adminSettings: 'sigma_vie_admin_settings' // Be careful restoring this
+    adminSettings: 'sigma_vie_admin_settings' 
 };
 
 export const generateBackupData = () => {
@@ -110,56 +110,51 @@ export const restoreBackup = async (file: File): Promise<{ success: boolean; mes
     });
 };
 
-// Updated to return Promise and call Server API
 export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
     
-    // 1. Wipe LocalStorage first (Optimistic UI)
-    if (scope === 'ORDERS') {
-        localStorage.removeItem(KEYS.orders);
-        localStorage.removeItem(KEYS.transactions);
-        // Set explicitly to empty so app doesn't load defaults
-        localStorage.setItem(KEYS.orders, '[]');
-        localStorage.setItem(KEYS.transactions, '[]');
-    } else if (scope === 'PRODUCTS') {
-        localStorage.removeItem(KEYS.products);
-        localStorage.removeItem(KEYS.transactions);
-        localStorage.setItem(KEYS.products, '[]');
-        localStorage.setItem(KEYS.transactions, '[]');
-    } else if (scope === 'FULL') {
-        // PRESERVE ESSENTIAL SETTINGS (Giữ lại cấu hình quan trọng)
-        const adminSettings = localStorage.getItem(KEYS.adminSettings);
-        const bankSettings = localStorage.getItem(KEYS.bankSettings);
-        const storeSettings = localStorage.getItem(KEYS.storeSettings);
-        const headerSettings = localStorage.getItem(KEYS.headerSettings);
-        const homeSettings = localStorage.getItem(KEYS.homeSettings);
-        const socialSettings = localStorage.getItem(KEYS.socialSettings);
-        
-        localStorage.clear();
-        
-        // RESTORE CONFIGS
-        if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
-        if (bankSettings) localStorage.setItem(KEYS.bankSettings, bankSettings);
-        if (storeSettings) localStorage.setItem(KEYS.storeSettings, storeSettings);
-        if (headerSettings) localStorage.setItem(KEYS.headerSettings, headerSettings);
-        if (homeSettings) localStorage.setItem(KEYS.homeSettings, homeSettings);
-        if (socialSettings) localStorage.setItem(KEYS.socialSettings, socialSettings);
-
-        // INITIALIZE EMPTY ARRAYS TO PREVENT DEMO DATA LOADING
-        localStorage.setItem(KEYS.products, '[]');
-        localStorage.setItem(KEYS.orders, '[]');
-        localStorage.setItem(KEYS.customers, '[]');
-        localStorage.setItem(KEYS.transactions, '[]');
-
-        // Keep Auth session active
-        sessionStorage.setItem('isAuthenticated', 'true');
-    }
-
-    // 2. Call Server API to Wipe DB
+    // Bước 1: Gửi lệnh reset lên Server TRƯỚC
     const serverResult = await resetDatabase(scope);
     
     if (serverResult && serverResult.success) {
-        return { success: true, message: 'Đã xóa dữ liệu thành công trên cả Trình duyệt và Server.' };
+        // Bước 2: Chỉ khi server thành công mới xóa LocalStorage để đảm bảo nhất quán
+        if (scope === 'ORDERS') {
+            localStorage.setItem(KEYS.orders, '[]');
+            localStorage.setItem(KEYS.transactions, '[]');
+        } else if (scope === 'PRODUCTS') {
+            localStorage.setItem(KEYS.products, '[]');
+            localStorage.setItem(KEYS.transactions, '[]');
+        } else if (scope === 'FULL') {
+            // Giữ lại cấu hình Admin để không bị out
+            const adminSettings = localStorage.getItem(KEYS.adminSettings);
+            const bankSettings = localStorage.getItem(KEYS.bankSettings);
+            const storeSettings = localStorage.getItem(KEYS.storeSettings);
+            const headerSettings = localStorage.getItem(KEYS.headerSettings);
+            const homeSettings = localStorage.getItem(KEYS.homeSettings);
+            const socialSettings = localStorage.getItem(KEYS.socialSettings);
+            const shippingSettings = localStorage.getItem(KEYS.shippingSettings);
+            
+            localStorage.clear();
+            
+            if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
+            if (bankSettings) localStorage.setItem(KEYS.bankSettings, bankSettings);
+            if (storeSettings) localStorage.setItem(KEYS.storeSettings, storeSettings);
+            if (headerSettings) localStorage.setItem(KEYS.headerSettings, headerSettings);
+            if (homeSettings) localStorage.setItem(KEYS.homeSettings, homeSettings);
+            if (socialSettings) localStorage.setItem(KEYS.socialSettings, socialSettings);
+            if (shippingSettings) localStorage.setItem(KEYS.shippingSettings, shippingSettings);
+
+            localStorage.setItem(KEYS.products, '[]');
+            localStorage.setItem(KEYS.orders, '[]');
+            localStorage.setItem(KEYS.customers, '[]');
+            localStorage.setItem(KEYS.transactions, '[]');
+        }
+        
+        return { success: true, message: 'Đã xóa dữ liệu sạch sẽ trên cả Server và Trình duyệt.' };
     } else {
-        return { success: false, message: 'Đã xóa ở Trình duyệt nhưng LỖI xóa Server. Dữ liệu có thể quay lại khi tải trang. ' + (serverResult?.error || '') };
+        // Nếu server lỗi, không xóa local để tránh mất dữ liệu "treo" (chưa sync)
+        return { 
+            success: false, 
+            message: `LỖI RESET SERVER: ${serverResult?.error || 'Server không phản hồi'}. Dữ liệu chưa bị xóa.` 
+        };
     }
 };
