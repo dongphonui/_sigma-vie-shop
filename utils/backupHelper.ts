@@ -112,49 +112,64 @@ export const restoreBackup = async (file: File): Promise<{ success: boolean; mes
 
 export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
     
-    // Bước 1: Gửi lệnh reset lên Server TRƯỚC
-    const serverResult = await resetDatabase(scope);
+    console.log(`🧨 Factory Reset Initiative: Scope = ${scope}`);
     
-    if (serverResult && serverResult.success) {
-        // Bước 2: Chỉ khi server thành công mới xóa LocalStorage để đảm bảo nhất quán
-        if (scope === 'ORDERS') {
-            localStorage.setItem(KEYS.orders, '[]');
-            localStorage.setItem(KEYS.transactions, '[]');
-        } else if (scope === 'PRODUCTS') {
-            localStorage.setItem(KEYS.products, '[]');
-            localStorage.setItem(KEYS.transactions, '[]');
-        } else if (scope === 'FULL') {
-            // Giữ lại cấu hình Admin để không bị out
-            const adminSettings = localStorage.getItem(KEYS.adminSettings);
-            const bankSettings = localStorage.getItem(KEYS.bankSettings);
-            const storeSettings = localStorage.getItem(KEYS.storeSettings);
-            const headerSettings = localStorage.getItem(KEYS.headerSettings);
-            const homeSettings = localStorage.getItem(KEYS.homeSettings);
-            const socialSettings = localStorage.getItem(KEYS.socialSettings);
-            const shippingSettings = localStorage.getItem(KEYS.shippingSettings);
-            
-            localStorage.clear();
-            
-            if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
-            if (bankSettings) localStorage.setItem(KEYS.bankSettings, bankSettings);
-            if (storeSettings) localStorage.setItem(KEYS.storeSettings, storeSettings);
-            if (headerSettings) localStorage.setItem(KEYS.headerSettings, headerSettings);
-            if (homeSettings) localStorage.setItem(KEYS.homeSettings, homeSettings);
-            if (socialSettings) localStorage.setItem(KEYS.socialSettings, socialSettings);
-            if (shippingSettings) localStorage.setItem(KEYS.shippingSettings, shippingSettings);
-
-            localStorage.setItem(KEYS.products, '[]');
-            localStorage.setItem(KEYS.orders, '[]');
-            localStorage.setItem(KEYS.customers, '[]');
-            localStorage.setItem(KEYS.transactions, '[]');
-        }
+    try {
+        // Bước 1: Gửi lệnh reset lên Server TRƯỚC và ĐỢI PHẢN HỒI
+        const serverResult = await resetDatabase(scope);
         
-        return { success: true, message: 'Đã xóa dữ liệu sạch sẽ trên cả Server và Trình duyệt.' };
-    } else {
-        // Nếu server lỗi, không xóa local để tránh mất dữ liệu "treo" (chưa sync)
-        return { 
-            success: false, 
-            message: `LỖI RESET SERVER: ${serverResult?.error || 'Server không phản hồi'}. Dữ liệu chưa bị xóa.` 
+        console.log("Server response received:", serverResult);
+        
+        // CHỈ khi Server báo thành công (success: true) chúng ta mới xóa ở Client
+        if (serverResult && serverResult.success === true) {
+            
+            console.log("Server Reset Confirmed. Now wiping local storage...");
+
+            if (scope === 'ORDERS') {
+                localStorage.setItem(KEYS.orders, '[]');
+                localStorage.setItem(KEYS.transactions, '[]');
+            } else if (scope === 'PRODUCTS') {
+                localStorage.setItem(KEYS.products, '[]');
+                localStorage.setItem(KEYS.transactions, '[]');
+            } else if (scope === 'FULL') {
+                // Bảo vệ các cài đặt quan trọng
+                const adminSettings = localStorage.getItem(KEYS.adminSettings);
+                const bankSettings = localStorage.getItem(KEYS.bankSettings);
+                const storeSettings = localStorage.getItem(KEYS.storeSettings);
+                const shippingSettings = localStorage.getItem(KEYS.shippingSettings);
+                
+                // Xóa tất cả
+                localStorage.clear();
+                
+                // Khôi phục lại cài đặt gốc
+                if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
+                if (bankSettings) localStorage.setItem(KEYS.bankSettings, bankSettings);
+                if (storeSettings) localStorage.setItem(KEYS.storeSettings, storeSettings);
+                if (shippingSettings) localStorage.setItem(KEYS.shippingSettings, shippingSettings);
+
+                localStorage.setItem(KEYS.products, '[]');
+                localStorage.setItem(KEYS.orders, '[]');
+                localStorage.setItem(KEYS.customers, '[]');
+                localStorage.setItem(KEYS.transactions, '[]');
+                localStorage.setItem(KEYS.categories, '[]');
+            }
+            
+            return { success: true, message: serverResult.message || 'Đã xóa dữ liệu sạch sẽ trên cả Server và Trình duyệt.' };
+        } else {
+            // Trường hợp Server phản hồi lỗi hoặc success: false
+            const errorMsg = serverResult?.error || serverResult?.message || 'Server từ chối lệnh reset.';
+            console.error("❌ SERVER RESET FAILED:", errorMsg);
+            
+            return { 
+                success: false, 
+                message: `LỖI TỪ SERVER: ${errorMsg}. Trình duyệt đã hủy lệnh xóa để bảo vệ dữ liệu.` 
+            };
+        }
+    } catch (networkError: any) {
+        console.error("❌ NETWORK ERROR DURING RESET:", networkError);
+        return {
+            success: false,
+            message: `LỖI KẾT NỐI: Không thể liên lạc với Server để xóa dữ liệu. Vui lòng kiểm tra mạng hoặc Server.`
         };
     }
 };

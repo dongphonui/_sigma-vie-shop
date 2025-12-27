@@ -55,7 +55,6 @@ const initDb = async () => {
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS data JSONB;`);
     await client.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_at BIGINT;`);
 
-    // Gỡ bỏ ràng buộc NOT NULL cho các cột cũ để tránh lỗi 23502
     const colsToRelax = ['fullname', 'phonenumber', 'full_name', 'phone_number', 'cccdnumber', 'cccd_number', 'address', 'gender', 'dob', 'issuedate', 'issue_date', 'password_hash', 'password'];
     for (const col of colsToRelax) {
         try {
@@ -132,7 +131,6 @@ app.get('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// REGISTER CUSTOMER (POST)
 app.post('/api/customers', async (req, res) => {
     const c = req.body;
     try {
@@ -140,20 +138,11 @@ app.post('/api/customers', async (req, res) => {
         const phone = c.phoneNumber || c.phone || '';
         const email = c.email || '';
         const customerData = { ...c, fullName: name, phoneNumber: phone, email: email };
-
-        await pool.query(
-            `INSERT INTO customers (id, name, phone, email, data, created_at) 
-             VALUES ($1, $2, $3, $4, $5, $6) 
-             ON CONFLICT (id) DO UPDATE SET name=$2, phone=$3, email=$4, data=$5`,
-            [c.id, name, phone, email, customerData, c.createdAt || Date.now()]
-        );
+        await pool.query(`INSERT INTO customers (id, name, phone, email, data, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET name=$2, phone=$3, email=$4, data=$5`, [c.id, name, phone, email, customerData, c.createdAt || Date.now()]);
         res.json({ success: true });
-    } catch (err) { 
-        handleCustomerDbError(err, res);
-    }
+    } catch (err) { handleCustomerDbError(err, res); }
 });
 
-// UPDATE CUSTOMER (PUT)
 app.put('/api/customers/:id', async (req, res) => {
     const c = req.body;
     const id = req.params.id;
@@ -162,63 +151,11 @@ app.put('/api/customers/:id', async (req, res) => {
         const phone = c.phoneNumber || c.phone || '';
         const email = c.email || '';
         const customerData = { ...c, fullName: name, phoneNumber: phone, email: email };
-
-        await pool.query(
-            `UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, 
-            [name, phone, email, customerData, id]
-        );
+        await pool.query(`UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, [name, phone, email, customerData, id]);
         res.json({ success: true });
-    } catch (err) { 
-        handleCustomerDbError(err, res);
-    }
+    } catch (err) { handleCustomerDbError(err, res); }
 });
 
-// FORGOT PASSWORD CUSTOMER (NEW)
-app.post('/api/customers/forgot-password', async (req, res) => {
-    const { identifier } = req.body;
-    try {
-        const result = await pool.query(
-            `SELECT id, name, email, phone FROM customers 
-             WHERE phone=$1 OR email=$1 OR data->>'phoneNumber'=$1 OR data->>'email'=$1`, 
-            [identifier]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.json({ success: false, message: 'Không tìm thấy tài khoản này.' });
-        }
-
-        const customer = result.rows[0];
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // In this implementation, we return OTP for the UI fallback
-        // In a live production env, only send via Email
-        res.json({ success: true, otp, email: customer.email });
-        
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// RESET PASSWORD CUSTOMER (NEW)
-app.post('/api/customers/reset-password', async (req, res) => {
-    const { identifier, newPasswordHash } = req.body;
-    try {
-        const result = await pool.query(
-            `SELECT id, data FROM customers 
-             WHERE phone=$1 OR email=$1 OR data->>'phoneNumber'=$1 OR data->>'email'=$1`, 
-            [identifier]
-        );
-        
-        if (result.rows.length === 0) return res.json({ success: false, message: 'Lỗi đồng bộ.' });
-        
-        const customer = result.rows[0];
-        const newData = { ...customer.data, passwordHash: newPasswordHash };
-        
-        await pool.query("UPDATE customers SET data=$1 WHERE id=$2", [newData, customer.id]);
-        res.json({ success: true });
-        
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// Helper to handle 23502 Errors for Customers
 async function handleCustomerDbError(err, res) {
     if (err.code === '23502') {
         let faultyColumn = err.column;
@@ -227,7 +164,6 @@ async function handleCustomerDbError(err, res) {
             if (colMatch) faultyColumn = colMatch[1];
         }
         if (faultyColumn) {
-            console.log(`AUTO-FIX: Dropping NOT NULL on '${faultyColumn}'`);
             try {
                 await pool.query(`ALTER TABLE customers ALTER COLUMN "${faultyColumn}" DROP NOT NULL`);
                 return res.status(500).json({ error: `Lỗi cấu trúc: Đã sửa cột '${faultyColumn}'. Vui lòng bấm 'Lưu' lại.` });
@@ -237,28 +173,45 @@ async function handleCustomerDbError(err, res) {
     res.status(500).json({ error: err.message });
 }
 
-app.delete('/api/customers/:id', async (req, res) => {
+// RESET DATABASE (FIXED)
+app.post('/api/admin/reset', async (req, res) => {
+    const { scope } = req.body; 
+    console.log(`🧨 RESET COMMAND RECEIVED: Scope = ${scope}`);
+    
+    let client;
     try {
-        await pool.query('DELETE FROM customers WHERE id = $1', [req.params.id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        client = await pool.connect();
+        await client.query('BEGIN');
+        
+        if (scope === 'ORDERS') {
+            console.log("Cleaning Orders and Transactions...");
+            await client.query('TRUNCATE TABLE orders, inventory_transactions RESTART IDENTITY CASCADE');
+        } 
+        else if (scope === 'PRODUCTS') {
+            console.log("Cleaning Products and Transactions...");
+            await client.query('TRUNCATE TABLE products, inventory_transactions RESTART IDENTITY CASCADE');
+        } 
+        else if (scope === 'FULL') {
+            console.log("Cleaning EVERYTHING (except settings/users)...");
+            // Xóa sạch các bảng dữ liệu phát sinh
+            await client.query('TRUNCATE TABLE products, categories, customers, orders, inventory_transactions, admin_logs RESTART IDENTITY CASCADE');
+        } else {
+            throw new Error("Invalid reset scope");
+        }
+        
+        await client.query('COMMIT');
+        console.log("✅ Database reset successful.");
+        res.json({ success: true, message: `Server đã xóa trắng dữ liệu ${scope}.` });
+    } catch (e) {
+        if (client) await client.query('ROLLBACK');
+        console.error("❌ Reset SQL Failed:", e.message);
+        res.status(500).json({ success: false, error: e.message });
+    } finally {
+        if (client) client.release();
+    }
 });
 
-app.post('/api/customers/login', async (req, res) => {
-    const { identifier, passwordHash } = req.body;
-    try {
-        const result = await pool.query(
-            `SELECT data FROM customers WHERE phone=$1 OR email=$1 OR data->>'phoneNumber'=$1 OR data->>'phone'=$1 OR data->>'email'=$1`, [identifier]
-        );
-        if (result.rows.length > 0) {
-            const customer = result.rows[0].data;
-            if (customer && customer.passwordHash === passwordHash) res.json({ success: true, customer });
-            else res.json({ success: false, message: 'Sai mật khẩu.' });
-        } else res.json({ success: false, message: 'Tài khoản không tồn tại.' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// CATEGORIES, ORDERS, INVENTORY, SETTINGS
+// OTHER ROUTES (CATEGORIES, SETTINGS, ADMIN)
 app.get('/api/categories', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM categories');
@@ -326,7 +279,6 @@ app.post('/api/settings/store', handleSetting('store_settings').post);
 app.get('/api/settings/bank', handleSetting('bank_settings').get);
 app.post('/api/settings/bank', handleSetting('bank_settings').post);
 
-// ADMIN
 app.post('/api/admin/login-auth', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -338,59 +290,6 @@ app.post('/api/admin/login-auth', async (req, res) => {
             res.json({ success: true, user: { ...user, permissions } });
         } else res.json({ success: false, message: 'Sai tên đăng nhập hoặc mật khẩu' });
     } catch (err) { res.status(500).json({ error: err.message }); }
-});
-app.get('/api/admin/users', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT id, username, fullname, role, permissions, created_at, is_totp_enabled FROM admin_users ORDER BY created_at DESC');
-        res.json(result.rows.map(user => ({ ...user, permissions: typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions || []) })));
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-app.post('/api/admin/users', async (req, res) => {
-    const { username, password, fullname, permissions } = req.body;
-    try {
-        await pool.query(`INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at) VALUES ($1, $2, $3, $4, 'STAFF', $5, $6)`, ['admin_' + Date.now(), username, password, fullname, JSON.stringify(permissions || []), Date.now()]);
-        res.json({ success: true });
-    } catch (err) { res.json({ success: false, message: err.message }); }
-});
-app.put('/api/admin/users/:id', async (req, res) => {
-    const { password, fullname, permissions, totp_secret, is_totp_enabled } = req.body;
-    try {
-        let q = 'UPDATE admin_users SET ', v = [], i = 1;
-        if (password) { q += `password=$${i++}, `; v.push(password); }
-        if (fullname) { q += `fullname=$${i++}, `; v.push(fullname); }
-        if (permissions) { q += `permissions=$${i++}, `; v.push(JSON.stringify(permissions)); }
-        if (totp_secret !== undefined) { q += `totp_secret=$${i++}, `; v.push(totp_secret); }
-        if (is_totp_enabled !== undefined) { q += `is_totp_enabled=$${i++}, `; v.push(is_totp_enabled); }
-        q = q.slice(0, -2) + ` WHERE id=$${i}`; v.push(req.params.id);
-        await pool.query(q, v); res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-app.delete('/api/admin/users/:id', async (req, res) => {
-    try { await pool.query("DELETE FROM admin_users WHERE id = $1 AND role != 'MASTER'", [req.params.id]); res.json({ success: true }); }
-    catch (err) { res.status(500).json({ error: err.message }); }
-});
-app.get('/api/admin/logs', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT 100');
-        res.json(result.rows.map(r => ({ ...r, id: r.id.toString(), timestamp: parseInt(r.timestamp) })));
-    } catch (err) { res.status(500).send(err.message); }
-});
-app.post('/api/admin/email', async (req, res) => {
-    const { to, subject, html } = req.body;
-    try { await transporter.sendMail({ from: `"Sigma Vie Admin" <${process.env.EMAIL_USER}>`, to, subject, html }); res.json({ success: true }); }
-    catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-app.post('/api/admin/reset', async (req, res) => {
-    const { scope } = req.body; 
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        if (scope === 'ORDERS') { await client.query('TRUNCATE TABLE orders; TRUNCATE TABLE inventory_transactions;'); }
-        else if (scope === 'PRODUCTS') { await client.query('TRUNCATE TABLE products; TRUNCATE TABLE inventory_transactions;'); }
-        else if (scope === 'FULL') { await client.query('TRUNCATE TABLE products; TRUNCATE TABLE categories; TRUNCATE TABLE customers; TRUNCATE TABLE orders; TRUNCATE TABLE inventory_transactions; TRUNCATE TABLE admin_logs; TRUNCATE TABLE app_settings;'); }
-        await client.query('COMMIT'); res.json({ success: true });
-    } catch (e) { await client.query('ROLLBACK'); res.status(500).json({ error: e.message }); }
-    finally { client.release(); }
 });
 
 app.listen(port, '0.0.0.0', () => {
