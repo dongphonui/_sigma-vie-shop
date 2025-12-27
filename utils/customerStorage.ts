@@ -1,6 +1,10 @@
 
 import type { Customer } from '../types';
-import { fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, deleteCustomerFromDB, verifyCustomerLoginOnServer } from './apiClient';
+import { 
+    fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, 
+    deleteCustomerFromDB, verifyCustomerLoginOnServer,
+    requestCustomerForgotPassword, confirmCustomerResetPassword
+} from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_customers';
 const SESSION_KEY = 'sigma_vie_current_customer';
@@ -203,7 +207,7 @@ export const loginCustomer = async (identifier: string, password: string): Promi
   // 1. LOCAL CHECK FIRST (Fast)
   const customers = getCustomers();
   const localCustomer = customers.find(c => 
-    c.phoneNumber === identifier && 
+    (c.phoneNumber === identifier || c.email === identifier) && 
     c.passwordHash === hash
   );
 
@@ -238,6 +242,16 @@ export const loginCustomer = async (identifier: string, password: string): Promi
   }
 
   return { success: false, message: 'Số điện thoại hoặc mật khẩu không đúng.' };
+};
+
+// NEW: Password Recovery Logic
+export const forgotPassword = async (identifier: string) => {
+    return await requestCustomerForgotPassword(identifier);
+};
+
+export const resetPassword = async (identifier: string, newPassword: string) => {
+    const hash = simpleHash(newPassword);
+    return await confirmCustomerResetPassword(identifier, hash);
 };
 
 export const logoutCustomer = (): void => {

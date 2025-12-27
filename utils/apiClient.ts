@@ -153,6 +153,8 @@ export const syncCustomerToDB = (customer: any) => syncData('customers', custome
 export const updateCustomerInDB = (customer: any) => syncData(`customers/${customer.id}`, customer, 'PUT');
 export const deleteCustomerFromDB = (id: string) => syncData(`customers/${id}`, {}, 'DELETE');
 export const verifyCustomerLoginOnServer = (identifier: string, passwordHash: string) => syncData('customers/login', { identifier, passwordHash }, 'POST');
+export const requestCustomerForgotPassword = (identifier: string) => syncData('customers/forgot-password', { identifier }, 'POST');
+export const confirmCustomerResetPassword = (identifier: string, newPasswordHash: string) => syncData('customers/reset-password', { identifier, newPasswordHash }, 'POST');
 
 // Orders
 export const fetchOrdersFromDB = () => fetchData('orders');

@@ -153,7 +153,7 @@ app.post('/api/customers', async (req, res) => {
     }
 });
 
-// UPDATE CUSTOMER (PUT) - ENHANCED FIX
+// UPDATE CUSTOMER (PUT)
 app.put('/api/customers/:id', async (req, res) => {
     const c = req.body;
     const id = req.params.id;
@@ -163,22 +163,59 @@ app.put('/api/customers/:id', async (req, res) => {
         const email = c.email || '';
         const customerData = { ...c, fullName: name, phoneNumber: phone, email: email };
 
-        // Chúng tôi sử dụng một kỹ thuật SQL linh hoạt hơn:
-        // Cập nhật các cột chuẩn VÀ cố gắng cập nhật các cột cũ nếu chúng tồn tại trong DB 
-        // để tránh vi phạm NOT NULL của cột cũ.
-        
-        const result = await pool.query(
-            `UPDATE customers 
-             SET name=$1, phone=$2, email=$3, data=$4
-             WHERE id=$5`, 
+        await pool.query(
+            `UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`, 
             [name, phone, email, customerData, id]
         );
-        
         res.json({ success: true });
     } catch (err) { 
-        console.error("Update Error:", err);
         handleCustomerDbError(err, res);
     }
+});
+
+// FORGOT PASSWORD CUSTOMER (NEW)
+app.post('/api/customers/forgot-password', async (req, res) => {
+    const { identifier } = req.body;
+    try {
+        const result = await pool.query(
+            `SELECT id, name, email, phone FROM customers 
+             WHERE phone=$1 OR email=$1 OR data->>'phoneNumber'=$1 OR data->>'email'=$1`, 
+            [identifier]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.json({ success: false, message: 'Không tìm thấy tài khoản này.' });
+        }
+
+        const customer = result.rows[0];
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // In this implementation, we return OTP for the UI fallback
+        // In a live production env, only send via Email
+        res.json({ success: true, otp, email: customer.email });
+        
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// RESET PASSWORD CUSTOMER (NEW)
+app.post('/api/customers/reset-password', async (req, res) => {
+    const { identifier, newPasswordHash } = req.body;
+    try {
+        const result = await pool.query(
+            `SELECT id, data FROM customers 
+             WHERE phone=$1 OR email=$1 OR data->>'phoneNumber'=$1 OR data->>'email'=$1`, 
+            [identifier]
+        );
+        
+        if (result.rows.length === 0) return res.json({ success: false, message: 'Lỗi đồng bộ.' });
+        
+        const customer = result.rows[0];
+        const newData = { ...customer.data, passwordHash: newPasswordHash };
+        
+        await pool.query("UPDATE customers SET data=$1 WHERE id=$2", [newData, customer.id]);
+        res.json({ success: true });
+        
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Helper to handle 23502 Errors for Customers
