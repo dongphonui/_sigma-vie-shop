@@ -173,10 +173,10 @@ async function handleCustomerDbError(err, res) {
     res.status(500).json({ error: err.message });
 }
 
-// RESET DATABASE (FIXED)
+// RESET DATABASE (ENHANCED)
 app.post('/api/admin/reset', async (req, res) => {
     const { scope } = req.body; 
-    console.log(`🧨 RESET COMMAND RECEIVED: Scope = ${scope}`);
+    console.log(`🧨 RESET INITIATED: Scope = ${scope}`);
     
     let client;
     try {
@@ -188,30 +188,31 @@ app.post('/api/admin/reset', async (req, res) => {
             await client.query('TRUNCATE TABLE orders, inventory_transactions RESTART IDENTITY CASCADE');
         } 
         else if (scope === 'PRODUCTS') {
-            console.log("Cleaning Products and Transactions...");
-            await client.query('TRUNCATE TABLE products, inventory_transactions RESTART IDENTITY CASCADE');
+            console.log("Cleaning Products, Transactions AND Orders (Dependencies)...");
+            // QUAN TRỌNG: Khi xóa sản phẩm, ta PHẢI xóa cả Đơn hàng và Giao dịch kho 
+            // vì chúng chứa ID sản phẩm. Nếu không xóa, Postgres sẽ chặn hoặc dữ liệu sẽ bị lỗi logic.
+            await client.query('TRUNCATE TABLE products, inventory_transactions, orders RESTART IDENTITY CASCADE');
         } 
         else if (scope === 'FULL') {
-            console.log("Cleaning EVERYTHING (except settings/users)...");
-            // Xóa sạch các bảng dữ liệu phát sinh
+            console.log("Cleaning ALL Data Tables...");
             await client.query('TRUNCATE TABLE products, categories, customers, orders, inventory_transactions, admin_logs RESTART IDENTITY CASCADE');
         } else {
             throw new Error("Invalid reset scope");
         }
         
         await client.query('COMMIT');
-        console.log("✅ Database reset successful.");
-        res.json({ success: true, message: `Server đã xóa trắng dữ liệu ${scope}.` });
+        console.log(`✅ ${scope} Reset successful.`);
+        res.json({ success: true, message: `Server đã xóa sạch dữ liệu ${scope} thành công.` });
     } catch (e) {
         if (client) await client.query('ROLLBACK');
-        console.error("❌ Reset SQL Failed:", e.message);
+        console.error(`❌ SQL RESET FAILED [${scope}]:`, e.message);
         res.status(500).json({ success: false, error: e.message });
     } finally {
         if (client) client.release();
     }
 });
 
-// OTHER ROUTES (CATEGORIES, SETTINGS, ADMIN)
+// OTHER ROUTES
 app.get('/api/categories', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM categories');

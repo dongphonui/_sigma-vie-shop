@@ -13,6 +13,16 @@ const processAndMergeData = (localData: Product[], dbProducts: any[]) => {
     if (dbProducts && Array.isArray(dbProducts)) {
         console.log('Đã tải dữ liệu từ Server. Số lượng:', dbProducts.length);
         
+        // --- QUAN TRỌNG: RESET LOGIC ---
+        // Nếu Server trả về danh sách RỖNG, có nghĩa là Server vừa bị Reset.
+        // Trong trường hợp này, chúng ta không được merge mà phải xóa sạch Local để đồng bộ.
+        if (dbProducts.length === 0 && localData.length > 0) {
+            // Kiểm tra xem Local có sản phẩm "mới tạo" (ID lớn hơn thời điểm reset) không.
+            // Nhưng đơn giản nhất cho chức năng Reset là: Server trống -> Local trống.
+            console.log("Server trống. Đang làm sạch Local để đồng bộ Reset.");
+            return [];
+        }
+
         // CHUẨN HÓA ID VỀ STRING ĐỂ SO SÁNH
         const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
         
@@ -41,7 +51,6 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
     
     // 1. Get current local data to preserve unsaved items
     const storedProducts = localStorage.getItem(STORAGE_KEY);
-    // CHANGE: Default to empty array, NOT demo products
     let localData: Product[] = storedProducts ? JSON.parse(storedProducts) : [];
 
     try {
@@ -57,11 +66,9 @@ export const forceReloadProducts = async (): Promise<Product[]> => {
                 return merged.map(formatProduct);
             }
         }
-        // If server empty or fails, return what we have (empty or local)
         return localData.map(formatProduct);
     } catch (e) {
         console.error("Lỗi khi ép buộc tải lại:", e);
-        // Fallback to local
         return getProducts();
     }
 };
@@ -103,13 +110,12 @@ export const hardResetProducts = async (): Promise<Product[]> => {
             hasLoadedFromDB = true;
             return dbProducts.map(formatProduct);
         } else {
-            // Server returned nothing or error -> Set empty
             localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
             return [];
         }
     } catch (e) {
         console.error("Hard Reset Failed:", e);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([])); // CHANGE: Default to empty on error
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([])); 
         throw e;
     }
 };
@@ -134,7 +140,6 @@ const formatProduct = (p: any): Product => ({
 
 export const getProducts = (): Product[] => {
   try {
-    // 1. Lấy từ LocalStorage trước
     const storedProducts = localStorage.getItem(STORAGE_KEY);
     let localData: Product[] = [];
     
@@ -145,15 +150,13 @@ export const getProducts = (): Product[] => {
       } catch (e) {
         console.error("LocalStorage corrupted, resetting.", e);
         localStorage.removeItem(STORAGE_KEY);
-        localData = []; // CHANGE: Default to empty
+        localData = []; 
       }
     } else {
-      // CHANGE: Do NOT load defaults. Start fresh.
       localData = [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     }
 
-    // 2. Load từ DB và Merge thông minh (Non-blocking background update)
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
       fetchProductsFromDB().then(dbProducts => {
@@ -162,39 +165,24 @@ export const getProducts = (): Product[] => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
             window.dispatchEvent(new Event('sigma_vie_products_update'));
           }
-      }).catch(err => {
-          // Silent catch for background fetch to avoid noisy logs when offline
-      });
+      }).catch(err => { });
     }
 
     return localData.map(formatProduct);
 
   } catch (error) {
     console.error("Lỗi storage nghiêm trọng", error);
-    return []; // CHANGE: Return empty on error
+    return []; 
   }
 };
 
-// Hàm thủ công để đẩy toàn bộ dữ liệu Local lên Server (Fix lỗi không đồng bộ)
 export const syncAllLocalDataToServer = async (): Promise<boolean> => {
     try {
         const storedProducts = localStorage.getItem(STORAGE_KEY);
         const products: Product[] = storedProducts ? JSON.parse(storedProducts) : [];
-        
-        console.log("Bắt đầu đồng bộ thủ công...", products.length, "sản phẩm");
-        
-        // Dùng Promise.allSettled để đảm bảo 1 cái lỗi không làm dừng tất cả
         const results = await Promise.allSettled(products.map(p => syncProductToDB(p)));
-        
         const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value?.success));
-        
-        if (failed.length > 0) {
-            console.warn(`Có ${failed.length} sản phẩm đồng bộ thất bại.`);
-            return false;
-        } else {
-            console.log("Đồng bộ tất cả sản phẩm thành công!");
-            return true;
-        }
+        return failed.length === 0;
     } catch (e) {
         console.error("Lỗi đồng bộ thủ công:", e);
         return false;
@@ -224,16 +212,9 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
   const updatedProducts = [newProduct, ...products];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
   
-  // Gửi lên Server Postgres (Không chặn UI)
-  console.log("Đang gửi sản phẩm mới lên Server:", newProduct.name);
   syncProductToDB(newProduct).then(res => {
-      // Check if it's a real server error or just offline/network error
       if (res && !res.success && !res.isNetworkError) {
-          console.error("❌ LƯU SERVER THẤT BẠI. Dữ liệu chỉ nằm ở Local.", res);
-          // Alert only on REAL server errors (like 500, 400), not offline mode
-          alert(`CẢNH BÁO LỖI SERVER:\n\nSản phẩm "${newProduct.name}" chỉ được lưu trên máy này và chưa lên Server.\n\nNguyên nhân: ${res?.message || 'Không xác định'}`);
-      } else if (res && res.success) {
-          console.log("✅ Đã lưu sản phẩm lên Server thành công.");
+          alert(`CẢNH BÁO LỖI SERVER:\n\nSản phẩm "${newProduct.name}" chỉ được lưu trên máy này và chưa lên Server.`);
       }
   });
   
@@ -242,17 +223,11 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
 
 export const updateProduct = (updatedProduct: Product): void => {
   const products = getProducts();
-  // So sánh ID dạng String để an toàn
   const index = products.findIndex(p => String(p.id) === String(updatedProduct.id));
   if (index !== -1) {
     products[index] = updatedProduct;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    
-    syncProductToDB(updatedProduct).then(res => {
-        if (res && !res.success && !res.isNetworkError) {
-             alert(`CẢNH BÁO LỖI SERVER:\n\nCập nhật "${updatedProduct.name}" thất bại trên Server.\n\nNguyên nhân: ${res?.message || 'Không xác định'}`);
-        }
-    });
+    syncProductToDB(updatedProduct);
   }
 };
 
@@ -260,56 +235,30 @@ export const deleteProduct = (id: number): void => {
   const products = getProducts();
   const updatedProducts = products.filter(product => String(product.id) !== String(id));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
-  // Note: Cần thêm API xóa trên server nếu muốn đồng bộ hoàn toàn việc xóa
 };
 
 export const updateProductStock = (id: number, quantityChange: number, size?: string, color?: string): boolean => {
     const products = getProducts();
     const productIndex = products.findIndex(p => String(p.id) === String(id));
-    
     if (productIndex === -1) return false;
-    
     const product = products[productIndex];
     let newTotalStock = product.stock + quantityChange;
-
-    // Logic: Optimistic Update for UI
     if (size || color) {
         if (!product.variants) product.variants = [];
-        
-        const vIndex = product.variants.findIndex(v => 
-            (v.size === size || (!v.size && !size)) && 
-            (v.color === color || (!v.color && !color))
-        );
-
+        const vIndex = product.variants.findIndex(v => (v.size === size || (!v.size && !size)) && (v.color === color || (!v.color && !color)));
         if (vIndex !== -1) {
-            // Update existing variant
             const variant = product.variants[vIndex];
             const newVariantStock = variant.stock + quantityChange;
             if (newVariantStock < 0) return false; 
             product.variants[vIndex].stock = newVariantStock;
         } else if (quantityChange > 0) {
-            // New Variant
             product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
-        } else {
-            return false; // Can't reduce non-existent variant
-        }
-        
-        // Recalculate total stock sum
+        } else return false;
         newTotalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
-    } else {
-        if (newTotalStock < 0) return false;
-    }
-
+    } else if (newTotalStock < 0) return false;
     product.stock = newTotalStock;
     products[productIndex] = product;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    
-    // Update server
-    updateProductStockInDB(id, quantityChange, size, color).then(response => {
-        if (response && response.success) {
-            console.log(`Đã cập nhật kho an toàn trên server.`);
-        }
-    });
-
+    updateProductStockInDB(id, quantityChange, size, color);
     return true;
 };

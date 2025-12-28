@@ -129,8 +129,11 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
                 localStorage.setItem(KEYS.orders, '[]');
                 localStorage.setItem(KEYS.transactions, '[]');
             } else if (scope === 'PRODUCTS') {
+                // KHI XÓA SẢN PHẨM: Xóa luôn đơn hàng và giao dịch kho ở local vì chúng trỏ đến ID cũ
                 localStorage.setItem(KEYS.products, '[]');
                 localStorage.setItem(KEYS.transactions, '[]');
+                localStorage.setItem(KEYS.orders, '[]'); 
+                console.log("Local Products and linked Orders/Transactions wiped.");
             } else if (scope === 'FULL') {
                 // Bảo vệ các cài đặt quan trọng
                 const adminSettings = localStorage.getItem(KEYS.adminSettings);
