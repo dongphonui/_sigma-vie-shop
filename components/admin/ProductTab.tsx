@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Product, Category } from '../../types';
 import { getProducts, addProduct, deleteProduct, updateProduct } from '../../utils/productStorage';
 import { getCategories, addCategory, deleteCategory, updateCategory } from '../../utils/categoryStorage';
 import { 
-    SearchIcon, EditIcon, Trash2Icon, ImagePlus, LightningIcon 
+    SearchIcon, EditIcon, Trash2Icon, ImagePlus, LightningIcon, QrCodeIcon, XIcon 
 } from '../Icons';
 
 const ProductTab: React.FC = () => {
@@ -12,6 +13,8 @@ const ProductTab: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isManagingCategories, setIsManagingCategories] = useState(false);
+  const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
+  const [selectedQrProduct, setSelectedQrProduct] = useState<Product | null>(null);
   
   // Product Form
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -47,6 +50,11 @@ const ProductTab: React.FC = () => {
 
   useEffect(() => {
     refreshData();
+    const handleUpdate = () => {
+        setProducts(getProducts());
+    };
+    window.addEventListener('sigma_vie_products_update', handleUpdate);
+    return () => window.removeEventListener('sigma_vie_products_update', handleUpdate);
   }, []);
 
   const refreshData = () => {
@@ -127,13 +135,22 @@ const ProductTab: React.FC = () => {
     setTimeout(() => setProductFeedback(''), 3000);
   };
   
-  const handleDeleteProduct = (productId: number, productName: string) => {
-    if (window.confirm(`Xóa sản phẩm "${productName}"?`)) {
-      deleteProduct(productId);
-      setProducts(currentProducts => currentProducts.filter(p => p.id !== productId));
+  const handleDeleteProduct = async (productId: number, productName: string) => {
+    if (window.confirm(`Bạn có chắc muốn xóa sản phẩm "${productName}" trên cả Server và thiết bị này không?`)) {
+      setIsDeletingId(productId);
+      setProductFeedback(`Đang xóa sản phẩm "${productName}"...`);
+      const result = await deleteProduct(productId);
+      
+      if (result.success) {
+          setProductFeedback(`✅ ${result.message}`);
+          refreshData();
+      } else {
+          setProductFeedback(`❌ Lỗi: ${result.message}`);
+      }
+      
+      setIsDeletingId(null);
       if (editingProduct?.id === productId) handleCancelProductEdit();
-      setProductFeedback(`Đã xóa sản phẩm.`);
-      setTimeout(() => setProductFeedback(''), 3000);
+      setTimeout(() => setProductFeedback(''), 4000);
     }
   };
 
@@ -148,6 +165,8 @@ const ProductTab: React.FC = () => {
   const handleEditCategory = (c: Category) => { setEditingCategory(c); setNewCategoryName(c.name); setNewCategoryDesc(c.description || ''); };
   const handleDeleteCategory = (id: string) => { if(confirm('Xóa danh mục?')) { deleteCategory(id); refreshData(); }};
   const handleCancelEdit = () => { setEditingCategory(null); setNewCategoryName(''); setNewCategoryDesc(''); };
+
+  const getProductUrl = (id: number) => `${window.location.origin}/?product=${id}`;
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -373,14 +392,14 @@ const ProductTab: React.FC = () => {
                         </form>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div className="bg-white rounded-lg shadow-md overflow-hidden relative">
                         <table className="min-w-full text-sm text-left text-gray-500">
                             <thead className="bg-gray-100 text-gray-700 uppercase font-medium">
                                 <tr>
                                     <th className="px-4 py-3">Sản phẩm</th>
                                     <th className="px-4 py-3">Giá</th>
+                                    <th className="px-4 py-3 text-center">Mã QR</th>
                                     <th className="px-4 py-3">Tồn kho</th>
-                                    <th className="px-4 py-3">Danh mục</th>
                                     <th className="px-4 py-3">Trạng thái</th>
                                     <th className="px-4 py-3 text-right">Thao tác</th>
                                 </tr>
@@ -392,7 +411,7 @@ const ProductTab: React.FC = () => {
                                         (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
                                     )
                                     .map((product) => (
-                                    <tr key={product.id} className="hover:bg-gray-50">
+                                    <tr key={product.id} className={`hover:bg-gray-50 ${isDeletingId === product.id ? 'opacity-50 grayscale bg-red-50' : ''}`}>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
                                                 <img src={product.imageUrl} alt={product.name} className="w-10 h-10 object-cover rounded" />
@@ -412,6 +431,15 @@ const ProductTab: React.FC = () => {
                                                 product.price
                                             )}
                                         </td>
+                                        <td className="px-4 py-3 text-center">
+                                            <button 
+                                                onClick={() => setSelectedQrProduct(product)}
+                                                className="p-1.5 bg-gray-50 border rounded-md hover:bg-teal-50 hover:border-teal-200 transition-colors shadow-sm"
+                                                title="Xem mã QR"
+                                            >
+                                                <QRCodeSVG value={getProductUrl(product.id)} size={24} />
+                                            </button>
+                                        </td>
                                         <td className="px-4 py-3">
                                             {product.sizes?.length || product.colors?.length ? (
                                                 <div className="text-xs">
@@ -428,7 +456,6 @@ const ProductTab: React.FC = () => {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3">{product.category}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded text-xs font-bold 
                                                 ${product.status === 'active' ? 'bg-green-100 text-green-700' : 
@@ -438,8 +465,17 @@ const ProductTab: React.FC = () => {
                                             {product.isFlashSale && <span className="ml-1 text-xs text-red-500 font-bold">⚡</span>}
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
-                                            <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                                            {isDeletingId === product.id ? (
+                                                <div className="flex items-center justify-end gap-2 text-red-600 font-bold text-xs animate-pulse">
+                                                    <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                                                    Đang xóa...
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-800 mr-2"><EditIcon className="w-4 h-4"/></button>
+                                                    <button onClick={() => handleDeleteProduct(product.id, product.name)} className="text-red-600 hover:text-red-800"><Trash2Icon className="w-4 h-4"/></button>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -450,10 +486,38 @@ const ProductTab: React.FC = () => {
             </>
         )}
         {productFeedback && (
-             <div className={`mt-4 p-3 rounded text-center font-medium animate-pulse ${productFeedback.includes('Lỗi') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+             <div className={`fixed bottom-4 right-4 z-50 p-3 rounded shadow-lg font-medium animate-fade-in-up ${productFeedback.includes('❌') ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
                  {productFeedback}
              </div>
         )}
+
+        {/* LARGE QR MODAL */}
+        {selectedQrProduct && (
+            <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={() => setSelectedQrProduct(null)}>
+                <div className="bg-white rounded-xl shadow-2xl p-8 max-w-xs w-full text-center relative" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setSelectedQrProduct(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-800 transition-colors">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                    <h4 className="font-bold text-[#00695C] mb-2">{selectedQrProduct.name}</h4>
+                    <p className="text-xs text-gray-500 mb-6">Mã QR Sản phẩm (Để in hoặc dán)</p>
+                    <div className="bg-white p-4 border-2 border-[#D4AF37] rounded-lg inline-block shadow-inner mb-6">
+                        <QRCodeSVG value={getProductUrl(selectedQrProduct.id)} size={200} />
+                    </div>
+                    <p className="text-xs text-gray-400 break-all">{getProductUrl(selectedQrProduct.id)}</p>
+                    <button 
+                        onClick={() => window.print()} 
+                        className="mt-6 w-full bg-[#00695C] text-white py-2 rounded-lg font-bold hover:bg-[#004d40] shadow-md transition-all active:scale-95"
+                    >
+                        In mã QR
+                    </button>
+                </div>
+            </div>
+        )}
+
+        <style>{`
+            @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+            .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+        `}</style>
     </div>
   );
 };

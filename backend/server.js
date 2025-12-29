@@ -117,10 +117,37 @@ app.post('/api/products/stock', async (req, res) => {
 });
 
 app.delete('/api/products/:id', async (req, res) => {
+    const productId = req.params.id;
+    console.log(`🗑️ Request to delete product ID: ${productId}`);
+    
+    const client = await pool.connect();
     try {
-        await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        await client.query('BEGIN');
+        
+        // 1. Delete associated inventory transactions
+        // Use string comparison if BIGINT issues occur, but cast is safer
+        const deletedTrans = await client.query('DELETE FROM inventory_transactions WHERE product_id::text = $1', [productId]);
+        console.log(`- Deleted ${deletedTrans.rowCount} associated transactions.`);
+
+        // 2. Delete the product itself
+        const deletedProd = await client.query('DELETE FROM products WHERE id::text = $1', [productId]);
+        
+        if (deletedProd.rowCount === 0) {
+            console.warn(`- No product found with ID ${productId} to delete.`);
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'Product not found on server.' });
+        }
+
+        await client.query('COMMIT');
+        console.log(`✅ Successfully deleted product ${productId}.`);
+        res.json({ success: true, message: 'Đã xóa sản phẩm khỏi hệ thống.' });
+    } catch (err) { 
+        await client.query('ROLLBACK');
+        console.error("❌ SQL delete failed:", err);
+        res.status(500).json({ success: false, error: err.message }); 
+    } finally {
+        client.release();
+    }
 });
 
 // CUSTOMERS
@@ -189,8 +216,6 @@ app.post('/api/admin/reset', async (req, res) => {
         } 
         else if (scope === 'PRODUCTS') {
             console.log("Cleaning Products, Transactions AND Orders (Dependencies)...");
-            // QUAN TRỌNG: Khi xóa sản phẩm, ta PHẢI xóa cả Đơn hàng và Giao dịch kho 
-            // vì chúng chứa ID sản phẩm. Nếu không xóa, Postgres sẽ chặn hoặc dữ liệu sẽ bị lỗi logic.
             await client.query('TRUNCATE TABLE products, inventory_transactions, orders RESTART IDENTITY CASCADE');
         } 
         else if (scope === 'FULL') {
