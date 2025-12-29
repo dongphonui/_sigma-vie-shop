@@ -105,7 +105,7 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
         const res = await fetch(`${API_BASE_URL}/${endpoint}`, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: method === 'DELETE' ? undefined : JSON.stringify(data)
         });
         
         if (!res.ok) {
@@ -142,6 +142,7 @@ export const fetchProductsFromDB = () => fetchData('products');
 export const syncProductToDB = (product: any) => syncData('products', product);
 export const updateProductStockInDB = (id: number, quantityChange: number, size?: string, color?: string) => 
     syncData('products/stock', { id, quantityChange, size, color }, 'POST');
+export const deleteProductFromDB = (id: number) => syncData(`products/${id}`, {}, 'DELETE');
 
 // Categories
 export const fetchCategoriesFromDB = () => fetchData('categories');

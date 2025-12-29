@@ -125,7 +125,6 @@ app.delete('/api/products/:id', async (req, res) => {
         await client.query('BEGIN');
         
         // 1. Delete associated inventory transactions
-        // Use string comparison if BIGINT issues occur, but cast is safer
         const deletedTrans = await client.query('DELETE FROM inventory_transactions WHERE product_id::text = $1', [productId]);
         console.log(`- Deleted ${deletedTrans.rowCount} associated transactions.`);
 
