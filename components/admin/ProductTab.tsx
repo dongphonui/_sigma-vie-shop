@@ -54,10 +54,9 @@ const ProductTab: React.FC = () => {
     }
   }, [categories]);
 
-  // Hàm hiển thị thông báo không chặn nút bấm (Góc dưới phải)
+  // Hàm hiển thị thông báo không chặn nút bấm (Góc trên phải)
   const showFeedback = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
       setProductFeedback({ msg, type });
-      // Tự biến mất sau 4 giây
       setTimeout(() => setProductFeedback(null), 4000);
   };
 
@@ -72,7 +71,7 @@ const ProductTab: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 3 * 1024 * 1024) {
-          showFeedback('⚠️ Ảnh quá lớn (Tối đa 3MB). Vui lòng nén ảnh.', 'error');
+          showFeedback('⚠️ Ảnh quá lớn (Tối đa 3MB).', 'error');
           return;
       }
       const reader = new FileReader();
@@ -125,13 +124,13 @@ const ProductTab: React.FC = () => {
 
   const handleGenerateDescriptionAI = async () => {
       if (!newProductName) {
-          showFeedback('⚠️ Hãy nhập "Tên sản phẩm" trước để AI có dữ liệu viết.', 'info');
+          showFeedback('⚠️ Hãy nhập Tên sản phẩm trước.', 'info');
           return;
       }
 
       const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined") {
-          showFeedback('❌ Hệ thống chưa cấu hình AI (Thiếu API Key).', 'error');
+      if (!apiKey || apiKey === "undefined" || apiKey === "") {
+          showFeedback('❌ Hệ thống chưa có API Key Gemini.', 'error');
           return;
       }
 
@@ -142,19 +141,19 @@ const ProductTab: React.FC = () => {
               model: 'gemini-3-flash-preview',
               contents: `Bạn là chuyên gia Content Marketing cho hãng thời trang Boutique cao cấp Sigma Vie. 
               Hãy viết một đoạn mô tả (3-4 câu), cực kỳ cuốn hút, sang trọng cho sản phẩm: "${newProductName}". 
-              Sử dụng tông giọng thanh lịch, nhấn mạnh vào sự tinh tế và chất lượng vượt trội. 
-              Ngôn ngữ: Tiếng Việt. Không dùng icon, không dùng tiêu đề.`
+              Sử dụng tông giọng thanh lịch. Ngôn ngữ: Tiếng Việt. Không dùng icon, không dùng tiêu đề.`
           });
           
           if (response.text) {
               setNewProductDescription(response.text.trim());
-              showFeedback('✨ AI Sigma Vie đã hoàn thành bản thảo mô tả!', 'success');
-              // Tự động focus để người dùng xem lại
+              showFeedback('✨ AI đã viết xong mô tả!', 'success');
               setTimeout(() => descriptionRef.current?.focus(), 100);
+          } else {
+              throw new Error("Empty response");
           }
       } catch (error) {
           console.error("AI Error:", error);
-          showFeedback('❌ AI bận hoặc lỗi kết nối. Vui lòng thử lại sau.', 'error');
+          showFeedback('❌ AI bận hoặc lỗi kết nối. Hãy thử lại.', 'error');
       } finally {
           setIsGeneratingAI(false);
       }
@@ -163,7 +162,7 @@ const ProductTab: React.FC = () => {
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName || !newProductPrice || !newProductImage) {
-      showFeedback('⚠️ Vui lòng điền Tên, Giá và chọn Ảnh sản phẩm.', 'error');
+      showFeedback('⚠️ Vui lòng điền đủ Tên, Giá và Ảnh.', 'error');
       return;
     }
 
@@ -192,7 +191,7 @@ const ProductTab: React.FC = () => {
             showFeedback('✅ Cập nhật sản phẩm thành công', 'success');
         } else {
             addProduct({ ...productData, stock: 0 });
-            showFeedback('✅ Đã lưu sản phẩm mới vào kho', 'success');
+            showFeedback('✅ Đã lưu sản phẩm mới', 'success');
         }
         
         setTimeout(() => {
@@ -202,31 +201,33 @@ const ProductTab: React.FC = () => {
             setIsSaving(false);
         }, 800);
     } catch (err) {
-        showFeedback('❌ Lỗi hệ thống khi lưu dữ liệu.', 'error');
+        showFeedback('❌ Lỗi hệ thống khi lưu.', 'error');
         setIsSaving(false);
     }
   };
 
   return (
     <div className="space-y-6 animate-fade-in-up relative min-h-screen">
-        {/* Toast Notification - Chuyển xuống góc dưới bên phải để không chặn nút bấm */}
-        {productFeedback && (
-             <div className={`fixed bottom-8 right-8 z-[100] px-6 py-4 rounded-2xl shadow-2xl border-l-8 flex items-center gap-4 transition-all transform translate-x-0 animate-slide-in-right
-                ${productFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 
-                  productFeedback.type === 'error' ? 'bg-rose-50 border-rose-500 text-rose-800' : 'bg-blue-50 border-blue-500 text-blue-800'}`}>
-                 <div className="flex-1 font-bold text-sm tracking-tight">{productFeedback.msg}</div>
-                 <button onClick={() => setProductFeedback(null)} className="p-1 hover:bg-black/5 rounded-full"><XIcon className="w-4 h-4 opacity-50 hover:opacity-100" /></button>
-             </div>
-        )}
+        {/* Toast Notification Container - Moved to TOP and made un-blocking */}
+        <div className="fixed top-20 right-5 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-xs items-end">
+            {productFeedback && (
+                <div className={`pointer-events-auto px-5 py-4 rounded-xl shadow-2xl border-l-8 flex items-center gap-3 transition-all transform animate-slide-in-right
+                    ${productFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 
+                    productFeedback.type === 'error' ? 'bg-rose-50 border-rose-500 text-rose-800' : 'bg-blue-50 border-blue-500 text-blue-800'}`}>
+                    <div className="flex-1 font-bold text-xs tracking-tight">{productFeedback.msg}</div>
+                    <button onClick={() => setProductFeedback(null)} className="p-1 hover:bg-black/5 rounded-full"><XIcon className="w-3 h-3 opacity-50" /></button>
+                </div>
+            )}
+        </div>
 
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">KHO HÀNG SIGMA VIE</h2>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">Kho hàng Sigma Vie</h2>
             <div className="flex gap-2">
                 <button onClick={() => setIsManagingCategories(!isManagingCategories)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">
-                    {isManagingCategories ? 'Quay lại' : 'Quản lý Loại hàng'}
+                    {isManagingCategories ? 'Quay lại' : 'Loại hàng'}
                 </button>
                 <button onClick={() => { resetProductForm(); setIsAddingProduct(true); }} className="px-5 py-2 bg-[#D4AF37] text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#b89b31] shadow-lg transition-all">
-                    + Thêm sản phẩm
+                    + Thêm mới
                 </button>
             </div>
         </div>
@@ -235,7 +236,7 @@ const ProductTab: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100 animate-fade-in-up">
                 <h3 className="font-bold mb-4 text-slate-700 uppercase text-xs tracking-widest">Danh mục sản phẩm</h3>
                 <form onSubmit={(e) => { e.preventDefault(); if (newCatName) { addCategory({ name: newCatName }); setNewCatName(''); showFeedback('Đã thêm danh mục', 'success'); refreshData(); } }} className="flex gap-2 mb-6">
-                    <input type="text" placeholder="Tên danh mục (Ví dụ: Váy Dạ Hội)" value={newCatName} onChange={e => setNewCatName(e.target.value)} className="border-2 border-slate-100 rounded-xl px-4 py-2 flex-1 outline-none focus:border-[#D4AF37]" required />
+                    <input type="text" placeholder="Tên danh mục..." value={newCatName} onChange={e => setNewCatName(e.target.value)} className="border-2 border-slate-100 rounded-xl px-4 py-2 flex-1 outline-none focus:border-[#D4AF37]" required />
                     <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded-xl font-bold">Thêm</button>
                 </form>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -293,13 +294,13 @@ const ProductTab: React.FC = () => {
                                             <button type="button" onClick={() => setNewProductImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"><XIcon className="w-3 h-3"/></button>
                                         </div>
                                     ) : (
-                                        <div className="text-slate-400 text-[10px] font-medium leading-tight">Chưa chọn ảnh.<br/>(Định dạng JPG/PNG)</div>
+                                        <div className="text-slate-400 text-[10px] font-medium leading-tight">Chưa chọn ảnh.</div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Cột phải: Mô tả AI - Đã được fix để không bị thông báo che */}
+                        {/* Cột phải: Mô tả AI */}
                         <div className="flex flex-col h-full">
                             <div className="flex justify-between items-center mb-3">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm chuyên sâu</label>
@@ -320,24 +321,24 @@ const ProductTab: React.FC = () => {
                                 value={newProductDescription} 
                                 onChange={e => setNewProductDescription(e.target.value)} 
                                 className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" 
-                                placeholder="Hãy nhập tên sản phẩm và bấm nút 'AI VIẾT MÔ TẢ' phía trên để tạo nội dung tự động..." 
+                                placeholder="Hãy nhập tên sản phẩm và dùng AI để tạo nội dung..." 
                                 required 
                             />
-                            <p className="text-[10px] text-slate-400 mt-2 italic">* Nội dung do AI tạo ra chỉ mang tính chất tham khảo, bạn có thể chỉnh sửa lại theo ý mình.</p>
+                            <p className="text-[10px] text-slate-400 mt-2 italic">* AI sẽ tự động viết nội dung thanh lịch dựa trên tên sản phẩm bạn nhập.</p>
                         </div>
                     </div>
 
                     <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
                         <button type="button" onClick={() => { setIsAddingProduct(false); resetProductForm(); }} className="px-8 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-slate-800 transition-colors">Bỏ qua</button>
                         <button type="submit" disabled={isSaving} className="px-12 py-3 bg-[#00695C] text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] hover:-translate-y-1 transition-all disabled:opacity-50">
-                            {isSaving ? 'ĐANG LƯU...' : (editingProduct ? 'CẬP NHẬT NGAY' : 'LƯU VÀO KHO')}
+                            {isSaving ? 'ĐANG LƯU...' : (editingProduct ? 'CẬP NHẬT' : 'LƯU VÀO KHO')}
                         </button>
                     </div>
                 </form>
             </div>
         ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed font-bold">Kho hàng trống. Hãy thêm sản phẩm đầu tiên!</div>}
+                {products.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed font-bold">Chưa có sản phẩm nào.</div>}
                 {products.map(product => (
                     <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative hover:shadow-xl transition-all">
                         <div className="relative h-60 rounded-xl overflow-hidden mb-4 bg-slate-50">
@@ -393,11 +394,11 @@ const ProductTab: React.FC = () => {
 
         <style>{`
             @keyframes slide-in-right {
-                from { opacity: 0; transform: translateX(100%); }
+                from { opacity: 0; transform: translateX(50px); }
                 to { opacity: 1; transform: translateX(0); }
             }
             .animate-slide-in-right {
-                animation: slide-in-right 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+                animation: slide-in-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
             }
         `}</style>
     </div>
