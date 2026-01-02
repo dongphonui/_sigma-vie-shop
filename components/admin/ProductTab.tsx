@@ -6,7 +6,7 @@ import type { Product, Category } from '../../types';
 import { getProducts, addProduct, deleteProduct, updateProduct } from '../../utils/productStorage';
 import { getCategories, addCategory, deleteCategory } from '../../utils/categoryStorage';
 import { 
-    SearchIcon, EditIcon, Trash2Icon, ImagePlus, QrCodeIcon, SparklesIcon, PrinterIcon, RefreshIcon, XIcon
+    SearchIcon, EditIcon, Trash2Icon, ImagePlus, QrCodeIcon, SparklesIcon, RefreshIcon, XIcon
 } from '../Icons';
 
 const ProductTab: React.FC = () => {
@@ -18,10 +18,8 @@ const ProductTab: React.FC = () => {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Refs để điều khiển UI
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-  // Product Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
@@ -34,7 +32,6 @@ const ProductTab: React.FC = () => {
   const [newProductSizes, setNewProductSizes] = useState('');
   const [newProductColors, setNewProductColors] = useState('');
 
-  // Category Form State
   const [newCatName, setNewCatName] = useState('');
 
   useEffect(() => {
@@ -54,7 +51,6 @@ const ProductTab: React.FC = () => {
     }
   }, [categories]);
 
-  // Hàm hiển thị thông báo không chặn nút bấm (Góc trên phải)
   const showFeedback = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
       setProductFeedback({ msg, type });
       setTimeout(() => setProductFeedback(null), 4000);
@@ -130,18 +126,22 @@ const ProductTab: React.FC = () => {
 
       const apiKey = process.env.API_KEY;
       if (!apiKey || apiKey === "undefined" || apiKey === "") {
-          showFeedback('❌ Hệ thống chưa có API Key Gemini.', 'error');
+          console.error("API Key not found in process.env");
+          showFeedback('❌ Lỗi: Chưa cấu hình API Key trên Vercel.', 'error');
           return;
       }
 
       setIsGeneratingAI(true);
       try {
           const ai = new GoogleGenAI({ apiKey: apiKey });
+          // Sử dụng cấu trúc contents chuẩn (array of parts) để tăng khả năng tương thích
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview',
-              contents: `Bạn là chuyên gia Content Marketing cho hãng thời trang Boutique cao cấp Sigma Vie. 
-              Hãy viết một đoạn mô tả (3-4 câu), cực kỳ cuốn hút, sang trọng cho sản phẩm: "${newProductName}". 
-              Sử dụng tông giọng thanh lịch. Ngôn ngữ: Tiếng Việt. Không dùng icon, không dùng tiêu đề.`
+              contents: [{
+                  parts: [{
+                      text: `Bạn là chuyên gia Content Marketing cho hãng thời trang Boutique cao cấp Sigma Vie. Hãy viết một đoạn mô tả (3-4 câu), cực kỳ cuốn hút, sang trọng cho sản phẩm: "${newProductName}". Sử dụng tông giọng thanh lịch. Ngôn ngữ: Tiếng Việt. Không dùng icon, không dùng tiêu đề.`
+                  }]
+              }]
           });
           
           if (response.text) {
@@ -149,11 +149,13 @@ const ProductTab: React.FC = () => {
               showFeedback('✨ AI đã viết xong mô tả!', 'success');
               setTimeout(() => descriptionRef.current?.focus(), 100);
           } else {
-              throw new Error("Empty response");
+              throw new Error("API returned empty text");
           }
-      } catch (error) {
-          console.error("AI Error:", error);
-          showFeedback('❌ AI bận hoặc lỗi kết nối. Hãy thử lại.', 'error');
+      } catch (error: any) {
+          console.error("AI Error Detailed:", error);
+          const errorMsg = error.message?.includes('401') ? 'API Key không hợp lệ hoặc hết hạn.' : 
+                           error.message?.includes('403') ? 'API Key bị chặn hoặc giới hạn vùng.' : 'Kết nối AI thất bại. Hãy kiểm tra Console.';
+          showFeedback(`❌ ${errorMsg}`, 'error');
       } finally {
           setIsGeneratingAI(false);
       }
@@ -208,7 +210,6 @@ const ProductTab: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in-up relative min-h-screen">
-        {/* Toast Notification Container - Moved to TOP and made un-blocking */}
         <div className="fixed top-20 right-5 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-xs items-end">
             {productFeedback && (
                 <div className={`pointer-events-auto px-5 py-4 rounded-xl shadow-2xl border-l-8 flex items-center gap-3 transition-all transform animate-slide-in-right
@@ -252,7 +253,6 @@ const ProductTab: React.FC = () => {
             <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 animate-fade-in-up max-w-5xl mx-auto">
                 <form onSubmit={handleProductSubmit} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {/* Cột trái: Thông tin cơ bản */}
                         <div className="space-y-6">
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tên sản phẩm *</label>
@@ -300,7 +300,6 @@ const ProductTab: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Cột phải: Mô tả AI */}
                         <div className="flex flex-col h-full">
                             <div className="flex justify-between items-center mb-3">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm chuyên sâu</label>

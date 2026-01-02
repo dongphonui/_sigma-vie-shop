@@ -68,7 +68,7 @@ const ChatWidget: React.FC = () => {
         setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'model',
-            text: "Hệ thống Chatbot đang bảo trì API Key. Vui lòng quay lại sau!",
+            text: "Hệ thống Chatbot chưa được cấu hình mã API Key trên Vercel. Vui lòng liên hệ quản trị viên!",
             timestamp: Date.now(),
         }]);
         setIsLoading(false);
@@ -97,7 +97,11 @@ const ChatWidget: React.FC = () => {
         },
       });
 
-      const result = await chat.sendMessage({ message: userMessage.text });
+      // Sử dụng cấu trúc message chuẩn của Chat Session
+      const result = await chat.sendMessage({ 
+          message: userMessage.text 
+      });
+      
       const responseText = result.text;
 
       setMessages(prev => [...prev, {
@@ -107,12 +111,12 @@ const ChatWidget: React.FC = () => {
         timestamp: Date.now(),
       }]);
 
-    } catch (error) {
-      console.error("Chat error:", error);
+    } catch (error: any) {
+      console.error("Chat AI Error Detailed:", error);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: "Xin lỗi, tôi đang gặp chút sự cố kết nối. Hãy thử lại sau vài giây!",
+        text: "Xin lỗi, tôi đang gặp sự cố kết nối AI (Có thể do mã API Key hoặc giới hạn vùng). Hãy thử lại sau!",
         timestamp: Date.now(),
       }]);
     } finally {
