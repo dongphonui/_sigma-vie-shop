@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { GoogleGenAI } from "@google/genai";
 import type { Product, Category } from '../../types';
 import { getProducts, addProduct, deleteProduct, updateProduct } from '../../utils/productStorage';
-import { getCategories, addCategory, deleteCategory, updateCategory } from '../../utils/categoryStorage';
+import { getCategories, addCategory, deleteCategory } from '../../utils/categoryStorage';
 import { 
-    SearchIcon, EditIcon, Trash2Icon, ImagePlus, LightningIcon, QrCodeIcon, XIcon, SparklesIcon, PrinterIcon, CopyIcon, RefreshIcon
+    SearchIcon, EditIcon, Trash2Icon, ImagePlus, QrCodeIcon, SparklesIcon, PrinterIcon, RefreshIcon, XIcon
 } from '../Icons';
 
 const ProductTab: React.FC = () => {
@@ -16,7 +16,11 @@ const ProductTab: React.FC = () => {
   const [isManagingCategories, setIsManagingCategories] = useState(false);
   const [selectedQrProduct, setSelectedQrProduct] = useState<Product | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
+  // Refs để điều khiển UI
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
   // Product Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProductName, setNewProductName] = useState('');
@@ -26,13 +30,12 @@ const ProductTab: React.FC = () => {
   const [newProductStatus, setNewProductStatus] = useState<'active' | 'draft' | 'archived'>('active');
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState<string | null>(null);
-  const [productFeedback, setProductFeedback] = useState('');
+  const [productFeedback, setProductFeedback] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
   const [newProductSizes, setNewProductSizes] = useState('');
   const [newProductColors, setNewProductColors] = useState('');
 
   // Category Form State
   const [newCatName, setNewCatName] = useState('');
-  const [newCatDesc, setNewCatDesc] = useState('');
 
   useEffect(() => {
     refreshData();
@@ -45,27 +48,37 @@ const ProductTab: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (categories.length > 0 && !newProductCategory) {
+        setNewProductCategory(categories[0].name);
+    }
+  }, [categories]);
+
+  // Hàm hiển thị thông báo không chặn nút bấm (Góc dưới phải)
+  const showFeedback = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+      setProductFeedback({ msg, type });
+      // Tự biến mất sau 4 giây
+      setTimeout(() => setProductFeedback(null), 4000);
+  };
+
   const refreshData = () => {
       const p = getProducts();
       const c = getCategories();
       setProducts(p);
       setCategories(c);
-      if (c.length > 0 && !newProductCategory) {
-          setNewProductCategory(c[0].name);
-      }
   };
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-          setProductFeedback('⚠️ Ảnh quá lớn (Tối đa 2MB)');
+      if (file.size > 3 * 1024 * 1024) {
+          showFeedback('⚠️ Ảnh quá lớn (Tối đa 3MB). Vui lòng nén ảnh.', 'error');
           return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewProductImage(reader.result as string);
-        setProductFeedback('✅ Đã tải ảnh lên');
+        showFeedback('✅ Đã nhận diện hình ảnh', 'success');
       };
       reader.readAsDataURL(file);
     }
@@ -80,13 +93,14 @@ const ProductTab: React.FC = () => {
       setNewProductImage(null);
       setNewProductSizes('');
       setNewProductColors('');
-      setProductFeedback('');
+      setNewProductStatus('active');
+      if (categories.length > 0) setNewProductCategory(categories[0].name);
   };
 
   const handleEditProduct = (product: Product) => {
       setEditingProduct(product);
       setNewProductName(product.name);
-      setNewProductPrice(product.price);
+      setNewProductPrice(product.price.replace(/[^\d]/g, ''));
       setNewProductSku(product.sku);
       setNewProductCategory(product.category);
       setNewProductStatus(product.status);
@@ -97,239 +111,249 @@ const ProductTab: React.FC = () => {
       setIsAddingProduct(true);
   };
 
-  // Fix error: Add missing handleDeleteProduct function
   const handleDeleteProduct = async (productId: number, productName: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${productName}" không?`)) {
+    if (window.confirm(`Bạn muốn xóa "${productName}"?`)) {
       const res = await deleteProduct(productId);
       if (res.success) {
-        setProducts(currentProducts => currentProducts.filter(p => p.id !== productId));
-        if (editingProduct?.id === productId) {
-            setIsAddingProduct(false);
-            setEditingProduct(null);
-            resetProductForm();
-        }
-        setProductFeedback(`✅ Đã xóa sản phẩm "${productName}".`);
+        showFeedback(`Đã xóa sản phẩm ${productName}`, 'success');
+        refreshData();
       } else {
-        setProductFeedback(`❌ ${res.message}`);
+        showFeedback(`❌ Lỗi: ${res.message}`, 'error');
       }
-      setTimeout(() => setProductFeedback(''), 3000);
     }
   };
 
   const handleGenerateDescriptionAI = async () => {
       if (!newProductName) {
-          setProductFeedback('⚠️ Vui lòng nhập tên sản phẩm.');
+          showFeedback('⚠️ Hãy nhập "Tên sản phẩm" trước để AI có dữ liệu viết.', 'info');
           return;
       }
+
+      const apiKey = process.env.API_KEY;
+      if (!apiKey || apiKey === "undefined") {
+          showFeedback('❌ Hệ thống chưa cấu hình AI (Thiếu API Key).', 'error');
+          return;
+      }
+
       setIsGeneratingAI(true);
       try {
-          // Fix Gemini API initialization: use correct constructor and named parameter
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          // Fix Gemini API generateContent: use ai.models.generateContent with model and contents
+          const ai = new GoogleGenAI({ apiKey: apiKey });
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview',
-              contents: `Viết mô tả ngắn sang trọng cho sản phẩm thời trang: ${newProductName}. Phom dáng hiện đại, chất liệu cao cấp.`
+              contents: `Bạn là chuyên gia Content Marketing cho hãng thời trang Boutique cao cấp Sigma Vie. 
+              Hãy viết một đoạn mô tả (3-4 câu), cực kỳ cuốn hút, sang trọng cho sản phẩm: "${newProductName}". 
+              Sử dụng tông giọng thanh lịch, nhấn mạnh vào sự tinh tế và chất lượng vượt trội. 
+              Ngôn ngữ: Tiếng Việt. Không dùng icon, không dùng tiêu đề.`
           });
-          // Fix Gemini API response: access .text property directly
+          
           if (response.text) {
               setNewProductDescription(response.text.trim());
-              setProductFeedback('✨ AI đã viết mô tả!');
+              showFeedback('✨ AI Sigma Vie đã hoàn thành bản thảo mô tả!', 'success');
+              // Tự động focus để người dùng xem lại
+              setTimeout(() => descriptionRef.current?.focus(), 100);
           }
       } catch (error) {
-          setProductFeedback('❌ Lỗi AI. Vui lòng kiểm tra API Key.');
+          console.error("AI Error:", error);
+          showFeedback('❌ AI bận hoặc lỗi kết nối. Vui lòng thử lại sau.', 'error');
       } finally {
           setIsGeneratingAI(false);
       }
   };
 
-  const handleProductSubmit = (e: React.FormEvent) => {
+  const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName || !newProductPrice || !newProductImage) {
-      setProductFeedback('⚠️ Vui lòng điền Tên, Giá và chọn Ảnh.');
+      showFeedback('⚠️ Vui lòng điền Tên, Giá và chọn Ảnh sản phẩm.', 'error');
       return;
     }
 
+    setIsSaving(true);
+    const formattedPrice = newProductPrice.includes('₫') 
+        ? newProductPrice 
+        : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductPrice))}₫`;
+
     const productData = {
       name: newProductName,
-      price: newProductPrice.includes('₫') ? newProductPrice : `${newProductPrice}₫`,
+      price: formattedPrice,
       importPrice: '0₫',
-      description: newProductDescription,
+      description: newProductDescription || 'Thời trang cao cấp Sigma Vie.',
       imageUrl: newProductImage,
       sku: newProductSku || `SIG-${Date.now().toString().slice(-6)}`,
       brand: 'Sigma Vie',
-      category: newProductCategory || 'Chung',
+      category: newProductCategory || (categories.length > 0 ? categories[0].name : 'Chung'),
       status: newProductStatus,
       sizes: newProductSizes.split(',').map(s => s.trim()).filter(s => s),
       colors: newProductColors.split(',').map(s => s.trim()).filter(s => s)
     };
 
-    if (editingProduct) {
-        updateProduct({ ...editingProduct, ...productData, stock: editingProduct.stock });
-        setProductFeedback('✅ Đã cập nhật sản phẩm!');
-    } else {
-        addProduct({ ...productData, stock: 0 });
-        setProductFeedback('✅ Đã thêm sản phẩm mới!');
+    try {
+        if (editingProduct) {
+            updateProduct({ ...editingProduct, ...productData, stock: editingProduct.stock });
+            showFeedback('✅ Cập nhật sản phẩm thành công', 'success');
+        } else {
+            addProduct({ ...productData, stock: 0 });
+            showFeedback('✅ Đã lưu sản phẩm mới vào kho', 'success');
+        }
+        
+        setTimeout(() => {
+            setIsAddingProduct(false);
+            resetProductForm();
+            refreshData();
+            setIsSaving(false);
+        }, 800);
+    } catch (err) {
+        showFeedback('❌ Lỗi hệ thống khi lưu dữ liệu.', 'error');
+        setIsSaving(false);
     }
-    
-    refreshData();
-    setTimeout(() => {
-        setIsAddingProduct(false);
-        resetProductForm();
-    }, 1000);
-  };
-
-  const handlePrintTag = (product: Product) => {
-      const printWindow = window.open('', '', 'width=400,height=600');
-      if (!printWindow) return;
-      const productUrl = `${window.location.origin}/?product=${product.id}`;
-      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(productUrl)}`;
-      printWindow.document.write(`
-        <html><head><style>
-            @page { size: 50mm 30mm; margin: 0; }
-            body { font-family: sans-serif; width: 50mm; height: 30mm; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; box-sizing: border-box; }
-            .brand { font-size: 7px; font-weight: bold; color: #00695C; margin-bottom: 1mm; }
-            .content { display: flex; width: 100%; align-items: center; gap: 2mm; }
-            .qr { width: 15mm; height: 15mm; }
-            .info { flex: 1; text-align: left; }
-            .name { font-size: 7px; font-weight: bold; height: 16px; overflow: hidden; }
-            .sku { font-size: 6px; color: #666; }
-            .price { font-size: 9px; font-weight: 900; margin-top: 1mm; }
-        </style></head><body>
-          <div class="brand">SIGMA VIE BOUTIQUE</div>
-          <div class="content">
-            <img class="qr" src="${qrImageUrl}" />
-            <div class="info">
-                <div class="name">${product.name.toUpperCase()}</div>
-                <div class="sku">SKU: ${product.sku}</div>
-                <div class="price">${product.price}</div>
-            </div>
-          </div>
-          <script>window.onload=function(){window.print();window.close();}</script>
-        </body></html>
-      `);
-      printWindow.document.close();
-  };
-
-  const handleCategorySubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newCatName) return;
-      addCategory({ name: newCatName, description: newCatDesc });
-      setNewCatName(''); setNewCatDesc('');
-      setProductFeedback('✅ Đã thêm danh mục!');
-      refreshData();
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6 animate-fade-in-up relative min-h-screen">
+        {/* Toast Notification - Chuyển xuống góc dưới bên phải để không chặn nút bấm */}
+        {productFeedback && (
+             <div className={`fixed bottom-8 right-8 z-[100] px-6 py-4 rounded-2xl shadow-2xl border-l-8 flex items-center gap-4 transition-all transform translate-x-0 animate-slide-in-right
+                ${productFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 
+                  productFeedback.type === 'error' ? 'bg-rose-50 border-rose-500 text-rose-800' : 'bg-blue-50 border-blue-500 text-blue-800'}`}>
+                 <div className="flex-1 font-bold text-sm tracking-tight">{productFeedback.msg}</div>
+                 <button onClick={() => setProductFeedback(null)} className="p-1 hover:bg-black/5 rounded-full"><XIcon className="w-4 h-4 opacity-50 hover:opacity-100" /></button>
+             </div>
+        )}
+
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-xl font-bold text-slate-800">Quản lý Sản phẩm</h2>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">KHO HÀNG SIGMA VIE</h2>
             <div className="flex gap-2">
-                <button onClick={() => setIsManagingCategories(!isManagingCategories)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-medium hover:bg-slate-200">
-                    {isManagingCategories ? 'Quay lại' : 'Quản lý Danh mục'}
+                <button onClick={() => setIsManagingCategories(!isManagingCategories)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">
+                    {isManagingCategories ? 'Quay lại' : 'Quản lý Loại hàng'}
                 </button>
-                <button onClick={() => { resetProductForm(); setIsAddingProduct(true); }} className="px-4 py-2 bg-[#D4AF37] text-white rounded-lg font-bold hover:bg-[#b89b31] shadow-md">
+                <button onClick={() => { resetProductForm(); setIsAddingProduct(true); }} className="px-5 py-2 bg-[#D4AF37] text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#b89b31] shadow-lg transition-all">
                     + Thêm sản phẩm
                 </button>
             </div>
         </div>
 
         {isManagingCategories ? (
-            <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
-                <h3 className="font-bold mb-4">Danh mục hiện có</h3>
-                <form onSubmit={handleCategorySubmit} className="flex gap-2 mb-6">
-                    <input type="text" placeholder="Tên danh mục mới" value={newCatName} onChange={e => setNewCatName(e.target.value)} className="border rounded-lg px-3 py-2 flex-1" required />
-                    <button type="submit" className="bg-[#00695C] text-white px-4 py-2 rounded-lg font-bold">Thêm</button>
+            <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100 animate-fade-in-up">
+                <h3 className="font-bold mb-4 text-slate-700 uppercase text-xs tracking-widest">Danh mục sản phẩm</h3>
+                <form onSubmit={(e) => { e.preventDefault(); if (newCatName) { addCategory({ name: newCatName }); setNewCatName(''); showFeedback('Đã thêm danh mục', 'success'); refreshData(); } }} className="flex gap-2 mb-6">
+                    <input type="text" placeholder="Tên danh mục (Ví dụ: Váy Dạ Hội)" value={newCatName} onChange={e => setNewCatName(e.target.value)} className="border-2 border-slate-100 rounded-xl px-4 py-2 flex-1 outline-none focus:border-[#D4AF37]" required />
+                    <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded-xl font-bold">Thêm</button>
                 </form>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {categories.map(cat => (
-                        <div key={cat.id} className="p-3 bg-slate-50 rounded-lg border flex justify-between items-center">
-                            <span className="font-medium text-sm">{cat.name}</span>
-                            <button onClick={() => deleteCategory(cat.id)} className="text-red-400 hover:text-red-600"><Trash2Icon className="w-4 h-4"/></button>
+                        <div key={cat.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center group">
+                            <span className="font-medium text-slate-700">{cat.name}</span>
+                            <button onClick={() => deleteCategory(cat.id)} className="text-slate-300 hover:text-red-500 transition-all"><Trash2Icon className="w-4 h-4"/></button>
                         </div>
                     ))}
                 </div>
             </div>
         ) : isAddingProduct ? (
-            <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-                <form onSubmit={handleProductSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-4">
+            <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 animate-fade-in-up max-w-5xl mx-auto">
+                <form onSubmit={handleProductSubmit} className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        {/* Cột trái: Thông tin cơ bản */}
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase mb-1">Tên sản phẩm *</label>
-                                <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} className="w-full border-b-2 border-slate-100 focus:border-[#D4AF37] py-2 text-lg font-medium outline-none" placeholder="Nhập tên sản phẩm..." required />
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tên sản phẩm *</label>
+                                <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 text-lg font-bold outline-none transition-all" placeholder="Ví dụ: Áo Sơ Mi Lụa Satin" required />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-black text-slate-400 uppercase mb-1">Giá bán *</label>
-                                    <input type="text" value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} className="w-full border-b-2 border-slate-100 focus:border-[#D4AF37] py-2 outline-none" placeholder="1.200.000" required />
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Giá bán (VNĐ) *</label>
+                                    <input type="number" value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none font-black text-teal-700" placeholder="1250000" required />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-black text-slate-400 uppercase mb-1">Danh mục</label>
-                                    <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value)} className="w-full border-b-2 border-slate-100 focus:border-[#D4AF37] py-2 outline-none">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Danh mục</label>
+                                    <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none cursor-pointer font-bold text-slate-700">
                                         {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-black text-slate-400 uppercase mb-1">Size (S, M, L...)</label>
-                                    <input type="text" value={newProductSizes} onChange={e => setNewProductSizes(e.target.value)} className="w-full border-b-2 border-slate-100 py-2 outline-none" placeholder="Cách nhau bằng dấu phẩy" />
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Kích thước</label>
+                                    <input type="text" value={newProductSizes} onChange={e => setNewProductSizes(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none" placeholder="S, M, L, XL" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-black text-slate-400 uppercase mb-1">Màu sắc</label>
-                                    <input type="text" value={newProductColors} onChange={e => setNewProductColors(e.target.value)} className="w-full border-b-2 border-slate-100 py-2 outline-none" placeholder="Đen, Trắng..." />
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Màu sắc</label>
+                                    <input type="text" value={newProductColors} onChange={e => setNewProductColors(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none" placeholder="Đen, Trắng, Be" />
                                 </div>
-                            </div>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="relative">
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-xs font-black text-slate-400 uppercase">Mô tả (AI Hỗ trợ)</label>
-                                    <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className="text-[10px] bg-purple-100 text-purple-600 px-2 py-1 rounded-full font-bold flex items-center gap-1">
-                                        <SparklesIcon className="w-3 h-3" /> {isGeneratingAI ? 'AI đang viết...' : 'AI Viết mô tả'}
-                                    </button>
-                                </div>
-                                <textarea rows={4} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full border rounded-xl p-3 text-sm focus:ring-2 focus:ring-[#D4AF37] outline-none" required />
                             </div>
                             <div>
-                                <label className="block text-xs font-black text-slate-400 uppercase mb-2">Ảnh sản phẩm *</label>
-                                <div className="flex items-center gap-4">
-                                    <label className="w-24 h-24 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#D4AF37] transition-all">
-                                        <ImagePlus className="w-6 h-6 text-slate-300" />
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Hình ảnh sản phẩm *</label>
+                                <div className="flex items-center gap-6 p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                                    <label className="w-24 h-24 bg-white border-2 border-slate-100 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all group">
+                                        <ImagePlus className="w-8 h-8 text-slate-300 group-hover:scale-110 transition-transform" />
+                                        <span className="text-[10px] mt-1 font-bold">Chọn ảnh</span>
                                         <input type="file" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
                                     </label>
-                                    {newProductImage && <img src={newProductImage} className="w-24 h-24 object-cover rounded-xl shadow-lg border" />}
+                                    {newProductImage ? (
+                                        <div className="relative">
+                                            <img src={newProductImage} className="w-24 h-24 object-cover rounded-xl shadow-md border-2 border-white" />
+                                            <button type="button" onClick={() => setNewProductImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"><XIcon className="w-3 h-3"/></button>
+                                        </div>
+                                    ) : (
+                                        <div className="text-slate-400 text-[10px] font-medium leading-tight">Chưa chọn ảnh.<br/>(Định dạng JPG/PNG)</div>
+                                    )}
                                 </div>
                             </div>
                         </div>
+
+                        {/* Cột phải: Mô tả AI - Đã được fix để không bị thông báo che */}
+                        <div className="flex flex-col h-full">
+                            <div className="flex justify-between items-center mb-3">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm chuyên sâu</label>
+                                <button 
+                                    type="button" 
+                                    onClick={handleGenerateDescriptionAI} 
+                                    disabled={isGeneratingAI} 
+                                    className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md active:scale-95
+                                        ${isGeneratingAI ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 hover:-translate-y-0.5'}`}
+                                >
+                                    {isGeneratingAI ? <RefreshIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
+                                    {isGeneratingAI ? 'AI ĐANG VIẾT...' : 'AI VIẾT MÔ TẢ'}
+                                </button>
+                            </div>
+                            <textarea 
+                                ref={descriptionRef}
+                                rows={12} 
+                                value={newProductDescription} 
+                                onChange={e => setNewProductDescription(e.target.value)} 
+                                className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" 
+                                placeholder="Hãy nhập tên sản phẩm và bấm nút 'AI VIẾT MÔ TẢ' phía trên để tạo nội dung tự động..." 
+                                required 
+                            />
+                            <p className="text-[10px] text-slate-400 mt-2 italic">* Nội dung do AI tạo ra chỉ mang tính chất tham khảo, bạn có thể chỉnh sửa lại theo ý mình.</p>
+                        </div>
                     </div>
-                    <div className="flex justify-end gap-3 pt-6 border-t">
-                        <button type="button" onClick={() => { setIsAddingProduct(false); resetProductForm(); }} className="px-6 py-2 text-slate-500 font-bold">Hủy</button>
-                        <button type="submit" className="px-10 py-3 bg-[#00695C] text-white rounded-full font-bold shadow-lg">Lưu sản phẩm</button>
+
+                    <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
+                        <button type="button" onClick={() => { setIsAddingProduct(false); resetProductForm(); }} className="px-8 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-slate-800 transition-colors">Bỏ qua</button>
+                        <button type="submit" disabled={isSaving} className="px-12 py-3 bg-[#00695C] text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] hover:-translate-y-1 transition-all disabled:opacity-50">
+                            {isSaving ? 'ĐANG LƯU...' : (editingProduct ? 'CẬP NHẬT NGAY' : 'LƯU VÀO KHO')}
+                        </button>
                     </div>
                 </form>
             </div>
         ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.length === 0 && (
-                    <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed">
-                        Chưa có sản phẩm nào. Hãy bấm "Thêm sản phẩm" để bắt đầu.
-                    </div>
-                )}
+                {products.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed font-bold">Kho hàng trống. Hãy thêm sản phẩm đầu tiên!</div>}
                 {products.map(product => (
-                    <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative">
-                        <div className="relative h-48 rounded-xl overflow-hidden mb-4">
-                            <img src={product.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500" />
+                    <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative hover:shadow-xl transition-all">
+                        <div className="relative h-60 rounded-xl overflow-hidden mb-4 bg-slate-50">
+                            <img src={product.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
-                                <button onClick={() => setSelectedQrProduct(product)} className="p-2 bg-white rounded-full text-slate-800"><QrCodeIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleEditProduct(product)} className="p-2 bg-white rounded-full text-blue-600"><EditIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2 bg-white rounded-full text-red-600"><Trash2Icon className="w-5 h-5" /></button>
+                                <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 transition-all shadow-lg" title="Xem mã QR"><QrCodeIcon className="w-5 h-5" /></button>
+                                <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 transition-all shadow-lg" title="Chỉnh sửa"><EditIcon className="w-5 h-5" /></button>
+                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2.5 bg-white rounded-full text-red-600 hover:scale-110 transition-all shadow-lg" title="Xóa sản phẩm"><Trash2Icon className="w-5 h-5" /></button>
                             </div>
                         </div>
-                        <h3 className="font-bold text-slate-800 truncate mb-1">{product.name}</h3>
-                        <div className="flex justify-between items-center">
-                            <span className="text-[#00695C] font-black">{product.price}</span>
-                            <button onClick={() => handlePrintTag(product)} className="text-slate-400 hover:text-[#D4AF37] p-1"><PrinterIcon className="w-4 h-4" /></button>
+                        <div className="flex justify-between items-start mb-2">
+                             <h3 className="font-bold text-slate-800 truncate flex-1 leading-tight">{product.name}</h3>
+                        </div>
+                        <div className="flex justify-between items-center mt-3">
+                            <span className="text-[#00695C] font-black text-lg">{product.price}</span>
+                            <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded-full font-black uppercase tracking-tighter">{product.category}</span>
                         </div>
                     </div>
                 ))}
@@ -337,25 +361,45 @@ const ProductTab: React.FC = () => {
         )}
 
         {selectedQrProduct && (
-            <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" onClick={() => setSelectedQrProduct(null)}>
-                <div className="bg-white rounded-3xl p-8 max-w-xs w-full text-center relative" onClick={e => e.stopPropagation()}>
-                    <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-sm">Product QR Tag</h4>
-                    <div className="p-4 bg-white border-2 border-[#D4AF37] rounded-2xl inline-block shadow-inner mb-6">
-                        <QRCodeSVG value={`${window.location.origin}/?product=${selectedQrProduct.id}`} size={200} />
+            <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedQrProduct(null)}>
+                <div className="bg-white rounded-3xl p-10 max-w-sm w-full text-center relative animate-fade-in-up shadow-2xl" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setSelectedQrProduct(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-800 transition-colors"><XIcon className="w-6 h-6"/></button>
+                    <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-sm border-b pb-4">Product Identifier</h4>
+                    <div className="p-4 bg-white border-4 border-slate-50 rounded-3xl inline-block shadow-inner mb-6">
+                        <QRCodeSVG value={`${window.location.origin}/?product=${selectedQrProduct.id}`} size={220} />
                     </div>
-                    <p className="text-[10px] text-slate-400 mb-6 font-mono">SKU: {selectedQrProduct.sku}</p>
-                    <button onClick={() => handlePrintTag(selectedQrProduct)} className="w-full bg-[#00695C] text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg">
-                        <PrinterIcon className="w-4 h-4" /> In tem ngay
+                    <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold">SERIAL: {selectedQrProduct.sku}</p>
+                    <button onClick={() => {
+                        const printWindow = window.open('', '', 'width=450,height=300');
+                        if (printWindow) {
+                            const productUrl = `${window.location.origin}/?product=${selectedQrProduct.id}`;
+                            const qrImageUrl = `https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=${encodeURIComponent(productUrl)}&choe=UTF-8`;
+                            printWindow.document.write(`
+                                <html><body onload="window.print();window.close();" style="text-align:center;font-family:Arial;padding:10px;">
+                                    <h2 style="margin:0;font-size:14px;">SIGMA VIE</h2>
+                                    <img src="${qrImageUrl}" style="width:120px;height:120px;margin:5px 0;">
+                                    <p style="margin:0;font-size:10px;font-weight:bold;">${selectedQrProduct.name.toUpperCase()}</p>
+                                    <p style="margin:0;font-size:12px;font-weight:900;">${selectedQrProduct.price}</p>
+                                </body></html>
+                            `);
+                            printWindow.document.close();
+                        }
+                    }} className="w-full bg-[#00695C] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] transition-all">
+                        In tem dán áo quần
                     </button>
                 </div>
             </div>
         )}
 
-        {productFeedback && (
-             <div className="fixed bottom-6 right-6 z-[70] px-6 py-3 bg-[#00695C] text-white rounded-full shadow-2xl font-bold animate-bounce border border-teal-700">
-                 {productFeedback}
-             </div>
-        )}
+        <style>{`
+            @keyframes slide-in-right {
+                from { opacity: 0; transform: translateX(100%); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+            .animate-slide-in-right {
+                animation: slide-in-right 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            }
+        `}</style>
     </div>
   );
 };
