@@ -103,7 +103,7 @@ const DashboardTab: React.FC = () => {
                   </div>
                   {!isApiKeyDetected && (
                       <p className="text-[10px] text-rose-500 leading-tight mt-1 font-medium">
-                        Vui lòng vào Vercel Settings -> Environment Variables và thêm biến <code className="bg-rose-100 px-1">API_KEY</code>.
+                        Vui lòng vào Vercel Settings &rarr; Environment Variables và thêm biến <code className="bg-rose-100 px-1">API_KEY</code>.
                       </p>
                   )}
               </div>
