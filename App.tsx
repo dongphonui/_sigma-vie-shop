@@ -196,6 +196,8 @@ const App: React.FC = () => {
                 onOpenAuth={openAuthModal}
                 currentUser={currentUser}
                 initialProductId={initialProductId}
+                cartItemCount={0}
+                onOpenCart={() => {}}
             />
         );
     }
