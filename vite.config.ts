@@ -15,8 +15,7 @@ export default defineConfig({
     sourcemap: false
   },
   define: {
-    'process.env': {
-      API_KEY: JSON.stringify(process.env.API_KEY || '')
-    }
+    // Đảm bảo process.env.API_KEY được ưu tiên lấy từ môi trường hệ thống (Vercel)
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')
   }
 })
