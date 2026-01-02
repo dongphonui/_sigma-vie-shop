@@ -53,7 +53,7 @@ const ProductTab: React.FC = () => {
 
   const showFeedback = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
       setProductFeedback({ msg, type });
-      setTimeout(() => setProductFeedback(null), 4000);
+      setTimeout(() => setProductFeedback(null), 5000);
   };
 
   const refreshData = () => {
@@ -126,36 +126,33 @@ const ProductTab: React.FC = () => {
 
       const apiKey = process.env.API_KEY;
       if (!apiKey || apiKey === "undefined" || apiKey === "") {
-          console.error("API Key not found in process.env");
-          showFeedback('❌ Lỗi: Chưa cấu hình API Key trên Vercel.', 'error');
+          showFeedback('❌ Lỗi: Web chưa nhận được API_KEY từ Vercel. Hãy Redeploy!', 'error');
           return;
       }
 
       setIsGeneratingAI(true);
       try {
           const ai = new GoogleGenAI({ apiKey: apiKey });
-          // Sử dụng cấu trúc contents chuẩn (array of parts) để tăng khả năng tương thích
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview',
               contents: [{
                   parts: [{
-                      text: `Bạn là chuyên gia Content Marketing cho hãng thời trang Boutique cao cấp Sigma Vie. Hãy viết một đoạn mô tả (3-4 câu), cực kỳ cuốn hút, sang trọng cho sản phẩm: "${newProductName}". Sử dụng tông giọng thanh lịch. Ngôn ngữ: Tiếng Việt. Không dùng icon, không dùng tiêu đề.`
+                      text: `Bạn là chuyên gia Content cho hãng Sigma Vie. Hãy viết 1 đoạn mô tả ngắn (3 câu), sang trọng cho: "${newProductName}". Ngôn ngữ: Tiếng Việt. Không icon.`
                   }]
               }]
           });
           
           if (response.text) {
               setNewProductDescription(response.text.trim());
-              showFeedback('✨ AI đã viết xong mô tả!', 'success');
-              setTimeout(() => descriptionRef.current?.focus(), 100);
+              showFeedback('✨ AI đã viết xong!', 'success');
           } else {
-              throw new Error("API returned empty text");
+              throw new Error("Empty Response");
           }
       } catch (error: any) {
-          console.error("AI Error Detailed:", error);
-          const errorMsg = error.message?.includes('401') ? 'API Key không hợp lệ hoặc hết hạn.' : 
-                           error.message?.includes('403') ? 'API Key bị chặn hoặc giới hạn vùng.' : 'Kết nối AI thất bại. Hãy kiểm tra Console.';
-          showFeedback(`❌ ${errorMsg}`, 'error');
+          console.error("DEBUG AI:", error);
+          // Trích xuất mã lỗi nếu có
+          const errorDetail = error.message || 'Lỗi không xác định';
+          showFeedback(`❌ Lỗi AI: ${errorDetail.substring(0, 50)}...`, 'error');
       } finally {
           setIsGeneratingAI(false);
       }
@@ -190,7 +187,7 @@ const ProductTab: React.FC = () => {
     try {
         if (editingProduct) {
             updateProduct({ ...editingProduct, ...productData, stock: editingProduct.stock });
-            showFeedback('✅ Cập nhật sản phẩm thành công', 'success');
+            showFeedback('✅ Cập nhật thành công', 'success');
         } else {
             addProduct({ ...productData, stock: 0 });
             showFeedback('✅ Đã lưu sản phẩm mới', 'success');
@@ -210,7 +207,7 @@ const ProductTab: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in-up relative min-h-screen">
-        <div className="fixed top-20 right-5 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-xs items-end">
+        <div className="fixed top-20 right-5 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-sm items-end">
             {productFeedback && (
                 <div className={`pointer-events-auto px-5 py-4 rounded-xl shadow-2xl border-l-8 flex items-center gap-3 transition-all transform animate-slide-in-right
                     ${productFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 

@@ -60,7 +60,7 @@ const ChatWidget: React.FC = () => {
 
     try {
       const products = getProducts();
-      const productContext = products.map(p => `${p.name} (Giá: ${p.price}). Mô tả: ${p.description}`).join('\n');
+      const productContext = products.map(p => `${p.name} (${p.price})`).join(', ');
 
       const apiKey = process.env.API_KEY;
       
@@ -68,7 +68,7 @@ const ChatWidget: React.FC = () => {
         setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'model',
-            text: "Hệ thống Chatbot chưa được cấu hình mã API Key trên Vercel. Vui lòng liên hệ quản trị viên!",
+            text: "⚠️ Lỗi: Biến API_KEY trên Vercel chưa được nhúng vào ứng dụng. Vui lòng vào Vercel > Deployments > Redeploy!",
             timestamp: Date.now(),
         }]);
         setIsLoading(false);
@@ -76,7 +76,7 @@ const ChatWidget: React.FC = () => {
       }
 
       const ai = new GoogleGenAI({ apiKey: apiKey });
-      const history: Content[] = messages.slice(-15).map(m => ({
+      const history: Content[] = messages.slice(-10).map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
       }));
@@ -85,19 +85,10 @@ const ChatWidget: React.FC = () => {
         model: 'gemini-3-flash-preview',
         history: history,
         config: {
-          systemInstruction: `Bạn là trợ lý ảo thời trang của Sigma Vie. 
-          Phong cách: Sang trọng, lịch thiệp, ngắn gọn. 
-          Dưới đây là danh sách sản phẩm hiện có:
-          ${productContext}
-          
-          Nhiệm vụ:
-          1. Tư vấn sản phẩm, size, màu sắc dựa trên dữ liệu trên.
-          2. Hướng dẫn đặt hàng: Khách hàng cần quét mã QR trên sản phẩm hoặc bấm "Mua ngay" trong chi tiết sản phẩm.
-          3. Không trả lời các vấn đề ngoài thời trang và cửa hàng.`,
+          systemInstruction: `Bạn là trợ lý Sigma Vie. Shop có: ${productContext}. Hãy trả lời ngắn gọn, thanh lịch.`,
         },
       });
 
-      // Sử dụng cấu trúc message chuẩn của Chat Session
       const result = await chat.sendMessage({ 
           message: userMessage.text 
       });
@@ -107,16 +98,17 @@ const ChatWidget: React.FC = () => {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: responseText || "Tôi có thể giúp gì khác cho bạn không?",
+        text: responseText || "Xin lỗi, tôi không thể trả lời lúc này.",
         timestamp: Date.now(),
       }]);
 
     } catch (error: any) {
-      console.error("Chat AI Error Detailed:", error);
+      console.error("DEBUG CHAT AI:", error);
+      const errorMsg = error.message || 'Lỗi kết nối API';
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: "Xin lỗi, tôi đang gặp sự cố kết nối AI (Có thể do mã API Key hoặc giới hạn vùng). Hãy thử lại sau!",
+        text: `❌ Sự cố AI: ${errorMsg.substring(0, 100)}... Hãy kiểm tra mã API Key của bạn.`,
         timestamp: Date.now(),
       }]);
     } finally {
