@@ -31,7 +31,6 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000, 
 });
 
-// Cấu hình gửi mail (Sử dụng các biến môi trường nếu có, nếu không sẽ dùng chế độ báo lỗi giả lập)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -63,7 +62,6 @@ const initDb = async () => {
 
 initDb();
 
-// Health Check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // --- PRODUCTS API ---
@@ -130,7 +128,7 @@ app.post('/api/categories', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- CUSTOMERS API (Sửa lỗi 404 cho Đăng ký/Đăng nhập) ---
+// --- CUSTOMERS API ---
 app.get('/api/customers', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
@@ -152,7 +150,6 @@ app.post('/api/customers', async (req, res) => {
 app.post('/api/customers/login', async (req, res) => {
     const { identifier, passwordHash } = req.body;
     try {
-        // Tìm khách hàng bằng email hoặc số điện thoại
         const result = await pool.query(
             "SELECT data FROM customers WHERE (phone = $1 OR email = $1) AND data->>'passwordHash' = $2",
             [identifier, passwordHash]
@@ -233,14 +230,12 @@ app.post('/api/settings/:key', async (req, res) => {
 // --- ADMIN & AUTH API ---
 app.post('/api/admin/login-auth', async (req, res) => {
     const { username, password } = req.body;
-    // Dummy check cho admin mặc định nếu DB trống
     if (username === 'admin' && password === 'admin') {
         return res.json({ 
             success: true, 
             user: { id: 'master', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER', permissions: ['ALL'] } 
         });
     }
-    // Thực tế sẽ check bảng admin_users ở đây (code mẫu rút gọn)
     res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu.' });
 });
 
@@ -271,19 +266,48 @@ app.post('/api/admin/email', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// --- RESET DATABASE ---
+// --- RESET DATABASE (Đã cập nhật để bảo mật hơn) ---
 app.post('/api/admin/reset', async (req, res) => {
     const { scope } = req.body;
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
+        
         if (scope === 'ORDERS') {
-            await pool.query('TRUNCATE orders, inventory_transactions');
-        } else if (scope === 'PRODUCTS') {
-            await pool.query('TRUNCATE products, inventory_transactions, orders');
-        } else if (scope === 'FULL') {
-            await pool.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs');
+            // Xóa đơn hàng và các giao dịch kho liên quan
+            await client.query('DELETE FROM orders');
+            await client.query('DELETE FROM inventory_transactions');
+            console.log("Reset Scope: ORDERS only");
+        } 
+        else if (scope === 'PRODUCTS') {
+            // Xóa sản phẩm và các thực thể phụ thuộc (Đơn hàng, Kho)
+            await client.query('DELETE FROM products');
+            await client.query('DELETE FROM inventory_transactions');
+            await client.query('DELETE FROM orders');
+            console.log("Reset Scope: PRODUCTS & Linked Data");
+        } 
+        else if (scope === 'FULL') {
+            // Xóa sạch dữ liệu nghiệp vụ nhưng GIỮ LẠI TÀI KHOẢN ADMIN
+            await client.query('DELETE FROM products');
+            await client.query('DELETE FROM categories');
+            await client.query('DELETE FROM customers');
+            await client.query('DELETE FROM orders');
+            await client.query('DELETE FROM inventory_transactions');
+            await client.query('DELETE FROM admin_logs');
+            await client.query('DELETE FROM app_settings');
+            // TUYỆT ĐỐI KHÔNG: DELETE FROM admin_users
+            console.log("Reset Scope: FULL (Excluding Admin Users)");
         }
-        res.json({ success: true, message: 'Đã xóa dữ liệu thành công.' });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Hệ thống đã được dọn dẹp sạch sẽ.' });
+    } catch (err) { 
+        await client.query('ROLLBACK');
+        console.error("Reset Database Error:", err);
+        res.status(500).json({ success: false, error: err.message }); 
+    } finally {
+        client.release();
+    }
 });
 
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
