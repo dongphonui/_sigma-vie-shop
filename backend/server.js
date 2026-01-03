@@ -31,14 +31,6 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000, 
 });
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER || '',
-        pass: process.env.EMAIL_PASS || ''
-    }
-});
-
 const initDb = async () => {
   if (!dbUrl) return;
   let client;
@@ -64,7 +56,8 @@ initDb();
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// --- PRODUCTS API ---
+// --- API ENDPOINTS ---
+
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -75,7 +68,7 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
     const p = req.body;
     try {
-        // Ensure stock is consistent with JSON data
+        // Luôn cập nhật cột stock cơ sở từ dữ liệu JSON gửi lên
         const currentStock = parseInt(p.stock) || 0;
         await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, currentStock, p, Date.now()]);
         res.json({ success: true });
@@ -86,22 +79,21 @@ app.post('/api/products/stock', async (req, res) => {
     const { id, quantityChange, size, color } = req.body;
     try {
         const productRes = await pool.query('SELECT data FROM products WHERE id = $1', [id]);
-        if (productRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Không thấy sản phẩm' });
+        if (productRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại' });
         
         let p = productRes.rows[0].data;
         
-        // Update variant stock if exists
         if (size || color) {
             if (!p.variants) p.variants = [];
             const vIndex = p.variants.findIndex(v => (v.size === size || (!v.size && !size)) && (v.color === color || (!v.color && !color)));
             
             if (vIndex !== -1) {
-                p.variants[vIndex].stock = (p.variants[vIndex].stock || 0) + quantityChange;
+                p.variants[vIndex].stock = (parseInt(p.variants[vIndex].stock) || 0) + quantityChange;
             } else if (quantityChange > 0) {
                 p.variants.push({ size: size || '', color: color || '', stock: quantityChange });
             }
             
-            // Recalculate global stock from ALL variants
+            // Tính lại tổng tồn kho từ tất cả biến thể
             p.stock = p.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
         } else {
             p.stock = (parseInt(p.stock) || 0) + quantityChange;
@@ -114,7 +106,8 @@ app.post('/api/products/stock', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- CUSTOMERS API ---
+// --- CUSTOMERS, ORDERS, ETC (GIỮ NGUYÊN NHƯNG ĐẢM BẢO KHÔNG CÓ SYNC NGƯỢC) ---
+
 app.get('/api/customers', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
@@ -133,7 +126,6 @@ app.post('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ORDERS API ---
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
@@ -163,13 +155,14 @@ app.post('/api/admin/reset', async (req, res) => {
         } else if (scope === 'PRODUCTS') {
             await client.query('TRUNCATE products, inventory_transactions, orders, categories RESTART IDENTITY CASCADE');
         } else if (scope === 'FULL') {
-            // Xóa sạch toàn bộ dữ liệu nghiệp vụ, bảo vệ bảng admin_users
+            // Xóa sạch toàn bộ dữ liệu nghiệp vụ, chỉ bảo vệ bảng admin_users
             await client.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs, app_settings RESTART IDENTITY CASCADE');
         }
         await client.query('COMMIT');
-        res.json({ success: true, message: 'Hệ thống đã được xóa trắng hoàn toàn trên máy chủ.' });
+        res.json({ success: true, message: 'Dữ liệu trên máy chủ đã được xóa trắng.' });
     } catch (err) { 
         await client.query('ROLLBACK');
+        console.error("Factory Reset Error:", err);
         res.status(500).json({ success: false, error: err.message }); 
     } finally { client.release(); }
 });

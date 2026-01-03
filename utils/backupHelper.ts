@@ -27,56 +27,56 @@ const KEYS = {
 };
 
 export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
-    console.log(`🧨 FACTORY RESET: Scope = ${scope}`);
+    console.log(`🧨 EXECUTE FACTORY RESET: Scope = ${scope}`);
     
     try {
-        // 1. Gửi lệnh xóa lên Server TRƯỚC
+        // 1. Gửi lệnh xóa lên Server trước
         const serverResult = await resetDatabase(scope);
         
         if (serverResult && serverResult.success === true) {
+            // 2. PHÁ HỦY DỮ LIỆU LOCAL NGAY LẬP TỨC
+            // Điều này cực kỳ quan trọng để tránh việc các hàm useEffect/Sync đẩy dữ liệu cũ lên lại Server
             
-            // 2. XÓA LOCAL STORAGE NGAY LẬP TỨC để tránh Auto-Sync đẩy dữ liệu cũ lên lại
             if (scope === 'ORDERS') {
                 localStorage.removeItem(KEYS.orders);
                 localStorage.removeItem(KEYS.transactions);
+                // Xóa cả giỏ hàng vì đơn đã bị xóa
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('sigma_vie_cart_')) localStorage.removeItem(key);
+                });
             } else if (scope === 'PRODUCTS') {
                 localStorage.removeItem(KEYS.products);
                 localStorage.removeItem(KEYS.transactions);
                 localStorage.removeItem(KEYS.orders); 
                 localStorage.removeItem(KEYS.categories);
             } else if (scope === 'FULL') {
-                // Lưu lại thông tin Admin để không bị out khỏi trang quản trị ngay lập tức (trải nghiệm người dùng)
-                const adminBackup = localStorage.getItem(KEYS.adminSettings);
-                const authState = sessionStorage.getItem('isAuthenticated');
-                const adminUser = sessionStorage.getItem('adminUser');
+                // Nuclear Option: Xóa SẠCH LocalStorage và SessionStorage
+                const adminSettingsBackup = localStorage.getItem(KEYS.adminSettings);
                 
-                // Xóa SẠCH LocalStorage
                 localStorage.clear();
-                
-                // Xóa SẠCH SessionStorage
                 sessionStorage.clear();
                 
-                // Khôi phục lại session admin tối thiểu để hiện thông báo thành công
-                if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
-                if (authState) sessionStorage.setItem('isAuthenticated', authState);
-                if (adminUser) sessionStorage.setItem('adminUser', adminUser);
+                // Chỉ giữ lại credential admin nếu cần thiết để không bị log out ngay lập tức
+                if (adminSettingsBackup) {
+                    localStorage.setItem(KEYS.adminSettings, adminSettingsBackup);
+                }
             }
 
-            console.log("Cleanup complete. Force reloading app...");
+            console.log("Local cleanup complete. Force reloading application...");
 
-            // 3. ÉP BUỘC TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN TỪ SERVER
-            // Dùng timeout ngắn để user kịp thấy thông báo
+            // 3. ÉP TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN
+            // Sử dụng window.location.href để đảm bảo React State bị xóa sạch 100%
             setTimeout(() => {
                 window.location.href = window.location.origin + window.location.pathname;
             }, 1000);
 
-            return { success: true, message: 'Dữ liệu đã được xóa trắng. Trang web đang khởi động lại...' };
+            return { success: true, message: 'Hệ thống đã được làm sạch. Đang khởi động lại...' };
         } else {
-            return { success: false, message: serverResult?.message || 'Lỗi server khi thực hiện reset.' };
+            return { success: false, message: serverResult?.message || 'Lỗi server khi reset.' };
         }
     } catch (err: any) {
         console.error("Factory Reset Error:", err);
-        return { success: false, message: 'Lỗi kết nối. Không thể thực hiện xóa sạch.' };
+        return { success: false, message: 'Không thể kết nối máy chủ để thực hiện xóa sạch.' };
     }
 };
 
