@@ -23,7 +23,72 @@ const KEYS = {
     bankSettings: 'sigma_vie_bank_settings',
     storeSettings: 'sigma_vie_store_settings',
     shippingSettings: 'sigma_vie_shipping_settings',
-    adminSettings: 'sigma_vie_admin_settings' 
+    adminSettings: 'sigma_vie_admin_settings'
+};
+
+export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
+    console.log(`🧨 FACTORY RESET START: Scope = ${scope}`);
+    
+    try {
+        // 1. Gửi lệnh xóa lên Server TRƯỚC
+        const serverResult = await resetDatabase(scope);
+        
+        if (serverResult && serverResult.success === true) {
+            
+            // 2. XÓA LOCAL STORAGE NGAY LẬP TỨC để tránh Auto-Sync đẩy dữ liệu cũ lên lại
+            if (scope === 'ORDERS') {
+                localStorage.removeItem(KEYS.orders);
+                localStorage.removeItem(KEYS.transactions);
+            } else if (scope === 'PRODUCTS') {
+                localStorage.removeItem(KEYS.products);
+                localStorage.removeItem(KEYS.transactions);
+                localStorage.removeItem(KEYS.orders); 
+                localStorage.removeItem(KEYS.categories);
+            } else if (scope === 'FULL') {
+                // Giữ lại cài đặt Admin để không bị Logout khỏi Admin Panel
+                const adminBackup = localStorage.getItem(KEYS.adminSettings);
+                const authState = sessionStorage.getItem('isAuthenticated');
+                const adminUser = sessionStorage.getItem('adminUser');
+                
+                // Xóa mọi thứ khác trong LocalStorage
+                Object.values(KEYS).forEach(key => {
+                    if (key !== KEYS.adminSettings) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                // Xóa các giỏ hàng khách hàng
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('sigma_vie_cart_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                
+                // Khôi phục lại session admin
+                if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
+                if (authState) sessionStorage.setItem('isAuthenticated', authState);
+                if (adminUser) sessionStorage.setItem('adminUser', adminUser);
+                
+                // Xóa session khách hàng
+                sessionStorage.removeItem('sigma_vie_current_customer');
+            }
+
+            console.log("Cleanup complete. Force reloading app to clear React State...");
+
+            // 3. ÉP BUỘC TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN
+            // Timeout để user kịp thấy thông báo thành công
+            setTimeout(() => {
+                window.location.href = window.location.origin + window.location.pathname + "#/";
+            }, 1500);
+
+            return { success: true, message: 'Dữ liệu đã được xóa trắng hoàn toàn. Hệ thống đang khởi động lại...' };
+        } else {
+            return { success: false, message: serverResult?.message || 'Lỗi server khi reset dữ liệu.' };
+        }
+    } catch (err: any) {
+        console.error("Factory Reset Critical Error:", err);
+        return { success: false, message: 'Không thể kết nối Server để thực hiện xóa sạch.' };
+    }
 };
 
 export const generateBackupData = () => {
@@ -70,70 +135,17 @@ export const restoreBackup = async (file: File): Promise<{ success: boolean; mes
             try {
                 const json = e.target?.result as string;
                 const parsed = JSON.parse(json);
-
-                if (!parsed.data) {
-                    resolve({ success: false, message: 'File backup không hợp lệ.' });
-                    return;
-                }
-
+                if (!parsed.data) { resolve({ success: false, message: 'File không hợp lệ.' }); return; }
                 const d = parsed.data;
                 if (d.products) localStorage.setItem(KEYS.products, JSON.stringify(d.products));
                 if (d.categories) localStorage.setItem(KEYS.categories, JSON.stringify(d.categories));
                 if (d.customers) localStorage.setItem(KEYS.customers, JSON.stringify(d.customers));
                 if (d.orders) localStorage.setItem(KEYS.orders, JSON.stringify(d.orders));
                 if (d.transactions) localStorage.setItem(KEYS.transactions, JSON.stringify(d.transactions));
-                if (d.homeSettings) localStorage.setItem(KEYS.homeSettings, JSON.stringify(d.homeSettings));
-                if (d.headerSettings) localStorage.setItem(KEYS.headerSettings, JSON.stringify(d.headerSettings));
-                
                 resolve({ success: true, message: 'Khôi phục thành công! Trang sẽ tải lại.' });
                 setTimeout(() => window.location.reload(), 1000);
-            } catch (err) {
-                resolve({ success: false, message: 'Lỗi đọc file.' });
-            }
+            } catch (err) { resolve({ success: false, message: 'Lỗi đọc file.' }); }
         };
         reader.readAsText(file);
     });
-};
-
-export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
-    console.log(`🧨 FACTORY RESET: Cleaning local storage for scope ${scope}...`);
-    
-    // 1. GỬI LỆNH XÓA LÊN SERVER TRƯỚC
-    try {
-        const serverResult = await resetDatabase(scope);
-        if (serverResult && serverResult.success === true) {
-            
-            // 2. XÓA LOCAL STORAGE SAU KHI SERVER XÁC NHẬN
-            if (scope === 'ORDERS') {
-                localStorage.setItem(KEYS.orders, '[]');
-                localStorage.setItem(KEYS.transactions, '[]');
-            } else if (scope === 'PRODUCTS') {
-                localStorage.setItem(KEYS.products, '[]');
-                localStorage.setItem(KEYS.transactions, '[]');
-                localStorage.setItem(KEYS.orders, '[]'); 
-                localStorage.setItem(KEYS.categories, '[]');
-            } else if (scope === 'FULL') {
-                const adminSettings = localStorage.getItem(KEYS.adminSettings);
-                Object.values(KEYS).forEach(key => {
-                    if (key !== KEYS.adminSettings) {
-                        localStorage.removeItem(key);
-                    }
-                });
-                if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
-            }
-
-            console.log("Server factory reset complete. Reloading page...");
-            // Ép buộc reload ngay lập tức để xóa cache React
-            setTimeout(() => {
-                window.location.href = window.location.origin + window.location.pathname;
-            }, 1500);
-
-            return { success: true, message: 'Dữ liệu đã được xóa sạch. Trang web đang khởi động lại...' };
-        } else {
-            return { success: false, message: serverResult?.message || 'Server không thể thực hiện reset.' };
-        }
-    } catch (err: any) {
-        console.error("Factory Reset Error:", err);
-        return { success: false, message: 'Lỗi kết nối. Vui lòng kiểm tra Server.' };
-    }
 };
