@@ -27,56 +27,55 @@ const KEYS = {
 };
 
 export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
-    console.log(`🧨 EXECUTE FACTORY RESET: Scope = ${scope}`);
+    console.log(`🧨 THỰC HIỆN RESET HỆ THỐNG: Scope = ${scope}`);
     
     try {
-        // 1. Gửi lệnh xóa lên Server trước
+        // 1. Gửi lệnh xóa lên Server
         const serverResult = await resetDatabase(scope);
         
         if (serverResult && serverResult.success === true) {
-            // 2. PHÁ HỦY DỮ LIỆU LOCAL NGAY LẬP TỨC
-            // Điều này cực kỳ quan trọng để tránh việc các hàm useEffect/Sync đẩy dữ liệu cũ lên lại Server
             
-            if (scope === 'ORDERS') {
-                localStorage.removeItem(KEYS.orders);
-                localStorage.removeItem(KEYS.transactions);
-                // Xóa cả giỏ hàng vì đơn đã bị xóa
-                Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('sigma_vie_cart_')) localStorage.removeItem(key);
-                });
-            } else if (scope === 'PRODUCTS') {
-                localStorage.removeItem(KEYS.products);
-                localStorage.removeItem(KEYS.transactions);
-                localStorage.removeItem(KEYS.orders); 
-                localStorage.removeItem(KEYS.categories);
-            } else if (scope === 'FULL') {
-                // Nuclear Option: Xóa SẠCH LocalStorage và SessionStorage
-                const adminSettingsBackup = localStorage.getItem(KEYS.adminSettings);
+            // 2. XÓA TRẮNG DỮ LIỆU LOCAL NGAY LẬP TỨC
+            // Việc xóa ngay tại đây cực kỳ quan trọng để các hàm useEffect/Sync không đẩy dữ liệu cũ lên lại
+            
+            if (scope === 'FULL') {
+                // Sao lưu lại cài đặt admin tối thiểu để không bị mất phiên đăng nhập ngay lúc này
+                const adminBackup = localStorage.getItem(KEYS.adminSettings);
+                const authState = sessionStorage.getItem('isAuthenticated');
+                const adminUser = sessionStorage.getItem('adminUser');
                 
+                // Xóa SẠCH LocalStorage và SessionStorage
                 localStorage.clear();
                 sessionStorage.clear();
                 
-                // Chỉ giữ lại credential admin nếu cần thiết để không bị log out ngay lập tức
-                if (adminSettingsBackup) {
-                    localStorage.setItem(KEYS.adminSettings, adminSettingsBackup);
-                }
+                // Khôi phục lại phiên làm việc admin để hiện thông báo
+                if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
+                if (authState) sessionStorage.setItem('isAuthenticated', authState);
+                if (adminUser) sessionStorage.setItem('adminUser', adminUser);
+                
+                console.log("Đã dọn dẹp sạch sẽ bộ nhớ trình duyệt.");
+            } else if (scope === 'ORDERS') {
+                localStorage.removeItem(KEYS.orders);
+                localStorage.removeItem(KEYS.transactions);
+            } else if (scope === 'PRODUCTS') {
+                localStorage.removeItem(KEYS.products);
+                localStorage.removeItem(KEYS.categories);
             }
 
-            console.log("Local cleanup complete. Force reloading application...");
-
-            // 3. ÉP TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN
-            // Sử dụng window.location.href để đảm bảo React State bị xóa sạch 100%
+            // 3. ÉP BUỘC TẢI LẠI TRANG TỪ ĐỊA CHỈ GỐC
+            // Sử dụng window.location.href để phá hủy hoàn toàn React State hiện tại
             setTimeout(() => {
-                window.location.href = window.location.origin + window.location.pathname;
-            }, 1000);
+                const baseUrl = window.location.origin + window.location.pathname;
+                window.location.href = baseUrl + "#/admin"; // Quay lại trang admin
+            }, 1500);
 
-            return { success: true, message: 'Hệ thống đã được làm sạch. Đang khởi động lại...' };
+            return { success: true, message: 'Hệ thống đã được xóa trắng hoàn toàn. Đang khởi động lại...' };
         } else {
-            return { success: false, message: serverResult?.message || 'Lỗi server khi reset.' };
+            return { success: false, message: serverResult?.message || 'Lỗi từ Server khi thực hiện reset.' };
         }
     } catch (err: any) {
-        console.error("Factory Reset Error:", err);
-        return { success: false, message: 'Không thể kết nối máy chủ để thực hiện xóa sạch.' };
+        console.error("Lỗi chí mạng khi reset:", err);
+        return { success: false, message: 'Không thể kết nối Server để xóa dữ liệu.' };
     }
 };
 

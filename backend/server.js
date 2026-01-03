@@ -68,7 +68,6 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
     const p = req.body;
     try {
-        // Luôn cập nhật cột stock cơ sở từ dữ liệu JSON gửi lên
         const currentStock = parseInt(p.stock) || 0;
         await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, currentStock, p, Date.now()]);
         res.json({ success: true });
@@ -93,7 +92,6 @@ app.post('/api/products/stock', async (req, res) => {
                 p.variants.push({ size: size || '', color: color || '', stock: quantityChange });
             }
             
-            // Tính lại tổng tồn kho từ tất cả biến thể
             p.stock = p.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
         } else {
             p.stock = (parseInt(p.stock) || 0) + quantityChange;
@@ -105,8 +103,6 @@ app.post('/api/products/stock', async (req, res) => {
         res.json({ success: true, newStock: p.stock });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-// --- CUSTOMERS, ORDERS, ETC (GIỮ NGUYÊN NHƯNG ĐẢM BẢO KHÔNG CÓ SYNC NGƯỢC) ---
 
 app.get('/api/customers', async (req, res) => {
     try {
@@ -123,6 +119,21 @@ app.post('/api/customers', async (req, res) => {
             [c.id, c.fullName, c.phoneNumber, c.email, c, c.createdAt || Date.now()]
         );
         res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/customers/login', async (req, res) => {
+    const { identifier, passwordHash } = req.body;
+    try {
+        const result = await pool.query(
+            "SELECT data FROM customers WHERE (phone = $1 OR email = $1) AND data->>'passwordHash' = $2",
+            [identifier, passwordHash]
+        );
+        if (result.rows.length > 0) {
+            res.json({ success: true, customer: result.rows[0].data });
+        } else {
+            res.json({ success: false, message: 'Thông tin đăng nhập không chính xác.' });
+        }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -159,10 +170,11 @@ app.post('/api/admin/reset', async (req, res) => {
             await client.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs, app_settings RESTART IDENTITY CASCADE');
         }
         await client.query('COMMIT');
-        res.json({ success: true, message: 'Dữ liệu trên máy chủ đã được xóa trắng.' });
+        console.log(`✅ Reset Successful: Scope = ${scope}`);
+        res.json({ success: true, message: 'Dữ liệu trên máy chủ đã được dọn sạch.' });
     } catch (err) { 
         await client.query('ROLLBACK');
-        console.error("Factory Reset Error:", err);
+        console.error("❌ Reset Error:", err);
         res.status(500).json({ success: false, error: err.message }); 
     } finally { client.release(); }
 });
