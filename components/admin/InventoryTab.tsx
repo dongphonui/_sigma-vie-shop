@@ -6,7 +6,7 @@ import { getProducts, updateProductStock } from '../../utils/productStorage';
 
 const InventoryTab: React.FC = () => {
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
-  const [products, setProducts] = useState(getProducts());
+  const [products, setProducts] = useState<any[]>([]);
   
   const [selectedProductForInventory, setSelectedProductForInventory] = useState<string>('');
   const [inventoryQuantity, setInventoryQuantity] = useState<string>('');
@@ -19,9 +19,15 @@ const InventoryTab: React.FC = () => {
   const [inventorySize, setInventorySize] = useState(''); 
   const [inventoryColor, setInventoryColor] = useState('');
 
-  useEffect(() => {
+  const refreshLocalData = () => {
       setTransactions(getTransactions());
       setProducts(getProducts());
+  };
+
+  useEffect(() => {
+      refreshLocalData();
+      window.addEventListener('sigma_vie_products_update', refreshLocalData);
+      return () => window.removeEventListener('sigma_vie_products_update', refreshLocalData);
   }, []);
 
   const handleInventorySubmit = (e: React.FormEvent) => {
@@ -41,7 +47,6 @@ const InventoryTab: React.FC = () => {
         return;
     }
     
-    // Check variant requirement
     if (product.sizes && product.sizes.length > 0 && !inventorySize) {
         setInventoryFeedback('Vui lòng chọn Size cho sản phẩm này.');
         return;
@@ -53,10 +58,9 @@ const InventoryTab: React.FC = () => {
 
     const change = inventoryType === 'IMPORT' ? qty : -qty;
     
-    // Check export stock
     let currentStock = product.stock;
     if (inventorySize || inventoryColor) {
-        const variant = product.variants?.find(v => 
+        const variant = product.variants?.find((v: any) => 
             (v.size === inventorySize || (!v.size && !inventorySize)) && 
             (v.color === inventoryColor || (!v.color && !inventoryColor))
         );
@@ -85,12 +89,13 @@ const InventoryTab: React.FC = () => {
             selectedColor: inventoryColor
         });
         
-        setTransactions(getTransactions());
-        setProducts(getProducts());
-        
         setInventoryFeedback(`Thành công: ${inventoryType === 'IMPORT' ? 'Nhập' : 'Xuất'} ${qty} sản phẩm.`);
         setInventoryQuantity('');
         setInventoryNote('');
+        
+        // Buộc UI cập nhật lại danh sách sản phẩm
+        refreshLocalData();
+        
         setTimeout(() => setInventoryFeedback(''), 3000);
     } else {
         setInventoryFeedback('Đã xảy ra lỗi khi cập nhật tồn kho.');
@@ -132,7 +137,7 @@ const InventoryTab: React.FC = () => {
                             >
                                 <option value="">-- Chọn sản phẩm --</option>
                                 {products.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name} (Hiện có: {p.stock})</option>
+                                    <option key={p.id} value={p.id}>{p.name} (Tổng tồn: {p.stock})</option>
                                 ))}
                             </select>
                         </div>
@@ -147,7 +152,7 @@ const InventoryTab: React.FC = () => {
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Kích thước</label>
                                             <select value={inventorySize} onChange={(e) => setInventorySize(e.target.value)} className="w-full border rounded px-3 py-2" required>
                                                 <option value="">-- Chọn Size --</option>
-                                                {p.sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                                                {p.sizes.map((s: string) => <option key={s} value={s}>{s}</option>)}
                                             </select>
                                         </div>
                                     )}
@@ -156,7 +161,7 @@ const InventoryTab: React.FC = () => {
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Màu sắc</label>
                                             <select value={inventoryColor} onChange={(e) => setInventoryColor(e.target.value)} className="w-full border rounded px-3 py-2" required>
                                                 <option value="">-- Chọn Màu --</option>
-                                                {p.colors.map(c => <option key={c} value={c}>{c}</option>)}
+                                                {p.colors.map((c: string) => <option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
                                     )}
@@ -182,7 +187,6 @@ const InventoryTab: React.FC = () => {
                             <textarea value={inventoryNote} onChange={(e) => setInventoryNote(e.target.value)} className="w-full border rounded px-3 py-2" rows={2} />
                         </div>
                         
-                        {/* Stock Helper */}
                         {selectedProductForInventory && (
                              <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
                                  {(() => {
@@ -191,16 +195,16 @@ const InventoryTab: React.FC = () => {
                                      let stockDisplay = p.stock;
                                      let label = 'Tổng tồn kho';
                                      if (inventorySize || inventoryColor) {
-                                         const v = p.variants?.find(v => (v.size === inventorySize || (!v.size && !inventorySize)) && (v.color === inventoryColor || (!v.color && !inventoryColor)));
+                                         const v = p.variants?.find((v: any) => (v.size === inventorySize || (!v.size && !inventorySize)) && (v.color === inventoryColor || (!v.color && !inventoryColor)));
                                          stockDisplay = v ? v.stock : 0;
-                                         label = `Tồn kho chi tiết`;
+                                         label = `Tồn kho biến thể`;
                                      }
                                      return <span><strong>{label}:</strong> {stockDisplay}</span>;
                                  })()}
                              </div>
                         )}
 
-                        <button type="submit" className="w-full bg-[#00695C] text-white py-2 rounded font-bold hover:bg-[#004d40]">Thực hiện</button>
+                        <button type="submit" className="w-full bg-[#00695C] text-white py-2 rounded font-bold hover:bg-[#004d40]">Cập nhật kho</button>
                         {inventoryFeedback && <div className={`mt-2 text-center text-sm font-medium ${inventoryFeedback.includes('Lỗi') ? 'text-red-600' : 'text-green-600'}`}>{inventoryFeedback}</div>}
                     </form>
                 </div>
