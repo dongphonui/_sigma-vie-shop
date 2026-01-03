@@ -19,6 +19,7 @@ const ProductTab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -68,6 +69,114 @@ const ProductTab: React.FC = () => {
       const c = getCategories();
       setProducts(p);
       setCategories(c);
+  };
+
+  const handlePrintLabel = () => {
+    if (!selectedQrProduct) return;
+
+    // 1. Tìm SVG của QR đang hiển thị
+    const svgElement = document.querySelector('.qr-container svg') as SVGGraphicsElement;
+    if (!svgElement) return;
+
+    // 2. Chuyển SVG sang Image Data URL thông qua Canvas để in ấn ổn định
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+        canvas.width = 300;
+        canvas.height = 300;
+        ctx?.clearRect(0, 0, 300, 300);
+        ctx?.drawImage(img, 0, 0, 300, 300);
+        const qrImageDataUrl = canvas.toDataURL('image/png');
+
+        // 3. Mở cửa sổ in với layout tem nhãn chuẩn
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        if (printWindow) {
+            const finalPrice = selectedQrProduct.isFlashSale && selectedQrProduct.salePrice 
+                ? selectedQrProduct.salePrice 
+                : selectedQrProduct.price;
+
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>In tem - ${selectedQrProduct.sku}</title>
+                    <style>
+                        @page { margin: 0; size: 50mm 30mm; }
+                        body { 
+                            margin: 0; 
+                            padding: 2mm; 
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: white;
+                        }
+                        .label-container {
+                            width: 46mm;
+                            height: 26mm;
+                            display: flex;
+                            flex-direction: row;
+                            border: 0.1mm solid #eee; /* Chỉ để căn chỉnh, khi in sẽ mờ */
+                            overflow: hidden;
+                        }
+                        .qr-side {
+                            width: 18mm;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+                        .qr-side img {
+                            width: 16mm;
+                            height: 16mm;
+                        }
+                        .info-side {
+                            flex: 1;
+                            padding-left: 1mm;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            min-width: 0;
+                        }
+                        .brand { font-size: 6pt; font-weight: bold; color: #666; margin-bottom: 0.5mm; letter-spacing: 0.5mm; }
+                        .name { 
+                            font-size: 7pt; 
+                            font-weight: 900; 
+                            line-height: 1.1; 
+                            margin-bottom: 1mm;
+                            display: -webkit-box;
+                            -webkit-line-clamp: 2;
+                            -webkit-box-orient: vertical;
+                            overflow: hidden;
+                            text-transform: uppercase;
+                        }
+                        .price { font-size: 9pt; font-weight: bold; color: black; }
+                        .sku { font-size: 5pt; color: #888; font-family: monospace; margin-top: 1mm; }
+                    </style>
+                </head>
+                <body onload="window.print(); window.close();">
+                    <div class="label-container">
+                        <div class="qr-side">
+                            <img src="${qrImageDataUrl}" />
+                        </div>
+                        <div class="info-side">
+                            <div class="brand">SIGMA VIE</div>
+                            <div class="name">${selectedQrProduct.name}</div>
+                            <div class="price">${finalPrice}</div>
+                            <div class="sku">#${selectedQrProduct.sku}</div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            URL.revokeObjectURL(url);
+        }
+    };
+    img.src = url;
   };
 
   const toLocalISOString = (date: Date) => {
@@ -120,7 +229,6 @@ const ProductTab: React.FC = () => {
       setNewProductSizes(product.sizes?.join(', ') || '');
       setNewProductColors(product.colors?.join(', ') || '');
       
-      // Load Flash Sale data
       setNewProductIsFlashSale(product.isFlashSale || false);
       setNewProductSalePrice(product.salePrice ? product.salePrice.replace(/[^\d]/g, '') : '');
       setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
@@ -146,13 +254,11 @@ const ProductTab: React.FC = () => {
           showFeedback('⚠️ Hãy nhập Tên sản phẩm trước.', 'info');
           return;
       }
-
       const apiKey = process.env.API_KEY;
       if (!apiKey || apiKey === "undefined" || apiKey === "") {
           showFeedback('❌ Lỗi: Web chưa nhận được API_KEY từ Vercel. Hãy Redeploy!', 'error');
           return;
       }
-
       setIsGeneratingAI(true);
       try {
           const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -164,7 +270,6 @@ const ProductTab: React.FC = () => {
                   }]
               }]
           });
-          
           if (response.text) {
               setNewProductDescription(response.text.trim());
               showFeedback('✨ AI đã viết xong!', 'success');
@@ -189,12 +294,10 @@ const ProductTab: React.FC = () => {
       showFeedback('⚠️ Vui lòng điền đủ Tên, Giá và Ảnh.', 'error');
       return;
     }
-
     setIsSaving(true);
     const formattedPrice = newProductPrice.includes('₫') 
         ? newProductPrice 
         : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductPrice))}₫`;
-
     const formattedSalePrice = newProductSalePrice 
         ? (newProductSalePrice.includes('₫') ? newProductSalePrice : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductSalePrice))}₫`)
         : undefined;
@@ -211,7 +314,6 @@ const ProductTab: React.FC = () => {
       status: newProductStatus,
       sizes: newProductSizes.split(',').map(s => s.trim()).filter(s => s),
       colors: newProductColors.split(',').map(s => s.trim()).filter(s => s),
-      // Flash Sale data
       isFlashSale: newProductIsFlashSale,
       salePrice: formattedSalePrice,
       flashSaleStartTime: newProductFlashSaleStartTime ? new Date(newProductFlashSaleStartTime).getTime() : undefined,
@@ -226,7 +328,6 @@ const ProductTab: React.FC = () => {
             addProduct({ ...productData, stock: 0 });
             showFeedback('✅ Đã lưu sản phẩm mới', 'success');
         }
-        
         setTimeout(() => {
             setIsAddingProduct(false);
             resetProductForm();
@@ -312,7 +413,6 @@ const ProductTab: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* FLASH SALE SETTINGS - ADDED BACK */}
                             <div className="p-5 bg-rose-50 rounded-2xl border-2 border-rose-100 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <label className="flex items-center gap-2 cursor-pointer group">
@@ -369,30 +469,14 @@ const ProductTab: React.FC = () => {
                         <div className="flex flex-col h-full">
                             <div className="flex justify-between items-center mb-3">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm chuyên sâu</label>
-                                <button 
-                                    type="button" 
-                                    onClick={handleGenerateDescriptionAI} 
-                                    disabled={isGeneratingAI} 
-                                    className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md active:scale-95
-                                        ${isGeneratingAI ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 hover:-translate-y-0.5'}`}
-                                >
+                                <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md active:scale-95 ${isGeneratingAI ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 hover:-translate-y-0.5'}`}>
                                     {isGeneratingAI ? <RefreshIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
                                     {isGeneratingAI ? 'AI ĐANG VIẾT...' : 'AI VIẾT MÔ TẢ'}
                                 </button>
                             </div>
-                            <textarea 
-                                ref={descriptionRef}
-                                rows={15} 
-                                value={newProductDescription} 
-                                onChange={e => setNewProductDescription(e.target.value)} 
-                                className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" 
-                                placeholder="Hãy nhập tên sản phẩm và dùng AI để tạo nội dung..." 
-                                required 
-                            />
-                            <p className="text-[10px] text-slate-400 mt-2 italic">* AI sẽ tự động viết nội dung thanh lịch dựa trên tên sản phẩm bạn nhập.</p>
+                            <textarea ref={descriptionRef} rows={15} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" placeholder="Hãy nhập tên sản phẩm và dùng AI để tạo nội dung..." required />
                         </div>
                     </div>
-
                     <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
                         <button type="button" onClick={() => { setIsAddingProduct(false); resetProductForm(); }} className="px-8 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-slate-800 transition-colors">Bỏ qua</button>
                         <button type="submit" disabled={isSaving} className="px-12 py-3 bg-[#00695C] text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] hover:-translate-y-1 transition-all disabled:opacity-50">
@@ -408,14 +492,11 @@ const ProductTab: React.FC = () => {
                     <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative hover:shadow-xl transition-all">
                         <div className="relative h-60 rounded-xl overflow-hidden mb-4 bg-slate-50">
                             <img src={product.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
-                            
-                            {/* Flash Sale Badge in List */}
                             {product.isFlashSale && (
                                 <div className="absolute top-2 left-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg z-10 animate-pulse">
                                     <LightningIcon className="w-3 h-3" />
                                 </div>
                             )}
-
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
                                 <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 transition-all shadow-lg" title="Xem mã QR"><QrCodeIcon className="w-5 h-5" /></button>
                                 <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 transition-all shadow-lg" title="Chỉnh sửa"><EditIcon className="w-5 h-5" /></button>
@@ -447,29 +528,16 @@ const ProductTab: React.FC = () => {
             <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedQrProduct(null)}>
                 <div className="bg-white rounded-3xl p-10 max-w-sm w-full text-center relative animate-fade-in-up shadow-2xl" onClick={e => e.stopPropagation()}>
                     <button onClick={() => setSelectedQrProduct(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-800 transition-colors"><XIcon className="w-6 h-6"/></button>
-                    <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-sm border-b pb-4">Product Identifier</h4>
-                    <div className="p-4 bg-white border-4 border-slate-50 rounded-3xl inline-block shadow-inner mb-6">
+                    <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-sm border-b pb-4 italic">Product Identifier</h4>
+                    <div className="qr-container p-4 bg-white border-4 border-slate-50 rounded-3xl inline-block shadow-inner mb-6">
                         <QRCodeSVG value={`${window.location.origin}/?product=${selectedQrProduct.id}`} size={220} />
                     </div>
-                    <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold">SERIAL: {selectedQrProduct.sku}</p>
-                    <button onClick={() => {
-                        const printWindow = window.open('', '', 'width=450,height=300');
-                        if (printWindow) {
-                            const productUrl = `${window.location.origin}/?product=${selectedQrProduct.id}`;
-                            const qrImageUrl = `https://chart.googleapis.com/chart?chs=150x150&cht=qr&chl=${encodeURIComponent(productUrl)}&choe=UTF-8`;
-                            printWindow.document.write(`
-                                <html><body onload="window.print();window.close();" style="text-align:center;font-family:Arial;padding:10px;">
-                                    <h2 style="margin:0;font-size:14px;">SIGMA VIE</h2>
-                                    <img src="${qrImageUrl}" style="width:120px;height:120px;margin:5px 0;">
-                                    <p style="margin:0;font-size:10px;font-weight:bold;">${selectedQrProduct.name.toUpperCase()}</p>
-                                    <p style="margin:0;font-size:12px;font-weight:900;">${selectedQrProduct.price}</p>
-                                </body></html>
-                            `);
-                            printWindow.document.close();
-                        }
-                    }} className="w-full bg-[#00695C] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] transition-all">
+                    <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold tracking-widest">SERIAL: {selectedQrProduct.sku}</p>
+                    <button onClick={handlePrintLabel} className="w-full bg-[#00695C] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] transition-all flex items-center justify-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                         In tem dán áo quần
                     </button>
+                    <p className="text-[9px] text-slate-400 mt-4 italic">* Định dạng tem chuẩn 50x30mm cho máy in nhiệt.</p>
                 </div>
             </div>
         )}
