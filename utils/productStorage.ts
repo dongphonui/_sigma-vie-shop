@@ -104,9 +104,6 @@ export const getProducts = (): Product[] => {
     let localData: Product[] = [];
     if (storedProducts) {
       try { localData = JSON.parse(storedProducts); } catch (e) { localStorage.removeItem(STORAGE_KEY); localData = []; }
-    } else {
-      localData = [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
     }
     if (!hasLoadedFromDB) {
       hasLoadedFromDB = true; 
@@ -150,11 +147,49 @@ export const updateProduct = (updatedProduct: Product): void => {
   const products = getProducts();
   const index = products.findIndex(p => String(p.id) === String(updatedProduct.id));
   if (index !== -1) {
-    products[index] = { ...updatedProduct, stock: Number(updatedProduct.stock) };
+    const productToSave = { ...updatedProduct, stock: Number(updatedProduct.stock) };
+    products[index] = productToSave;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    syncProductToDB(products[index]);
+    syncProductToDB(productToSave);
     window.dispatchEvent(new Event('sigma_vie_products_update'));
   }
+};
+
+export const updateProductStock = (id: number, quantityChange: number, size?: string, color?: string): boolean => {
+    const products = getProducts();
+    const productIndex = products.findIndex(p => String(p.id) === String(id));
+    if (productIndex === -1) return false;
+    
+    const product = products[productIndex];
+    
+    if (size || color) {
+        if (!product.variants) product.variants = [];
+        const vIndex = product.variants.findIndex(v => (v.size === size || (!v.size && !size)) && (v.color === color || (!v.color && !color)));
+        
+        if (vIndex !== -1) {
+            product.variants[vIndex].stock = (Number(product.variants[vIndex].stock) || 0) + quantityChange;
+        } else if (quantityChange > 0) {
+            product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
+        } else return false;
+        
+        // CỰC KỲ QUAN TRỌNG: Tính lại tổng stock từ các biến thể để tránh lỗi stock = 0
+        product.stock = product.variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+    } else {
+        product.stock = (Number(product.stock) || 0) + quantityChange;
+    }
+
+    if (product.stock < 0) product.stock = 0;
+
+    products[productIndex] = product;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+    window.dispatchEvent(new Event('sigma_vie_products_update'));
+    
+    // Gửi lên server đồng bộ
+    updateProductStockInDB(id, quantityChange, size, color).then(res => {
+        if (!res || !res.success) console.error("Lỗi đồng bộ tồn kho lên Server");
+    });
+
+    return true;
 };
 
 export const deleteProduct = async (id: number): Promise<{ success: boolean; message: string }> => {
@@ -170,43 +205,4 @@ export const deleteProduct = async (id: number): Promise<{ success: boolean; mes
       }
       return { success: false, message: 'Server từ chối xóa.' };
   } catch (err: any) { return { success: false, message: 'Lỗi kết nối.' }; }
-};
-
-export const updateProductStock = (id: number, quantityChange: number, size?: string, color?: string): boolean => {
-    const products = getProducts();
-    const productIndex = products.findIndex(p => String(p.id) === String(id));
-    if (productIndex === -1) return false;
-    
-    const product = products[productIndex];
-    
-    // Cập nhật logic tồn kho local đồng bộ với Server
-    if (size || color) {
-        if (!product.variants) product.variants = [];
-        const vIndex = product.variants.findIndex(v => (v.size === size || (!v.size && !size)) && (v.color === color || (!v.color && !color)));
-        if (vIndex !== -1) {
-            product.variants[vIndex].stock = (product.variants[vIndex].stock || 0) + quantityChange;
-        } else if (quantityChange > 0) {
-            product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
-        } else return false;
-        
-        product.stock = product.variants.reduce((sum, v) => sum + (v.stock || 0), 0);
-    } else {
-        product.stock = (product.stock || 0) + quantityChange;
-    }
-
-    if (product.stock < 0) product.stock = 0;
-
-    // Lưu lại LocalStorage ngay lập tức
-    products[productIndex] = product;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    
-    // Phát sự kiện cho UI nhận biết
-    window.dispatchEvent(new Event('sigma_vie_products_update'));
-    
-    // Gửi lên server
-    updateProductStockInDB(id, quantityChange, size, color).then(res => {
-        if (!res || !res.success) console.error("Lỗi đồng bộ tồn kho lên Server");
-    });
-
-    return true;
 };

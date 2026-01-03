@@ -64,8 +64,7 @@ initDb();
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// --- API ENDPOINTS ---
-
+// --- PRODUCTS API ---
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -76,8 +75,50 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
     const p = req.body;
     try {
-        await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, p.stock, p, Date.now()]);
+        // Ensure stock is consistent with JSON data
+        const currentStock = parseInt(p.stock) || 0;
+        await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, currentStock, p, Date.now()]);
         res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/products/stock', async (req, res) => {
+    const { id, quantityChange, size, color } = req.body;
+    try {
+        const productRes = await pool.query('SELECT data FROM products WHERE id = $1', [id]);
+        if (productRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Không thấy sản phẩm' });
+        
+        let p = productRes.rows[0].data;
+        
+        // Update variant stock if exists
+        if (size || color) {
+            if (!p.variants) p.variants = [];
+            const vIndex = p.variants.findIndex(v => (v.size === size || (!v.size && !size)) && (v.color === color || (!v.color && !color)));
+            
+            if (vIndex !== -1) {
+                p.variants[vIndex].stock = (p.variants[vIndex].stock || 0) + quantityChange;
+            } else if (quantityChange > 0) {
+                p.variants.push({ size: size || '', color: color || '', stock: quantityChange });
+            }
+            
+            // Recalculate global stock from ALL variants
+            p.stock = p.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        } else {
+            p.stock = (parseInt(p.stock) || 0) + quantityChange;
+        }
+
+        if (p.stock < 0) p.stock = 0;
+
+        await pool.query('UPDATE products SET stock = $1, data = $2, updated_at = $3 WHERE id = $4', [p.stock, p, Date.now(), id]);
+        res.json({ success: true, newStock: p.stock });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- CUSTOMERS API ---
+app.get('/api/customers', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
+        res.json(result.rows.map(row => row.data));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -92,21 +133,7 @@ app.post('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/customers/login', async (req, res) => {
-    const { identifier, passwordHash } = req.body;
-    try {
-        const result = await pool.query(
-            "SELECT data FROM customers WHERE (phone = $1 OR email = $1) AND data->>'passwordHash' = $2",
-            [identifier, passwordHash]
-        );
-        if (result.rows.length > 0) {
-            res.json({ success: true, customer: result.rows[0].data });
-        } else {
-            res.json({ success: false, message: 'Tài khoản hoặc mật khẩu không đúng.' });
-        }
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
+// --- ORDERS API ---
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
@@ -136,14 +163,13 @@ app.post('/api/admin/reset', async (req, res) => {
         } else if (scope === 'PRODUCTS') {
             await client.query('TRUNCATE products, inventory_transactions, orders, categories RESTART IDENTITY CASCADE');
         } else if (scope === 'FULL') {
-            // Xóa sạch toàn bộ dữ liệu nghiệp vụ, bảo vệ bảng admin_users để không mất quyền truy cập
+            // Xóa sạch toàn bộ dữ liệu nghiệp vụ, bảo vệ bảng admin_users
             await client.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs, app_settings RESTART IDENTITY CASCADE');
         }
         await client.query('COMMIT');
-        res.json({ success: true, message: 'Dữ liệu trên máy chủ đã được xóa trắng hoàn toàn.' });
+        res.json({ success: true, message: 'Hệ thống đã được xóa trắng hoàn toàn trên máy chủ.' });
     } catch (err) { 
         await client.query('ROLLBACK');
-        console.error("Factory Reset Backend Error:", err);
         res.status(500).json({ success: false, error: err.message }); 
     } finally { client.release(); }
 });

@@ -27,7 +27,7 @@ const KEYS = {
 };
 
 export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
-    console.log(`🧨 FACTORY RESET START: Scope = ${scope}`);
+    console.log(`🧨 FACTORY RESET: Scope = ${scope}`);
     
     try {
         // 1. Gửi lệnh xóa lên Server TRƯỚC
@@ -45,49 +45,38 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
                 localStorage.removeItem(KEYS.orders); 
                 localStorage.removeItem(KEYS.categories);
             } else if (scope === 'FULL') {
-                // Giữ lại cài đặt Admin để không bị Logout khỏi Admin Panel
+                // Lưu lại thông tin Admin để không bị out khỏi trang quản trị ngay lập tức (trải nghiệm người dùng)
                 const adminBackup = localStorage.getItem(KEYS.adminSettings);
                 const authState = sessionStorage.getItem('isAuthenticated');
                 const adminUser = sessionStorage.getItem('adminUser');
                 
-                // Xóa mọi thứ khác trong LocalStorage
-                Object.values(KEYS).forEach(key => {
-                    if (key !== KEYS.adminSettings) {
-                        localStorage.removeItem(key);
-                    }
-                });
+                // Xóa SẠCH LocalStorage
+                localStorage.clear();
                 
-                // Xóa các giỏ hàng khách hàng
-                Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith('sigma_vie_cart_')) {
-                        localStorage.removeItem(key);
-                    }
-                });
+                // Xóa SẠCH SessionStorage
+                sessionStorage.clear();
                 
-                // Khôi phục lại session admin
+                // Khôi phục lại session admin tối thiểu để hiện thông báo thành công
                 if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
                 if (authState) sessionStorage.setItem('isAuthenticated', authState);
                 if (adminUser) sessionStorage.setItem('adminUser', adminUser);
-                
-                // Xóa session khách hàng
-                sessionStorage.removeItem('sigma_vie_current_customer');
             }
 
-            console.log("Cleanup complete. Force reloading app to clear React State...");
+            console.log("Cleanup complete. Force reloading app...");
 
-            // 3. ÉP BUỘC TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN
-            // Timeout để user kịp thấy thông báo thành công
+            // 3. ÉP BUỘC TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN TỪ SERVER
+            // Dùng timeout ngắn để user kịp thấy thông báo
             setTimeout(() => {
-                window.location.href = window.location.origin + window.location.pathname + "#/";
-            }, 1500);
+                window.location.href = window.location.origin + window.location.pathname;
+            }, 1000);
 
-            return { success: true, message: 'Dữ liệu đã được xóa trắng hoàn toàn. Hệ thống đang khởi động lại...' };
+            return { success: true, message: 'Dữ liệu đã được xóa trắng. Trang web đang khởi động lại...' };
         } else {
-            return { success: false, message: serverResult?.message || 'Lỗi server khi reset dữ liệu.' };
+            return { success: false, message: serverResult?.message || 'Lỗi server khi thực hiện reset.' };
         }
     } catch (err: any) {
-        console.error("Factory Reset Critical Error:", err);
-        return { success: false, message: 'Không thể kết nối Server để thực hiện xóa sạch.' };
+        console.error("Factory Reset Error:", err);
+        return { success: false, message: 'Lỗi kết nối. Không thể thực hiện xóa sạch.' };
     }
 };
 
