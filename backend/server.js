@@ -266,7 +266,7 @@ app.post('/api/admin/email', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// --- RESET DATABASE (Đã cập nhật để bảo mật hơn) ---
+// --- RESET DATABASE (SỬ DỤNG TRUNCATE ĐỂ XÓA TRẮNG HOÀN TOÀN) ---
 app.post('/api/admin/reset', async (req, res) => {
     const { scope } = req.body;
     const client = await pool.connect();
@@ -274,36 +274,25 @@ app.post('/api/admin/reset', async (req, res) => {
         await client.query('BEGIN');
         
         if (scope === 'ORDERS') {
-            // Xóa đơn hàng và các giao dịch kho liên quan
-            await client.query('DELETE FROM orders');
-            await client.query('DELETE FROM inventory_transactions');
-            console.log("Reset Scope: ORDERS only");
+            await client.query('TRUNCATE orders, inventory_transactions RESTART IDENTITY CASCADE');
+            console.log("Reset Scope: ORDERS only (Database wiped)");
         } 
         else if (scope === 'PRODUCTS') {
-            // Xóa sản phẩm và các thực thể phụ thuộc (Đơn hàng, Kho)
-            await client.query('DELETE FROM products');
-            await client.query('DELETE FROM inventory_transactions');
-            await client.query('DELETE FROM orders');
-            console.log("Reset Scope: PRODUCTS & Linked Data");
+            // Xóa sản phẩm kéo theo đơn hàng và kho
+            await client.query('TRUNCATE products, inventory_transactions, orders RESTART IDENTITY CASCADE');
+            console.log("Reset Scope: PRODUCTS & Linked Data (Database wiped)");
         } 
         else if (scope === 'FULL') {
-            // Xóa sạch dữ liệu nghiệp vụ nhưng GIỮ LẠI TÀI KHOẢN ADMIN
-            await client.query('DELETE FROM products');
-            await client.query('DELETE FROM categories');
-            await client.query('DELETE FROM customers');
-            await client.query('DELETE FROM orders');
-            await client.query('DELETE FROM inventory_transactions');
-            await client.query('DELETE FROM admin_logs');
-            await client.query('DELETE FROM app_settings');
-            // TUYỆT ĐỐI KHÔNG: DELETE FROM admin_users
-            console.log("Reset Scope: FULL (Excluding Admin Users)");
+            // XÓA TẤT CẢ NGOẠI TRỪ ADMIN_USERS
+            await client.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs, app_settings RESTART IDENTITY CASCADE');
+            console.log("Reset Scope: FULL (Database wiped, Admin Users preserved)");
         }
         
         await client.query('COMMIT');
-        res.json({ success: true, message: 'Hệ thống đã được dọn dẹp sạch sẽ.' });
+        res.json({ success: true, message: 'Hệ thống đã được xóa trắng hoàn toàn trên Server.' });
     } catch (err) { 
         await client.query('ROLLBACK');
-        console.error("Reset Database Error:", err);
+        console.error("Critical Reset Database Error:", err);
         res.status(500).json({ success: false, error: err.message }); 
     } finally {
         client.release();
