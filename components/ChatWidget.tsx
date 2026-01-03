@@ -68,7 +68,7 @@ const ChatWidget: React.FC = () => {
         setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'model',
-            text: "⚠️ Lỗi: Biến API_KEY trên Vercel chưa được nhúng vào ứng dụng. Vui lòng vào Vercel > Deployments > Redeploy!",
+            text: "⚠️ Lỗi: Web chưa nhận được API_KEY. Hãy vào Vercel Settings để cấu hình và Redeploy!",
             timestamp: Date.now(),
         }]);
         setIsLoading(false);
@@ -104,11 +104,19 @@ const ChatWidget: React.FC = () => {
 
     } catch (error: any) {
       console.error("DEBUG CHAT AI:", error);
-      const errorMsg = error.message || 'Lỗi kết nối API';
+      let errorMsg = "Xin lỗi, hệ thống AI đang bận. Hãy thử lại sau!";
+      
+      const errorStr = JSON.stringify(error);
+      if (errorStr.includes("leaked")) {
+        errorMsg = "❌ Lỗi bảo mật: API Key của bạn đã bị lộ và bị Google khóa. Vui lòng tạo mã API mới trong Google AI Studio và cập nhật lại trên Vercel!";
+      } else if (errorStr.includes("403")) {
+        errorMsg = "❌ Lỗi truy cập (403): API Key không hợp lệ hoặc không đủ quyền. Hãy kiểm tra lại cấu hình.";
+      }
+
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: `❌ Sự cố AI: ${errorMsg.substring(0, 100)}... Hãy kiểm tra mã API Key của bạn.`,
+        text: errorMsg,
         timestamp: Date.now(),
       }]);
     } finally {

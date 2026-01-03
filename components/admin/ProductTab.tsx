@@ -150,9 +150,16 @@ const ProductTab: React.FC = () => {
           }
       } catch (error: any) {
           console.error("DEBUG AI:", error);
-          // Trích xuất mã lỗi nếu có
-          const errorDetail = error.message || 'Lỗi không xác định';
-          showFeedback(`❌ Lỗi AI: ${errorDetail.substring(0, 50)}...`, 'error');
+          const errorStr = JSON.stringify(error);
+          let userMsg = "Lỗi kết nối AI.";
+          
+          if (errorStr.includes("leaked")) {
+            userMsg = "Mã API bị lộ và bị Google khóa. Hãy tạo mã mới!";
+          } else if (errorStr.includes("403")) {
+            userMsg = "API Key không hợp lệ (403).";
+          }
+          
+          showFeedback(`❌ ${userMsg}`, 'error');
       } finally {
           setIsGeneratingAI(false);
       }
