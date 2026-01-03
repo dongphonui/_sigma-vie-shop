@@ -6,7 +6,7 @@ import type { Product, Category } from '../../types';
 import { getProducts, addProduct, deleteProduct, updateProduct } from '../../utils/productStorage';
 import { getCategories, addCategory, deleteCategory } from '../../utils/categoryStorage';
 import { 
-    SearchIcon, EditIcon, Trash2Icon, ImagePlus, QrCodeIcon, SparklesIcon, RefreshIcon, XIcon
+    SearchIcon, EditIcon, Trash2Icon, ImagePlus, QrCodeIcon, SparklesIcon, RefreshIcon, XIcon, LightningIcon
 } from '../Icons';
 
 const ProductTab: React.FC = () => {
@@ -20,6 +20,7 @@ const ProductTab: React.FC = () => {
   
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
+  // Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
@@ -31,6 +32,12 @@ const ProductTab: React.FC = () => {
   const [productFeedback, setProductFeedback] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
   const [newProductSizes, setNewProductSizes] = useState('');
   const [newProductColors, setNewProductColors] = useState('');
+
+  // Flash Sale State
+  const [newProductIsFlashSale, setNewProductIsFlashSale] = useState(false);
+  const [newProductSalePrice, setNewProductSalePrice] = useState('');
+  const [newProductFlashSaleStartTime, setNewProductFlashSaleStartTime] = useState('');
+  const [newProductFlashSaleEndTime, setNewProductFlashSaleEndTime] = useState('');
 
   const [newCatName, setNewCatName] = useState('');
 
@@ -63,6 +70,11 @@ const ProductTab: React.FC = () => {
       setCategories(c);
   };
 
+  const toLocalISOString = (date: Date) => {
+      const tzOffset = date.getTimezoneOffset() * 60000;
+      return (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+  };
+
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -89,6 +101,10 @@ const ProductTab: React.FC = () => {
       setNewProductSizes('');
       setNewProductColors('');
       setNewProductStatus('active');
+      setNewProductIsFlashSale(false);
+      setNewProductSalePrice('');
+      setNewProductFlashSaleStartTime('');
+      setNewProductFlashSaleEndTime('');
       if (categories.length > 0) setNewProductCategory(categories[0].name);
   };
 
@@ -103,6 +119,13 @@ const ProductTab: React.FC = () => {
       setNewProductImage(product.imageUrl);
       setNewProductSizes(product.sizes?.join(', ') || '');
       setNewProductColors(product.colors?.join(', ') || '');
+      
+      // Load Flash Sale data
+      setNewProductIsFlashSale(product.isFlashSale || false);
+      setNewProductSalePrice(product.salePrice ? product.salePrice.replace(/[^\d]/g, '') : '');
+      setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
+      setNewProductFlashSaleEndTime(product.flashSaleEndTime ? toLocalISOString(new Date(product.flashSaleEndTime)) : '');
+      
       setIsAddingProduct(true);
   };
 
@@ -152,13 +175,8 @@ const ProductTab: React.FC = () => {
           console.error("DEBUG AI:", error);
           const errorStr = JSON.stringify(error);
           let userMsg = "Lỗi kết nối AI.";
-          
-          if (errorStr.includes("leaked")) {
-            userMsg = "Mã API bị lộ và bị Google khóa. Hãy tạo mã mới!";
-          } else if (errorStr.includes("403")) {
-            userMsg = "API Key không hợp lệ (403).";
-          }
-          
+          if (errorStr.includes("leaked")) userMsg = "Mã API bị lộ và bị Google khóa. Hãy tạo mã mới!";
+          else if (errorStr.includes("403")) userMsg = "API Key không hợp lệ (403).";
           showFeedback(`❌ ${userMsg}`, 'error');
       } finally {
           setIsGeneratingAI(false);
@@ -177,6 +195,10 @@ const ProductTab: React.FC = () => {
         ? newProductPrice 
         : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductPrice))}₫`;
 
+    const formattedSalePrice = newProductSalePrice 
+        ? (newProductSalePrice.includes('₫') ? newProductSalePrice : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductSalePrice))}₫`)
+        : undefined;
+
     const productData = {
       name: newProductName,
       price: formattedPrice,
@@ -188,7 +210,12 @@ const ProductTab: React.FC = () => {
       category: newProductCategory || (categories.length > 0 ? categories[0].name : 'Chung'),
       status: newProductStatus,
       sizes: newProductSizes.split(',').map(s => s.trim()).filter(s => s),
-      colors: newProductColors.split(',').map(s => s.trim()).filter(s => s)
+      colors: newProductColors.split(',').map(s => s.trim()).filter(s => s),
+      // Flash Sale data
+      isFlashSale: newProductIsFlashSale,
+      salePrice: formattedSalePrice,
+      flashSaleStartTime: newProductFlashSaleStartTime ? new Date(newProductFlashSaleStartTime).getTime() : undefined,
+      flashSaleEndTime: newProductFlashSaleEndTime ? new Date(newProductFlashSaleEndTime).getTime() : undefined,
     };
 
     try {
@@ -284,6 +311,41 @@ const ProductTab: React.FC = () => {
                                     <input type="text" value={newProductColors} onChange={e => setNewProductColors(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none" placeholder="Đen, Trắng, Be" />
                                 </div>
                             </div>
+
+                            {/* FLASH SALE SETTINGS - ADDED BACK */}
+                            <div className="p-5 bg-rose-50 rounded-2xl border-2 border-rose-100 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className={`w-10 h-6 rounded-full transition-all relative ${newProductIsFlashSale ? 'bg-red-500' : 'bg-slate-300'}`}>
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${newProductIsFlashSale ? 'left-5' : 'left-1'}`}></div>
+                                        </div>
+                                        <input type="checkbox" className="hidden" checked={newProductIsFlashSale} onChange={e => setNewProductIsFlashSale(e.target.checked)} />
+                                        <span className="text-[10px] font-black text-red-700 uppercase tracking-widest flex items-center gap-1">
+                                            <LightningIcon className="w-3 h-3" /> Kích hoạt Flash Sale
+                                        </span>
+                                    </label>
+                                </div>
+
+                                {newProductIsFlashSale && (
+                                    <div className="grid grid-cols-1 gap-4 animate-fade-in-up">
+                                        <div>
+                                            <label className="block text-[9px] font-black text-rose-400 uppercase mb-1">Giá khuyến mãi</label>
+                                            <input type="number" value={newProductSalePrice} onChange={e => setNewProductSalePrice(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg px-3 py-2 text-sm font-bold text-red-600 outline-none focus:ring-1 focus:ring-red-400" placeholder="Giá Sale..." />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-rose-400 uppercase mb-1">Bắt đầu</label>
+                                                <input type="datetime-local" value={newProductFlashSaleStartTime} onChange={e => setNewProductFlashSaleStartTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px] outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-rose-400 uppercase mb-1">Kết thúc</label>
+                                                <input type="datetime-local" value={newProductFlashSaleEndTime} onChange={e => setNewProductFlashSaleEndTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px] outline-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Hình ảnh sản phẩm *</label>
                                 <div className="flex items-center gap-6 p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
@@ -320,7 +382,7 @@ const ProductTab: React.FC = () => {
                             </div>
                             <textarea 
                                 ref={descriptionRef}
-                                rows={12} 
+                                rows={15} 
                                 value={newProductDescription} 
                                 onChange={e => setNewProductDescription(e.target.value)} 
                                 className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" 
@@ -346,6 +408,14 @@ const ProductTab: React.FC = () => {
                     <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative hover:shadow-xl transition-all">
                         <div className="relative h-60 rounded-xl overflow-hidden mb-4 bg-slate-50">
                             <img src={product.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
+                            
+                            {/* Flash Sale Badge in List */}
+                            {product.isFlashSale && (
+                                <div className="absolute top-2 left-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg z-10 animate-pulse">
+                                    <LightningIcon className="w-3 h-3" />
+                                </div>
+                            )}
+
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
                                 <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 transition-all shadow-lg" title="Xem mã QR"><QrCodeIcon className="w-5 h-5" /></button>
                                 <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 transition-all shadow-lg" title="Chỉnh sửa"><EditIcon className="w-5 h-5" /></button>
@@ -356,7 +426,16 @@ const ProductTab: React.FC = () => {
                              <h3 className="font-bold text-slate-800 truncate flex-1 leading-tight">{product.name}</h3>
                         </div>
                         <div className="flex justify-between items-center mt-3">
-                            <span className="text-[#00695C] font-black text-lg">{product.price}</span>
+                            <div className="flex flex-col">
+                                {product.isFlashSale && product.salePrice ? (
+                                    <>
+                                        <span className="text-red-600 font-black text-lg">{product.salePrice}</span>
+                                        <span className="text-[10px] text-slate-400 line-through">{product.price}</span>
+                                    </>
+                                ) : (
+                                    <span className="text-[#00695C] font-black text-lg">{product.price}</span>
+                                )}
+                            </div>
                             <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded-full font-black uppercase tracking-tighter">{product.category}</span>
                         </div>
                     </div>
