@@ -1,7 +1,7 @@
 
 import { getHomePageSettings } from './homePageSettingsStorage';
 import { getAboutPageSettings } from './aboutPageSettingsStorage';
-import { getAboutPageContent } from './aboutPageContentStorage'; // Fixed incorrect import
+import { getAboutPageContent } from './aboutPageStorage';
 import { getHeaderSettings } from './headerSettingsStorage';
 import { getSocialSettings } from './socialSettingsStorage';
 import { getBankSettings } from './bankSettingsStorage';
@@ -38,6 +38,7 @@ export const generateBackupData = () => {
             transactions: localStorage.getItem(KEYS.transactions) ? JSON.parse(localStorage.getItem(KEYS.transactions)!) : [],
             homeSettings: getHomePageSettings(),
             aboutSettings: getAboutPageSettings(),
+            aboutContent: getAboutPageContent(),
             headerSettings: getHeaderSettings(),
             socialSettings: getSocialSettings(),
             bankSettings: getBankSettings(),
@@ -85,6 +86,7 @@ export const restoreBackup = async (file: File): Promise<{ success: boolean; mes
                 if (d.headerSettings) localStorage.setItem(KEYS.headerSettings, JSON.stringify(d.headerSettings));
                 
                 resolve({ success: true, message: 'Khôi phục thành công! Trang sẽ tải lại.' });
+                setTimeout(() => window.location.reload(), 1000);
             } catch (err) {
                 resolve({ success: false, message: 'Lỗi đọc file.' });
             }
@@ -96,35 +98,37 @@ export const restoreBackup = async (file: File): Promise<{ success: boolean; mes
 export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS'): Promise<{ success: boolean, message: string }> => {
     console.log(`🧨 FACTORY RESET: Cleaning local storage for scope ${scope}...`);
     
-    // 1. XÓA LOCAL STORAGE NGAY LẬP TỨC (Tránh auto-sync đẩy dữ liệu cũ lên lại)
-    if (scope === 'ORDERS') {
-        localStorage.setItem(KEYS.orders, '[]');
-        localStorage.setItem(KEYS.transactions, '[]');
-    } else if (scope === 'PRODUCTS') {
-        localStorage.setItem(KEYS.products, '[]');
-        localStorage.setItem(KEYS.transactions, '[]');
-        localStorage.setItem(KEYS.orders, '[]'); 
-        localStorage.setItem(KEYS.categories, '[]');
-    } else if (scope === 'FULL') {
-        // Chỉ giữ lại tài khoản admin để không bị logout
-        const adminSettings = localStorage.getItem(KEYS.adminSettings);
-        
-        // Xóa sạch sẽ các key khác
-        Object.values(KEYS).forEach(key => {
-            if (key !== KEYS.adminSettings) {
-                localStorage.removeItem(key);
-            }
-        });
-        
-        if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
-    }
-
-    // 2. GỬI LỆNH XÓA LÊN SERVER
+    // 1. GỬI LỆNH XÓA LÊN SERVER TRƯỚC
     try {
         const serverResult = await resetDatabase(scope);
         if (serverResult && serverResult.success === true) {
-            console.log("Server factory reset complete.");
-            return { success: true, message: 'Dữ liệu đã được xóa sạch trên cả Máy khách và Máy chủ.' };
+            
+            // 2. XÓA LOCAL STORAGE SAU KHI SERVER XÁC NHẬN
+            if (scope === 'ORDERS') {
+                localStorage.setItem(KEYS.orders, '[]');
+                localStorage.setItem(KEYS.transactions, '[]');
+            } else if (scope === 'PRODUCTS') {
+                localStorage.setItem(KEYS.products, '[]');
+                localStorage.setItem(KEYS.transactions, '[]');
+                localStorage.setItem(KEYS.orders, '[]'); 
+                localStorage.setItem(KEYS.categories, '[]');
+            } else if (scope === 'FULL') {
+                const adminSettings = localStorage.getItem(KEYS.adminSettings);
+                Object.values(KEYS).forEach(key => {
+                    if (key !== KEYS.adminSettings) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                if (adminSettings) localStorage.setItem(KEYS.adminSettings, adminSettings);
+            }
+
+            console.log("Server factory reset complete. Reloading page...");
+            // Ép buộc reload ngay lập tức để xóa cache React
+            setTimeout(() => {
+                window.location.href = window.location.origin + window.location.pathname;
+            }, 1500);
+
+            return { success: true, message: 'Dữ liệu đã được xóa sạch. Trang web đang khởi động lại...' };
         } else {
             return { success: false, message: serverResult?.message || 'Server không thể thực hiện reset.' };
         }

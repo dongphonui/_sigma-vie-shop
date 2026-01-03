@@ -266,37 +266,25 @@ app.post('/api/admin/email', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// --- RESET DATABASE (SỬ DỤNG TRUNCATE ĐỂ XÓA TRẮNG HOÀN TOÀN) ---
+// --- RESET DATABASE ---
 app.post('/api/admin/reset', async (req, res) => {
     const { scope } = req.body;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        
         if (scope === 'ORDERS') {
             await client.query('TRUNCATE orders, inventory_transactions RESTART IDENTITY CASCADE');
-            console.log("Reset Scope: ORDERS only (Database wiped)");
-        } 
-        else if (scope === 'PRODUCTS') {
-            // Xóa sản phẩm kéo theo đơn hàng và kho
+        } else if (scope === 'PRODUCTS') {
             await client.query('TRUNCATE products, inventory_transactions, orders RESTART IDENTITY CASCADE');
-            console.log("Reset Scope: PRODUCTS & Linked Data (Database wiped)");
-        } 
-        else if (scope === 'FULL') {
-            // XÓA TẤT CẢ NGOẠI TRỪ ADMIN_USERS
+        } else if (scope === 'FULL') {
             await client.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs, app_settings RESTART IDENTITY CASCADE');
-            console.log("Reset Scope: FULL (Database wiped, Admin Users preserved)");
         }
-        
         await client.query('COMMIT');
-        res.json({ success: true, message: 'Hệ thống đã được xóa trắng hoàn toàn trên Server.' });
+        res.json({ success: true, message: 'Dữ liệu đã được xóa trắng trên Server.' });
     } catch (err) { 
         await client.query('ROLLBACK');
-        console.error("Critical Reset Database Error:", err);
         res.status(500).json({ success: false, error: err.message }); 
-    } finally {
-        client.release();
-    }
+    } finally { client.release(); }
 });
 
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
