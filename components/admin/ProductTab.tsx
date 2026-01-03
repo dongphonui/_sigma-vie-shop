@@ -19,7 +19,6 @@ const ProductTab: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
-  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -93,8 +92,8 @@ const ProductTab: React.FC = () => {
         ctx?.drawImage(img, 0, 0, 300, 300);
         const qrImageDataUrl = canvas.toDataURL('image/png');
 
-        // 3. Mở cửa sổ in với layout tem nhãn chuẩn
-        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        // 3. Mở cửa sổ in với layout tem nhãn chuẩn (Ép chết size 50x30mm)
+        const printWindow = window.open('', '_blank', 'width=450,height=300');
         if (printWindow) {
             const finalPrice = selectedQrProduct.isFlashSale && selectedQrProduct.salePrice 
                 ? selectedQrProduct.salePrice 
@@ -103,47 +102,62 @@ const ProductTab: React.FC = () => {
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>In tem - ${selectedQrProduct.sku}</title>
+                    <title>Print Label - ${selectedQrProduct.sku}</title>
                     <style>
-                        @page { margin: 0; size: 50mm 30mm; }
-                        body { 
-                            margin: 0; 
-                            padding: 2mm; 
-                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
+                        @page { 
+                            margin: 0 !important; 
+                            size: 50mm 30mm;
+                        }
+                        * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
+                        html, body { 
+                            margin: 0 !important; 
+                            padding: 0 !important; 
+                            width: 50mm; 
+                            height: 30mm;
+                            overflow: hidden;
                             background: white;
                         }
                         .label-container {
-                            width: 46mm;
-                            height: 26mm;
+                            width: 50mm;
+                            height: 30mm;
                             display: flex;
                             flex-direction: row;
-                            border: 0.1mm solid #eee; /* Chỉ để căn chỉnh, khi in sẽ mờ */
+                            align-items: center;
+                            padding: 2mm;
                             overflow: hidden;
+                            page-break-after: avoid;
                         }
                         .qr-side {
                             width: 18mm;
+                            height: 100%;
                             display: flex;
                             align-items: center;
                             justify-content: center;
                         }
                         .qr-side img {
-                            width: 16mm;
-                            height: 16mm;
+                            width: 17mm;
+                            height: 17mm;
+                            display: block;
                         }
                         .info-side {
                             flex: 1;
-                            padding-left: 1mm;
+                            padding-left: 2mm;
                             display: flex;
                             flex-direction: column;
                             justify-content: center;
                             min-width: 0;
+                            height: 100%;
                         }
-                        .brand { font-size: 6pt; font-weight: bold; color: #666; margin-bottom: 0.5mm; letter-spacing: 0.5mm; }
+                        .brand { 
+                            font-size: 6pt; 
+                            font-weight: bold; 
+                            color: #444; 
+                            margin-bottom: 0.5mm; 
+                            letter-spacing: 0.3mm; 
+                            font-family: Arial, sans-serif;
+                        }
                         .name { 
-                            font-size: 7pt; 
+                            font-size: 7.5pt; 
                             font-weight: 900; 
                             line-height: 1.1; 
                             margin-bottom: 1mm;
@@ -152,12 +166,24 @@ const ProductTab: React.FC = () => {
                             -webkit-box-orient: vertical;
                             overflow: hidden;
                             text-transform: uppercase;
+                            color: black;
+                            font-family: Arial, sans-serif;
                         }
-                        .price { font-size: 9pt; font-weight: bold; color: black; }
-                        .sku { font-size: 5pt; color: #888; font-family: monospace; margin-top: 1mm; }
+                        .price { 
+                            font-size: 10pt; 
+                            font-weight: 900; 
+                            color: black; 
+                            font-family: Arial, sans-serif;
+                        }
+                        .sku { 
+                            font-size: 5pt; 
+                            color: #666; 
+                            font-family: monospace; 
+                            margin-top: 0.5mm; 
+                        }
                     </style>
                 </head>
-                <body onload="window.print(); window.close();">
+                <body onload="setTimeout(function(){ window.print(); window.close(); }, 300);">
                     <div class="label-container">
                         <div class="qr-side">
                             <img src="${qrImageDataUrl}" />
