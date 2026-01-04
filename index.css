@@ -5,8 +5,8 @@
 
 @layer base {
   body {
-    font-family: 'Montserrat', 'Poppins', sans-serif;
-    @apply bg-[#F4F7F5] text-slate-900;
+    font-family: 'Montserrat', sans-serif;
+    @apply bg-[#FCFCF9] text-[#064E3B];
     -webkit-font-smoothing: antialiased;
   }
   
@@ -14,23 +14,44 @@
     font-family: 'Playfair Display', serif;
   }
 
-  /* Định nghĩa font số cho các bảng giá */
+  /* Font số chuyên nghiệp cho giá tiền */
   .font-sans {
     font-family: 'Montserrat', sans-serif;
   }
 }
 
 .btn-primary {
-  @apply bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-2xl 
-         transition-all duration-300 shadow-lg shadow-blue-900/20 
-         active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-xs;
+  @apply bg-[#064E3B] hover:bg-[#022c22] text-white font-bold py-4 px-6 rounded-2xl 
+         transition-all duration-300 shadow-xl shadow-[#064E3B]/20 
+         active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px];
+}
+
+.btn-gold {
+  @apply bg-[#92400E] hover:bg-[#78350f] text-white font-bold py-4 px-6 rounded-2xl 
+         transition-all duration-300 shadow-xl shadow-[#92400E]/20 
+         active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px];
+}
+
+.input-luxury {
+  @apply w-full bg-white border border-slate-200 rounded-xl px-4 py-3 
+         focus:border-[#92400E] focus:ring-4 focus:ring-[#92400E]/5 
+         outline-none transition-all text-sm font-medium;
 }
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(30px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in-up {
   animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-slide-in-right {
+    animation: slide-in-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
