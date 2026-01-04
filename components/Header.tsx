@@ -47,173 +47,95 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
 
   const handleManualRefresh = async () => {
       if (isRefreshing) return;
-      
-      const confirmReset = window.confirm("Bạn có muốn xóa dữ liệu cũ và tải lại mới nhất từ Server không?");
+      const confirmReset = window.confirm("Cập nhật dữ liệu mới nhất từ xưởng may Sigma Vie?");
       if (!confirmReset) return;
-
       setIsRefreshing(true);
       try {
-          // Use Hard Reset to wipe local cache and force fetch
-          const updatedProducts = await hardResetProducts();
-          console.log("Dữ liệu đã được làm mới:", updatedProducts.length, "sản phẩm");
-          alert(`Đã cập nhật thành công! Tìm thấy ${updatedProducts.length} sản phẩm.`);
-          window.location.reload(); // Reload page to reflect changes cleanly
-          
+          await hardResetProducts();
+          window.location.reload();
       } catch (e) {
-          console.error("Refresh failed", e);
-          alert(`KHÔNG THỂ KẾT NỐI SERVER!\n\nĐiện thoại của bạn không tìm thấy máy chủ tại: ${API_BASE_URL}\n\nCách khắc phục:\n1. Tắt tường lửa (Firewall) trên máy tính chạy Server.\n2. Đảm bảo điện thoại và máy tính chung Wifi.`);
+          alert(`Lỗi kết nối.`);
       } finally {
-          setTimeout(() => setIsRefreshing(false), 800);
+          setIsRefreshing(false);
       }
   };
 
-  const brandStyle = settings ? {
-    color: settings.brandColor,
-    fontSize: settings.brandFontSize,
-    fontFamily: `'${settings.brandFont}', serif`,
-    textShadow: settings.brandColor === '#00695C' ? `
-      1px 1px 0px #b2dfdb, 
-      2px 2px 0px #80cbc4, 
-      3px 3px 0px #4db6ac, 
-      4px 4px 8px rgba(0, 0, 0, 0.2)` : 'none'
-  } : {};
-
-  const navStyle = settings ? {
-      color: settings.navColor,
-      fontFamily: `'${settings.navFont}', sans-serif`,
-      fontSize: settings.navFontSize,
-  } : {};
-
-  const loginBtnStyle = settings ? {
-      color: settings.loginBtnTextColor,
-      backgroundColor: settings.loginBtnBgColor,
-      fontFamily: `'${settings.loginBtnFont}', sans-serif`,
-      fontSize: settings.loginBtnFontSize,
-  } : {};
-
   return (
-    <header 
-      className="backdrop-blur-md shadow-sm sticky top-0 z-40 transition-all duration-300"
-      style={{ 
-          backgroundColor: settings?.brandBackgroundColor || 'rgba(255, 255, 255, 0.8)',
-          borderBottomWidth: settings?.borderWidth || '0px',
-          borderBottomColor: settings?.borderColor || 'transparent',
-          borderBottomStyle: (settings?.borderStyle || 'solid') as any,
-      }}
-    >
+    <header className="backdrop-blur-md shadow-sm sticky top-0 z-40 bg-white/80 border-b border-[#064E3B]/5">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-24">
           <a 
             href="#/" 
             onClick={(e) => handleNavigate(e, '/')} 
-            className="font-bold tracking-wider cursor-pointer transition-transform duration-300 ease-in-out hover:scale-105 flex items-center gap-3"
+            className="font-bold tracking-[0.2em] cursor-pointer transition-transform duration-300 ease-in-out hover:scale-105 flex items-center gap-4"
           >
             {settings?.logoUrl && (
-                <img 
-                    src={settings.logoUrl} 
-                    alt={settings.brandName} 
-                    className="h-12 w-auto object-contain max-w-[150px]" 
-                />
+                <img src={settings.logoUrl} alt="Logo" className="h-14 w-auto object-contain" />
             )}
-            <span style={brandStyle}>
-                {settings ? settings.brandName : 'Sigma Vie'}
-            </span>
+            <div className="flex flex-col">
+                <span className="text-2xl font-serif font-black text-[#064E3B] leading-none uppercase">Sigma Vie</span>
+                <span className="text-[8px] font-black text-[#92400E] uppercase tracking-[0.5em] mt-1">Fashion Boutique</span>
+            </div>
           </a>
           
-          <div className="flex items-center space-x-8">
-            <nav className="hidden md:flex items-center space-x-8">
+          <div className="flex items-center space-x-10">
+            <nav className="hidden lg:flex items-center space-x-10">
                 <a 
                     href="#/" 
                     onClick={(e) => handleNavigate(e, '/')} 
-                    className="transition-colors font-medium"
-                    style={navStyle}
-                    onMouseEnter={(e) => e.currentTarget.style.color = settings?.navHoverColor || '#D4AF37'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = settings?.navColor || '#4B5563'}
+                    className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.3em] hover:text-[#92400E] transition-colors"
                 >
-                    {settings ? settings.navStoreText : 'Cửa Hàng'}
+                    {settings?.navStoreText || 'Collections'}
                 </a>
                 <a 
                     href="#/about" 
                     onClick={(e) => handleNavigate(e, '/about')} 
-                    className="transition-colors font-medium"
-                    style={navStyle}
-                    onMouseEnter={(e) => e.currentTarget.style.color = settings?.navHoverColor || '#D4AF37'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = settings?.navColor || '#4B5563'}
+                    className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.3em] hover:text-[#92400E] transition-colors"
                 >
-                    {settings ? settings.navAboutText : 'Về Chúng Tôi'}
+                    {settings?.navAboutText || 'Our Story'}
                 </a>
             </nav>
 
-            <div className="flex items-center gap-4">
-                {/* Refresh Button (Mobile Friendly) */}
-                <button 
-                    onClick={handleManualRefresh}
-                    className={`p-2 text-gray-600 transition-all rounded-full hover:bg-gray-100 ${isRefreshing ? 'bg-yellow-50 text-[#D4AF37]' : 'hover:text-[#D4AF37]'}`}
-                    title="Xóa Cache & Tải lại dữ liệu"
-                >
-                    <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <div className="flex items-center gap-6">
+                <button onClick={handleManualRefresh} className="p-2 text-[#064E3B]/40 hover:text-[#92400E] transition-all">
+                    <RefreshIcon className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-[#92400E]' : ''}`} />
                 </button>
 
-                {/* Cart Icon */}
-                <button 
-                    onClick={onOpenCart}
-                    className="relative p-2 text-gray-600 hover:text-[#D4AF37] transition-colors"
-                >
+                <button onClick={onOpenCart} className="relative p-2 text-[#064E3B] hover:text-[#92400E] transition-colors">
                     <ShoppingBagIcon className="w-6 h-6" />
                     {cartItemCount > 0 && (
-                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] flex items-center justify-center shadow-sm">
+                        <span className="absolute -top-1 -right-1 bg-[#92400E] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-lg">
                             {cartItemCount}
                         </span>
                     )}
                 </button>
 
-                {/* User Section */}
                 <div className="relative">
                     {currentUser ? (
                         <div className="relative">
-                            <button 
-                                onClick={() => setUserMenuVisible(!userMenuVisible)}
-                                className="flex items-center gap-2 text-gray-700 hover:text-[#00695C] transition-colors"
-                            >
-                                <span className="text-sm font-medium hidden sm:block">Xin chào, {currentUser.fullName.split(' ').pop()}</span>
-                                <div className="bg-teal-100 p-2 rounded-full">
-                                    <UserIcon className="w-5 h-5 text-[#00695C]"/>
+                            <button onClick={() => setUserMenuVisible(!userMenuVisible)} className="flex items-center gap-3 group">
+                                <div className="text-right hidden sm:block">
+                                    <p className="text-[9px] font-black text-[#92400E] uppercase tracking-widest">Member</p>
+                                    <p className="text-xs font-bold text-[#064E3B]">{currentUser.fullName.split(' ').pop()}</p>
+                                </div>
+                                <div className="bg-[#064E3B] p-2.5 rounded-2xl group-hover:bg-[#92400E] transition-colors shadow-lg">
+                                    <UserIcon className="w-5 h-5 text-white"/>
                                 </div>
                             </button>
-                            
-                            {/* Dropdown Menu */}
                             {userMenuVisible && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5 animate-fade-in-up">
-                                    <div className="px-4 py-2 border-b border-gray-100">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{currentUser.fullName}</p>
-                                        <p className="text-xs text-gray-500 truncate">{currentUser.email || currentUser.phoneNumber}</p>
+                                <div className="absolute right-0 mt-4 w-56 bg-white rounded-2xl shadow-2xl py-3 border border-slate-50 animate-fade-in-up">
+                                    <div className="px-5 py-3 border-b border-slate-50 mb-2">
+                                        <p className="text-[10px] font-black text-[#92400E] uppercase tracking-widest">Tài khoản</p>
+                                        <p className="text-sm font-bold text-[#064E3B] truncate">{currentUser.fullName}</p>
                                     </div>
-                                    <a 
-                                        href="#/my-orders" 
-                                        onClick={(e) => handleNavigate(e, '/my-orders')}
-                                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    >
-                                        Đơn hàng của tôi
-                                    </a>
-                                    <button 
-                                        onClick={handleLogout}
-                                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                                    >
-                                        Đăng xuất
-                                    </button>
+                                    <a href="#/my-orders" onClick={(e) => handleNavigate(e, '/my-orders')} className="block px-5 py-2 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50">Lịch sử đơn hàng</a>
+                                    <button onClick={handleLogout} className="block w-full text-left px-5 py-2 text-xs font-bold text-rose-500 hover:bg-rose-50">Đăng xuất</button>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <button 
-                            onClick={onOpenAuth}
-                            className="flex items-center gap-2 font-medium px-4 py-2 rounded-full transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                            style={loginBtnStyle}
-                            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                        >
-                            <UserIcon className="w-4 h-4"/>
-                            <span>{settings ? settings.loginBtnText : 'Đăng nhập'}</span>
+                        <button onClick={onOpenAuth} className="btn-primary py-3 px-8 rounded-full shadow-[#064E3B]/10">
+                            Đăng nhập
                         </button>
                     )}
                 </div>
