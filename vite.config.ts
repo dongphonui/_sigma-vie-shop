@@ -12,10 +12,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: false,
+    chunkSizeWarningLimit: 1500
   },
   define: {
-    // Đảm bảo process.env.API_KEY được ưu tiên lấy từ môi trường hệ thống (Vercel)
+    // Đảm bảo process.env luôn là một object hợp lệ ngay cả khi không có key
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')
   }
 })

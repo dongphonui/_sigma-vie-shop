@@ -141,8 +141,8 @@ const ProductTab: React.FC = () => {
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-          showFeedback('⚠️ Ảnh quá lớn (Tối đa 3MB).', 'error');
+      if (file.size > 5 * 1024 * 1024) {
+          showFeedback('⚠️ Ảnh quá lớn (Tối đa 5MB).', 'error');
           return;
       }
       const reader = new FileReader();
@@ -220,23 +220,21 @@ const ProductTab: React.FC = () => {
               model: 'gemini-3-flash-preview',
               contents: [{
                   parts: [{
-                      text: `Bạn là chuyên gia Content thời trang cao cấp cho hãng Sigma Vie. Hãy viết 1 đoạn mô tả cực kỳ sang trọng, đầy chiều sâu cho sản phẩm: "${newProductName}". 
+                      text: `Bạn là chuyên gia viết quảng cáo thời trang Luxury cho Sigma Vie. Hãy viết 1 đoạn mô tả cực kỳ sang trọng cho sản phẩm: "${newProductName}". 
                       Yêu cầu:
-                      1. Văn phong tinh tế, gợi cảm hứng về phong thái tự tin và đẳng cấp sống.
-                      2. Độ dài khoảng 3-4 câu. 
-                      3. Ngôn ngữ: Tiếng Việt, không dùng icon, tập trung vào cảm xúc khi diện bộ trang phục này.`
+                      - Văn phong thanh lịch, đẳng cấp, gợi cảm hứng sống.
+                      - Độ dài: 3-4 câu xúc tích.
+                      - Tránh dùng từ quá bình dân. Ví dụ: "giúp tôn vinh trọn vẹn nét thanh lịch và phong thái tự tin".
+                      - Không dùng icon, không gạch đầu dòng.`
                   }]
               }]
           });
           if (response.text) {
               setNewProductDescription(response.text.trim());
               showFeedback('✨ AI đã viết xong!', 'success');
-          } else {
-              throw new Error("Empty Response");
           }
       } catch (error: any) {
-          console.error("DEBUG AI:", error);
-          showFeedback(`❌ Lỗi kết nối AI.`, 'error');
+          showFeedback(`❌ Lỗi AI.`, 'error');
       } finally {
           setIsGeneratingAI(false);
       }
@@ -308,7 +306,7 @@ const ProductTab: React.FC = () => {
         </div>
 
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">Kho hàng Sigma Vie</h2>
+            <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">Quản lý kho Sigma</h2>
             <div className="flex gap-2">
                 <button onClick={() => setIsManagingCategories(!isManagingCategories)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">
                     {isManagingCategories ? 'Quay lại' : 'Loại hàng'}
@@ -321,14 +319,14 @@ const ProductTab: React.FC = () => {
 
         {isManagingCategories ? (
             <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100 animate-fade-in-up">
-                <h3 className="font-bold mb-4 text-slate-700 uppercase text-xs tracking-widest">Danh mục sản phẩm</h3>
+                <h3 className="font-bold mb-4 text-slate-700 uppercase text-xs tracking-widest">Danh mục</h3>
                 <form onSubmit={(e) => { e.preventDefault(); if (newCatName) { addCategory({ name: newCatName }); setNewCatName(''); showFeedback('Đã thêm danh mục', 'success'); refreshData(); } }} className="flex gap-2 mb-6">
                     <input type="text" placeholder="Tên danh mục..." value={newCatName} onChange={e => setNewCatName(e.target.value)} className="border-2 border-slate-100 rounded-xl px-4 py-2 flex-1 outline-none focus:border-[#D4AF37]" required />
                     <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded-xl font-bold">Thêm</button>
                 </form>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {categories.map(cat => (
-                        <div key={cat.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center group">
+                        <div key={cat.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
                             <span className="font-medium text-slate-700">{cat.name}</span>
                             <button onClick={() => deleteCategory(cat.id)} className="text-slate-300 hover:text-red-500 transition-all"><Trash2Icon className="w-4 h-4"/></button>
                         </div>
@@ -368,33 +366,20 @@ const ProductTab: React.FC = () => {
                             </div>
 
                             <div className="p-5 bg-rose-50 rounded-2xl border-2 border-rose-100 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <div className={`w-10 h-6 rounded-full transition-all relative ${newProductIsFlashSale ? 'bg-red-500' : 'bg-slate-300'}`}>
-                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${newProductIsFlashSale ? 'left-5' : 'left-1'}`}></div>
-                                        </div>
-                                        <input type="checkbox" className="hidden" checked={newProductIsFlashSale} onChange={e => setNewProductIsFlashSale(e.target.checked)} />
-                                        <span className="text-[10px] font-black text-red-700 uppercase tracking-widest flex items-center gap-1">
-                                            <LightningIcon className="w-3 h-3" /> Kích hoạt Flash Sale
-                                        </span>
-                                    </label>
-                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <div className={`w-10 h-6 rounded-full transition-all relative ${newProductIsFlashSale ? 'bg-red-500' : 'bg-slate-300'}`}>
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${newProductIsFlashSale ? 'left-5' : 'left-1'}`}></div>
+                                    </div>
+                                    <input type="checkbox" className="hidden" checked={newProductIsFlashSale} onChange={e => setNewProductIsFlashSale(e.target.checked)} />
+                                    <span className="text-[10px] font-black text-red-700 uppercase tracking-widest flex items-center gap-1">⚡ Kích hoạt Flash Sale</span>
+                                </label>
 
                                 {newProductIsFlashSale && (
                                     <div className="grid grid-cols-1 gap-4 animate-fade-in-up">
-                                        <div>
-                                            <label className="block text-[9px] font-black text-rose-400 uppercase mb-1">Giá khuyến mãi</label>
-                                            <input type="number" value={newProductSalePrice} onChange={e => setNewProductSalePrice(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg px-3 py-2 text-sm font-bold text-red-600 outline-none focus:ring-1 focus:ring-red-400" placeholder="Giá Sale..." />
-                                        </div>
+                                        <input type="number" value={newProductSalePrice} onChange={e => setNewProductSalePrice(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg px-3 py-2 text-sm font-bold text-red-600 outline-none" placeholder="Giá khuyến mãi..." />
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="block text-[9px] font-black text-rose-400 uppercase mb-1">Bắt đầu</label>
-                                                <input type="datetime-local" value={newProductFlashSaleStartTime} onChange={e => setNewProductFlashSaleStartTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px] outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[9px] font-black text-rose-400 uppercase mb-1">Kết thúc</label>
-                                                <input type="datetime-local" value={newProductFlashSaleEndTime} onChange={e => setNewProductFlashSaleEndTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px] outline-none" />
-                                            </div>
+                                            <input type="datetime-local" value={newProductFlashSaleStartTime} onChange={e => setNewProductFlashSaleStartTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px]" />
+                                            <input type="datetime-local" value={newProductFlashSaleEndTime} onChange={e => setNewProductFlashSaleEndTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px]" />
                                         </div>
                                     </div>
                                 )}
@@ -403,18 +388,16 @@ const ProductTab: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Hình ảnh sản phẩm *</label>
                                 <div className="flex items-center gap-6 p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                                    <label className="w-24 h-24 bg-white border-2 border-slate-100 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all group">
-                                        <ImagePlus className="w-8 h-8 text-slate-300 group-hover:scale-110 transition-transform" />
-                                        <span className="text-[10px] mt-1 font-bold">Chọn ảnh</span>
+                                    <label className="w-24 h-24 bg-white border-2 border-slate-100 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#D4AF37] transition-all">
+                                        <ImagePlus className="w-8 h-8 text-slate-300" />
+                                        <span className="text-[10px] mt-1 font-bold">Tải ảnh</span>
                                         <input type="file" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
                                     </label>
-                                    {newProductImage ? (
+                                    {newProductImage && (
                                         <div className="relative">
                                             <img src={newProductImage} className="w-24 h-24 object-cover rounded-xl shadow-md border-2 border-white" />
-                                            <button type="button" onClick={() => setNewProductImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:scale-110 transition-transform"><XIcon className="w-3 h-3"/></button>
+                                            <button type="button" onClick={() => setNewProductImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"><XIcon className="w-3 h-3"/></button>
                                         </div>
-                                    ) : (
-                                        <div className="text-slate-400 text-[10px] font-medium leading-tight">Chưa chọn ảnh.</div>
                                     )}
                                 </div>
                             </div>
@@ -422,56 +405,40 @@ const ProductTab: React.FC = () => {
 
                         <div className="flex flex-col h-full">
                             <div className="flex justify-between items-center mb-3">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm (Văn phong sang trọng)</label>
-                                <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md active:scale-95 ${isGeneratingAI ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 hover:-translate-y-0.5'}`}>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả thiết kế cao cấp</label>
+                                <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md ${isGeneratingAI ? 'bg-slate-200 text-slate-400' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
                                     {isGeneratingAI ? <RefreshIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
-                                    {isGeneratingAI ? 'AI ĐANG VIẾT...' : 'AI VIẾT MÔ TẢ'}
+                                    AI VIẾT MÔ TẢ
                                 </button>
                             </div>
-                            <textarea ref={descriptionRef} rows={15} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" placeholder="AI sẽ giúp bạn viết mô tả chuyên sâu tại đây..." required />
+                            <textarea rows={15} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" placeholder="Mô tả sẽ hiển thị ở đầu trang chi tiết sản phẩm..." required />
                         </div>
                     </div>
                     <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
                         <button type="button" onClick={() => { setIsAddingProduct(false); resetProductForm(); }} className="px-8 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-slate-800 transition-colors">Bỏ qua</button>
-                        <button type="submit" disabled={isSaving} className="px-12 py-3 bg-[#00695C] text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] hover:-translate-y-1 transition-all disabled:opacity-50">
-                            {isSaving ? 'ĐANG LƯU...' : (editingProduct ? 'CẬP NHẬT' : 'LƯU VÀO KHO')}
+                        <button type="submit" disabled={isSaving} className="px-12 py-3 bg-[#00695C] text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] transition-all">
+                            {isSaving ? 'ĐANG LƯU...' : 'XÁC NHẬN LƯU'}
                         </button>
                     </div>
                 </form>
             </div>
         ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed font-bold">Chưa có sản phẩm nào.</div>}
+                {products.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed font-bold">Trống.</div>}
                 {products.map(product => (
                     <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative hover:shadow-xl transition-all">
                         <div className="relative h-60 rounded-xl overflow-hidden mb-4 bg-slate-50">
                             <img src={product.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
-                            {product.isFlashSale && (
-                                <div className="absolute top-2 left-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg z-10 animate-pulse">
-                                    <LightningIcon className="w-3 h-3" />
-                                </div>
-                            )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
-                                <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 transition-all shadow-lg" title="Xem mã QR"><QrCodeIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 transition-all shadow-lg" title="Chỉnh sửa"><EditIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2.5 bg-white rounded-full text-red-600 hover:scale-110 transition-all shadow-lg" title="Xóa sản phẩm"><Trash2Icon className="w-5 h-5" /></button>
+                                <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 shadow-lg"><QrCodeIcon className="w-5 h-5" /></button>
+                                <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 shadow-lg"><EditIcon className="w-5 h-5" /></button>
+                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2.5 bg-white rounded-full text-red-600 hover:scale-110 shadow-lg"><Trash2Icon className="w-5 h-5" /></button>
                             </div>
                         </div>
-                        <div className="flex justify-between items-start mb-2">
-                             <h3 className="font-bold text-slate-800 truncate flex-1 leading-tight">{product.name}</h3>
-                        </div>
-                        <div className="flex justify-between items-center mt-3">
-                            <div className="flex flex-col">
-                                {product.isFlashSale && product.salePrice ? (
-                                    <>
-                                        <span className="text-red-600 font-black text-lg">{product.salePrice}</span>
-                                        <span className="text-[10px] text-slate-400 line-through">{product.price}</span>
-                                    </>
-                                ) : (
-                                    <span className="text-[#00695C] font-black text-lg">{product.price}</span>
-                                )}
-                            </div>
-                            <span className="text-[9px] text-slate-400 bg-slate-100 px-2 py-1 rounded-full font-black uppercase tracking-tighter">{product.category}</span>
+                        <h3 className="font-bold text-slate-800 truncate leading-tight mb-2">{product.name}</h3>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[#00695C] font-black text-lg">{product.isFlashSale ? product.salePrice : product.price}</span>
+                            <span className="text-[9px] text-slate-400 font-black uppercase">{product.category}</span>
                         </div>
                     </div>
                 ))}
@@ -481,27 +448,17 @@ const ProductTab: React.FC = () => {
         {selectedQrProduct && (
             <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedQrProduct(null)}>
                 <div className="bg-white rounded-3xl p-10 max-w-sm w-full text-center relative animate-fade-in-up shadow-2xl" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setSelectedQrProduct(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-800 transition-colors"><XIcon className="w-6 h-6"/></button>
-                    <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-sm border-b pb-4 italic">Product Identifier</h4>
+                    <button onClick={() => setSelectedQrProduct(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-800"><XIcon className="w-6 h-6"/></button>
                     <div className="qr-container p-4 bg-white border-4 border-slate-50 rounded-3xl inline-block shadow-inner mb-6">
                         <QRCodeSVG value={`${window.location.origin}/?product=${selectedQrProduct.id}`} size={220} />
                     </div>
-                    <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold tracking-widest">SERIAL: {selectedQrProduct.sku}</p>
-                    <button onClick={handlePrintLabel} className="w-full bg-[#00695C] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] transition-all flex items-center justify-center gap-2">
-                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                        In tem dán áo quần
-                    </button>
+                    <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold tracking-widest uppercase">SKU: {selectedQrProduct.sku}</p>
+                    <button onClick={handlePrintLabel} className="w-full bg-[#00695C] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-[#004d40] transition-all flex items-center justify-center gap-2">IN TEM DÁN</button>
                 </div>
             </div>
         )}
+    </div>
+  );
+};
 
-        <style>{`
-            @keyframes slide-in-right {
-                from { opacity: 0; transform: translateX(50px); }
-                to { opacity: 1; transform: translateX(0); }
-            }
-            .animate-slide-in-right {
-                animation: slide-in-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            }
-        `}</style>
-    
+export default ProductTab;

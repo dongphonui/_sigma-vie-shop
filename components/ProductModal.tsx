@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import type { Product, Order } from '../types';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
-import { addToCart } from '../utils/cartStorage';
 import { calculateShippingFee, getShippingSettings } from '../utils/shippingSettingsStorage';
 import PaymentModal from './PaymentModal';
 import { QRCodeSVG } from 'qrcode.react';
@@ -115,19 +114,32 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
             </div>
 
             {/* Right: Content Area */}
-            <div className="w-full md:w-[55%] p-6 md:p-10 overflow-y-auto bg-white/50">
+            <div className="w-full md:w-[55%] p-6 md:p-10 overflow-y-auto bg-white">
                 <button onClick={onClose} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 transition-colors z-20"><XIcon className="w-8 h-8"/></button>
                 
-                {/* Description at Top (As requested) */}
+                {/* Product Name & Description at Top */}
                 <div className="mb-8">
-                    <h2 className="text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Chi tiết thiết kế</h2>
-                    <p className="text-gray-700 leading-relaxed text-base italic font-serif opacity-90">
-                        "{product.description || 'Sản phẩm thuộc bộ sưu tập mới nhất của Sigma Vie, mang đậm dấu ấn của sự thanh lịch và tinh tế.'}"
+                    <div className="flex justify-between items-start mb-2">
+                        <h1 className="text-3xl font-black text-gray-900 font-serif leading-tight">{product.name}</h1>
+                        <div className="text-right">
+                            {isFlashSaleActive ? (
+                                <>
+                                    <span className="text-2xl font-black text-red-600 block">{product.salePrice}</span>
+                                    <span className="text-sm text-gray-400 line-through">{product.price}</span>
+                                </>
+                            ) : (
+                                <span className="text-2xl font-black text-[#00695C] block">{product.price}</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="h-0.5 w-16 bg-[#D4AF37] mb-6"></div>
+                    <p className="text-gray-600 leading-relaxed text-base italic font-serif opacity-90">
+                        {product.description || 'Sản phẩm thuộc bộ sưu tập mới nhất của Sigma Vie, mang đậm dấu ấn của sự thanh lịch và tinh tế.'}
                     </p>
                 </div>
 
                 {/* Purchase Card */}
-                <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 mb-6">
+                <div className="bg-[#F8F9FA] rounded-3xl p-8 border border-slate-100 mb-6">
                     <h3 className="text-xl font-bold text-center font-serif text-gray-800 mb-8">Mua Sản Phẩm</h3>
 
                     <div className="space-y-6">
@@ -137,7 +149,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                                 <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Chọn Kích thước:</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.sizes.map(s => (
-                                        <button key={s} onClick={() => setSelectedSize(s)} className={`min-w-[44px] h-11 rounded-lg border-2 font-bold transition-all ${selectedSize === s ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-slate-100 text-gray-400 hover:border-slate-200'}`}>{s}</button>
+                                        <button key={s} onClick={() => setSelectedSize(s)} className={`min-w-[44px] h-11 rounded-lg border-2 font-bold transition-all ${selectedSize === s ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>{s}</button>
                                     ))}
                                 </div>
                             </div>
@@ -149,15 +161,15 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                                 <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Chọn Màu sắc:</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.colors.map(c => (
-                                        <button key={c} onClick={() => setSelectedColor(c)} className={`px-5 h-11 rounded-lg border-2 font-bold transition-all ${selectedColor === c ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-slate-100 text-gray-400 hover:border-slate-200'}`}>{c}</button>
+                                        <button key={c} onClick={() => setSelectedColor(c)} className={`px-5 h-11 rounded-lg border-2 font-bold transition-all ${selectedColor === c ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>{c}</button>
                                     ))}
                                 </div>
                             </div>
                         )}
 
                         {/* Quantity & Stock */}
-                        <div className="flex flex-col items-center gap-2 pt-4 border-t border-slate-50">
-                            <div className="flex items-center gap-8 bg-slate-50 p-2 rounded-full px-4">
+                        <div className="flex flex-col items-center gap-2 pt-4 border-t border-slate-200">
+                            <div className="flex items-center gap-8 bg-white p-2 rounded-full px-4 shadow-sm border border-slate-100">
                                 <button onClick={() => handleQuantityChange(-1)} className="w-10 h-10 flex items-center justify-center text-2xl text-gray-400 hover:text-gray-800 transition-colors">-</button>
                                 <span className="text-xl font-black text-gray-900 w-6 text-center">{quantity}</span>
                                 <button onClick={() => handleQuantityChange(1)} className="w-10 h-10 flex items-center justify-center text-2xl text-gray-400 hover:text-gray-800 transition-colors">+</button>
@@ -166,7 +178,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         </div>
 
                         {/* Price Breakdown */}
-                        <div className="pt-6 border-t border-slate-50 space-y-2">
+                        <div className="pt-6 border-t border-slate-200 space-y-2">
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-400 font-medium">Tạm tính:</span>
                                 <span className="font-bold text-gray-600">{formatCurrency(subtotal)}</span>
@@ -182,20 +194,20 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         </div>
 
                         {/* Recipient Info Form */}
-                        <div className="space-y-3 pt-6">
+                        <div className="space-y-3 pt-6 border-t border-slate-200">
                             <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">Thông tin người nhận:</h4>
-                            <input type="text" placeholder="Họ và tên" value={shipName} onChange={e => setShipName(e.target.value)} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800" />
-                            <input type="tel" placeholder="Số điện thoại" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800" />
-                            <input type="text" placeholder="Địa chỉ chi tiết" value={shipAddress} onChange={e => setShipAddress(e.target.value)} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800" />
-                            <textarea placeholder="Ghi chú (Tùy chọn)" value={shipNote} onChange={e => setShipNote(e.target.value)} className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800 resize-none h-20" />
+                            <input type="text" placeholder="Họ và tên" value={shipName} onChange={e => setShipName(e.target.value)} className="w-full bg-white border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800 shadow-sm" />
+                            <input type="tel" placeholder="Số điện thoại" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="w-full bg-white border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800 shadow-sm" />
+                            <input type="text" placeholder="Địa chỉ chi tiết" value={shipAddress} onChange={e => setShipAddress(e.target.value)} className="w-full bg-white border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800 shadow-sm" />
+                            <textarea placeholder="Ghi chú (Tùy chọn)" value={shipNote} onChange={e => setShipNote(e.target.value)} className="w-full bg-white border-none rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-100 transition-all font-medium text-gray-800 shadow-sm resize-none h-20" />
                         </div>
 
                         {/* Payment Method */}
                         <div className="pt-4">
                             <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Phương thức thanh toán:</h4>
                             <div className="grid grid-cols-2 gap-3">
-                                <button onClick={() => setPaymentMethod('COD')} className={`py-3 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'COD' ? 'border-[#D4AF37] bg-amber-50 text-[#D4AF37]' : 'border-slate-100 text-gray-400 hover:border-slate-200'}`}>Tiền mặt (COD)</button>
-                                <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-3 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'BANK_TRANSFER' ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-slate-100 text-gray-400 hover:border-slate-200'}`}>Chuyển khoản</button>
+                                <button onClick={() => setPaymentMethod('COD')} className={`py-3 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'COD' ? 'border-[#D4AF37] bg-amber-50 text-[#D4AF37]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>Tiền mặt (COD)</button>
+                                <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-3 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all ${paymentMethod === 'BANK_TRANSFER' ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>Chuyển khoản</button>
                             </div>
                         </div>
 
