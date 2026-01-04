@@ -35,9 +35,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
           className={`w-full h-full object-cover transform transition-transform duration-700 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
         />
         
-        {/* Subtle QR Indicator */}
+        {/* Permanent QR Indicator - Fixed visibility */}
         {!isOutOfStock && (
-            <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-md p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0">
+            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md p-2.5 rounded-full shadow-xl z-10 border border-teal-50 transition-transform group-hover:scale-110">
                 <QrCodeIcon className="w-5 h-5 text-[#00695C]" />
             </div>
         )}
