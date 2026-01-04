@@ -124,14 +124,19 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         <span className="w-6 h-px bg-[#92400E]"></span>
                         <span className="text-[9px] font-black text-[#92400E] uppercase tracking-[0.4em]">Boutique Collection</span>
                     </div>
-                    <h1 className="text-3xl md:text-5xl font-serif font-bold text-[#064E3B] leading-tight mb-4">{product.name}</h1>
-                    <div className="flex items-baseline gap-3 mb-6">
+                    <h1 className="text-3xl md:text-5xl font-serif font-bold text-[#064E3B] leading-tight mb-6">{product.name}</h1>
+                    <div className="flex items-baseline gap-3 mb-8">
                         <span className="text-3xl font-black text-[#064E3B] font-sans tracking-tighter">{product.isFlashSale ? product.salePrice : product.price}</span>
                         {product.isFlashSale && <span className="text-base text-slate-300 line-through font-light italic">{product.price}</span>}
                     </div>
-                    <p className="text-slate-500 text-sm leading-relaxed border-l-2 border-[#92400E]/20 pl-4 italic">
-                        {product.description || 'Sản phẩm cao cấp mang đậm dấu ấn phong cách Sigma Vie, tinh tế trong từng chi tiết.'}
-                    </p>
+                    
+                    {/* KHỐI MÔ TẢ NÂNG CẤP FONT CHUYÊN NGHIỆP */}
+                    <div className="relative">
+                        <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-[#92400E] to-transparent rounded-full opacity-40"></div>
+                        <p className="pro-description text-sm italic">
+                            {product.description || 'Chế tác từ những chất liệu tinh tuyển, mỗi thiết kế tại Sigma Vie là sự giao thoa hoàn mỹ giữa nghệ thuật cắt may truyền thống và tư duy thẩm mỹ đương đại, mang lại phong thái tự tin tuyệt đối cho chủ sở hữu.'}
+                        </p>
+                    </div>
                 </div>
 
                 <div className="space-y-8 bg-[#F9FAF9] rounded-[2.5rem] p-6 md:p-10 border border-[#064E3B]/5">
@@ -249,7 +254,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                   <button onClick={() => setShowProductQrView(false)} className="absolute top-8 right-8 text-slate-300 hover:text-[#064E3B]"><XIcon/></button>
                   <h4 className="text-[11px] font-black text-[#92400E] mb-10 uppercase tracking-[0.4em]">Product Signature</h4>
                   <div className="bg-white p-6 border-4 border-slate-50 rounded-[2.5rem] inline-block shadow-inner mb-8">
-                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={200} />
+                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={220} />
                   </div>
                   <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold tracking-widest uppercase">REF SKU: {product.sku}</p>
                   <p className="text-xs text-slate-500 leading-relaxed font-medium italic">Sử dụng mã định danh để truy cập nhanh từ các thiết bị khác hoặc chia sẻ cho bạn bè.</p>
