@@ -33,8 +33,8 @@ export const getCustomers = (): Customer[] => {
         hasLoadedFromDB = true;
         fetchCustomersFromDB().then(dbCustomers => {
             if (dbCustomers && Array.isArray(dbCustomers)) {
-                // Nếu server rỗng, ta phải dọn sạch local ngay lập tức
                 if (dbCustomers.length === 0 && localData.length > 0) {
+                    console.log("Xác nhận Server rỗng, xóa dữ liệu khách hàng cục bộ.");
                     localStorage.removeItem(STORAGE_KEY);
                     dispatchCustomerUpdate();
                     return;
@@ -64,7 +64,6 @@ export const forceReloadCustomers = async (): Promise<Customer[]> => {
             hasLoadedFromDB = true;
             return dbCustomers;
         }
-        // If server unreachable, we return local data for now but we'll handle connectivity in the caller
     } catch (e) {
         console.error("Lỗi force reload customers:", e);
     }
@@ -87,23 +86,9 @@ export const registerCustomer = async (data: {
       return { success: false, message: 'Vui lòng điền đầy đủ thông tin.' };
   }
 
-  // Luôn bắt buộc tải lại dữ liệu từ Server để đảm bảo tính chính xác sau khi reset
-  let freshCustomers: Customer[] = [];
-  try {
-      // Force reload set to empty if server returns null/unreachable to avoid stale local check
-      const fromDB = await fetchCustomersFromDB();
-      if (fromDB && Array.isArray(fromDB)) {
-          freshCustomers = fromDB;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(fromDB));
-      } else if (fromDB === null) {
-          // Server unreachable, cannot safely verify duplicates
-          return { success: false, message: 'Máy chủ đang bận hoặc không thể kết nối. Vui lòng thử lại sau giây lát.' };
-      }
-  } catch (e) {
-      return { success: false, message: 'Lỗi đồng bộ hệ thống. Vui lòng thử lại.' };
-  }
+  // BƯỚC QUYẾT ĐỊNH: Lấy dữ liệu mới nhất từ server để xóa cache cũ nếu vừa Reset Factory
+  const freshCustomers = await forceReloadCustomers();
   
-  // Kiểm tra trùng lặp trên dữ liệu vừa fetch
   if (freshCustomers.some(c => c.email === data.email)) {
     return { success: false, message: 'Email này đã được đăng ký trên hệ thống.' };
   }
@@ -127,18 +112,11 @@ export const registerCustomer = async (data: {
 
   try {
       const res = await syncCustomerToDB(newCustomer);
-      if (res && !res.success) {
-          if (res.isNetworkError) {
-              return { success: false, message: 'Lỗi kết nối máy chủ. Dữ liệu chưa được lưu an toàn.' };
-          }
-          // Thay đổi thông báo chung thành thông báo cụ thể từ Server
-          return { success: false, message: res.message || 'Máy chủ bận, vui lòng bấm đăng ký lại.' };
+      if (res && !res.success && !res.isNetworkError) {
+          return { success: false, message: res.message || 'Tài khoản đã tồn tại.' };
       }
-  } catch (e) {
-      return { success: false, message: 'Lỗi hệ thống khi gửi dữ liệu.' };
-  }
+  } catch (e) {}
 
-  // Cập nhật local storage
   const updatedCustomers = [newCustomer, ...freshCustomers];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
   dispatchCustomerUpdate();
@@ -149,6 +127,7 @@ export const registerCustomer = async (data: {
 };
 
 export const updateCustomer = async (updatedCustomer: Customer): Promise<boolean> => {
+    // 1. Cập nhật local trước để UI mượt mà
     const customers = getCustomers();
     const index = customers.findIndex(c => c.id === updatedCustomer.id);
     
@@ -163,26 +142,30 @@ export const updateCustomer = async (updatedCustomer: Customer): Promise<boolean
         }
     }
 
+    // 2. Đồng bộ lên Server (Sử dụng PUT hoặc POST tùy cấu hình server)
     try {
         const res = await updateCustomerInDB(updatedCustomer);
         return !!(res && res.success);
     } catch (e) {
+        console.error("Lỗi đồng bộ khách hàng lên server:", e);
         return false;
     }
 };
 
 export const deleteCustomer = async (id: string): Promise<boolean> => {
-    const customers = getCustomers();
-    const updatedCustomers = customers.filter(c => c.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
-    dispatchCustomerUpdate();
-
     try {
         const res = await deleteCustomerFromDB(id);
-        return !!(res && res.success);
+        if (res && res.success) {
+            const customers = getCustomers();
+            const updatedCustomers = customers.filter(c => c.id !== id);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
+            dispatchCustomerUpdate();
+            return true;
+        }
     } catch (e) {
-        return false;
+        console.error("Lỗi xóa khách hàng:", e);
     }
+    return false;
 };
 
 export const loginCustomer = async (identifier: string, password: string): Promise<{ success: boolean; message: string; customer?: Customer }> => {

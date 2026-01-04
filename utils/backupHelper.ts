@@ -30,34 +30,31 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
     console.log(`🧨 THỰC HIỆN RESET HỆ THỐNG: Scope = ${scope}`);
     
     try {
-        // 1. Gửi lệnh xóa lên Server trước
+        // 1. Gửi lệnh xóa lên Server trước để máy chủ sạch trước
         const serverResult = await resetDatabase(scope);
         
         if (serverResult && serverResult.success === true) {
             
-            // 2. PHÁ HỦY DỮ LIỆU LOCAL NGAY LẬP TỨC TRƯỚC KHI TRANG TẢI LẠI
-            // Điều này đảm bảo khi trang tải lại, không còn mẩu dữ liệu cũ nào để đồng bộ ngược lên server
+            // 2. NGAY LẬP TỨC XÓA SẠCH DỮ LIỆU LOCAL
+            // Không được để bất kỳ dữ liệu nào sót lại để tránh sync ngược
             
             if (scope === 'FULL') {
                 const adminBackup = localStorage.getItem(KEYS.adminSettings);
                 const authState = sessionStorage.getItem('isAuthenticated');
                 const adminUser = sessionStorage.getItem('adminUser');
                 
-                // Xóa SẠCH TRẮNG hoàn toàn LocalStorage và SessionStorage
+                // Xóa trắng toàn bộ
                 localStorage.clear();
                 sessionStorage.clear();
                 
-                // Chỉ khôi phục quyền Admin tối thiểu để không bị đá ra khỏi phiên làm việc hiện tại
+                // Khôi phục quyền Admin tối thiểu
                 if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
                 if (authState) sessionStorage.setItem('isAuthenticated', authState);
                 if (adminUser) sessionStorage.setItem('adminUser', adminUser);
-                
-                console.log("Đã dọn sạch 100% dữ liệu trình duyệt.");
             } else {
                 if (scope === 'ORDERS') {
                     localStorage.removeItem(KEYS.orders);
                     localStorage.removeItem(KEYS.transactions);
-                    // Dọn các giỏ hàng cũ để tránh lỗi phục hồi đơn
                     Object.keys(localStorage).forEach(key => {
                         if (key.startsWith('sigma_vie_cart_')) localStorage.removeItem(key);
                     });
@@ -68,21 +65,20 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
                 }
             }
 
-            // 3. ÉP TRÌNH DUYỆT TẢI LẠI TỪ ĐẦU (HARD RELOAD)
-            // Dùng window.location.replace để thay thế lịch sử trang, ngăn chặn quay lại trạng thái cũ
+            // 3. ÉP TRÌNH DUYỆT TẢI LẠI CỨNG (HARD RELOAD)
+            // Phá hủy mọi trạng thái JavaScript trong RAM
             setTimeout(() => {
-                const cleanUrl = window.location.origin + window.location.pathname + "#/admin";
-                window.location.replace(cleanUrl);
+                window.location.replace(window.location.origin + window.location.pathname + "#/admin");
                 window.location.reload(); 
-            }, 1000);
+            }, 500);
 
-            return { success: true, message: 'Hệ thống đã được làm sạch hoàn toàn. Đang khởi động lại...' };
+            return { success: true, message: 'Dữ liệu đã được làm sạch. Hệ thống đang khởi động lại...' };
         } else {
-            return { success: false, message: serverResult?.message || 'Server từ chối yêu cầu reset.' };
+            return { success: false, message: serverResult?.message || 'Lỗi server khi reset.' };
         }
     } catch (err: any) {
         console.error("Lỗi chí mạng khi reset:", err);
-        return { success: false, message: 'Không thể kết nối Server để xóa dữ liệu.' };
+        return { success: false, message: 'Không thể kết nối Server.' };
     }
 };
 

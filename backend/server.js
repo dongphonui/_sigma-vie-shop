@@ -58,6 +58,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Dat
 
 // --- API ENDPOINTS ---
 
+// Products
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -70,6 +71,14 @@ app.post('/api/products', async (req, res) => {
     try {
         const currentStock = parseInt(p.stock) || 0;
         await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, currentStock, p, Date.now()]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/products/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM products WHERE id = $1', [id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -104,6 +113,7 @@ app.post('/api/products/stock', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Customers
 app.get('/api/customers', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
@@ -118,6 +128,26 @@ app.post('/api/customers', async (req, res) => {
             "INSERT INTO customers (id, name, phone, email, data, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET name=$2, phone=$3, email=$4, data=$5",
             [c.id, c.fullName, c.phoneNumber, c.email, c, c.createdAt || Date.now()]
         );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/customers/:id', async (req, res) => {
+    const { id } = req.params;
+    const c = req.body;
+    try {
+        await pool.query(
+            "UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5",
+            [c.fullName, c.phoneNumber, c.email, c, id]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/customers/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM customers WHERE id = $1', [id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -137,6 +167,7 @@ app.post('/api/customers/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Orders
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
@@ -166,7 +197,6 @@ app.post('/api/admin/reset', async (req, res) => {
         } else if (scope === 'PRODUCTS') {
             await client.query('TRUNCATE products, inventory_transactions, orders, categories RESTART IDENTITY CASCADE');
         } else if (scope === 'FULL') {
-            // Xóa sạch toàn bộ dữ liệu nghiệp vụ, chỉ bảo vệ bảng admin_users
             await client.query('TRUNCATE products, categories, customers, orders, inventory_transactions, admin_logs, app_settings RESTART IDENTITY CASCADE');
         }
         await client.query('COMMIT');

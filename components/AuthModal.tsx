@@ -92,6 +92,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
         }
         
         try {
+            // Hàm registerCustomer bây giờ sẽ force sync với server rỗng trước khi check
             const result = await registerCustomer(formData as any);
             if (result.success && result.customer) {
                 setSuccessMsg('Đăng ký thành công!');
@@ -128,7 +129,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
             <div className="absolute inset-0 bg-white/80 z-[60] flex flex-col items-center justify-center p-6 text-center">
                 <div className="w-12 h-12 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p className="font-bold text-[#00695C] animate-pulse">Hệ thống đang xử lý...</p>
-                <p className="text-xs text-gray-500 mt-2">Vui lòng chờ trong giây lát, máy chủ đang ghi nhận thông tin của bạn.</p>
+                <p className="text-xs text-gray-500 mt-2">Đang xác thực thông tin với máy chủ Sigma Vie.</p>
             </div>
         )}
 
