@@ -56,8 +56,6 @@ initDb();
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// --- API ENDPOINTS ---
-
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -89,18 +87,23 @@ app.post('/api/products/stock', async (req, res) => {
         if (productRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại' });
         
         let p = productRes.rows[0].data;
+        const hasSizes = p.sizes && p.sizes.length > 0;
+        const hasColors = p.colors && p.colors.length > 0;
         
-        if (size || color) {
+        if (hasSizes || hasColors) {
             if (!p.variants) p.variants = [];
-            const vIndex = p.variants.findIndex(v => (v.size === size || (!v.size && !size)) && (v.color === color || (!v.color && !color)));
+            // Tìm biến thể khớp CẢ Size VÀ Color
+            const vIndex = p.variants.findIndex(v => 
+                (v.size === (size || '') || (!hasSizes && !v.size)) && 
+                (v.color === (color || '') || (!hasColors && !v.color))
+            );
             
             if (vIndex !== -1) {
                 p.variants[vIndex].stock = (parseInt(p.variants[vIndex].stock) || 0) + quantityChange;
             } else if (quantityChange > 0) {
                 p.variants.push({ size: size || '', color: color || '', stock: quantityChange });
             } else {
-                // Đã có lỗi xảy ra nếu không tìm thấy biến thể để trừ
-                return res.status(400).json({ success: false, message: 'Không tìm thấy phân loại hàng để cập nhật.' });
+                return res.status(400).json({ success: false, message: 'Không tìm thấy tổ hợp Size/Màu để trừ kho.' });
             }
             
             p.stock = p.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
@@ -115,7 +118,6 @@ app.post('/api/products/stock', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Customers
 app.get('/api/customers', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
@@ -169,7 +171,6 @@ app.post('/api/customers/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Orders
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
@@ -188,7 +189,6 @@ app.post('/api/orders', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- RESET DATABASE API ---
 app.post('/api/admin/reset', async (req, res) => {
     const { scope } = req.body;
     const client = await pool.connect();

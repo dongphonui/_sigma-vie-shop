@@ -22,24 +22,18 @@ const trackDeletedId = (id: string) => {
 const processAndMergeData = (localData: Product[], dbProducts: any[]) => {
     if (dbProducts && Array.isArray(dbProducts)) {
         const deletedIds = getDeletedIds();
-        
-        // RESET PROTECTION: Server rỗng -> Xóa sạch local rác
         if (dbProducts.length === 0 && localData.length > 0) {
             localStorage.removeItem(STORAGE_KEY);
             return [];
         }
-
         const serverIdSet = new Set(dbProducts.map((p: any) => String(p.id)));
         const unsavedLocalProducts = localData.filter(p => {
             const idStr = String(p.id);
             return !serverIdSet.has(idStr) && !deletedIds.has(idStr);
         });
-
-        // Chỉ sync lên nếu server không rỗng (tránh sync dữ liệu cũ sau reset)
         if (unsavedLocalProducts.length > 0 && dbProducts.length > 0) {
             unsavedLocalProducts.forEach(p => syncProductToDB(p));
         }
-
         const mergedProducts = [...dbProducts, ...unsavedLocalProducts];
         mergedProducts.sort((a, b) => Number(b.id) - Number(a.id));
         return mergedProducts;
@@ -126,12 +120,10 @@ export const getProducts = (): Product[] => {
 export const addProduct = (product: Omit<Product, 'id'>): Product => {
   const products = getProducts();
   const id = Date.now();
-  
   let initialStock = Number(product.stock) || 0;
   if (product.variants && product.variants.length > 0) {
       initialStock = product.variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
   }
-
   const newProduct: Product = {
     ...product,
     id,
@@ -146,7 +138,6 @@ export const addProduct = (product: Omit<Product, 'id'>): Product => {
     colors: product.colors || [],
     variants: product.variants || []
   };
-  
   const updatedProducts = [newProduct, ...products];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProducts));
   syncProductToDB(newProduct);
@@ -162,7 +153,6 @@ export const updateProduct = (updatedProduct: Product): void => {
     if (updatedProduct.variants && updatedProduct.variants.length > 0) {
         totalStock = updatedProduct.variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
     }
-
     const productToSave = { ...updatedProduct, stock: totalStock };
     products[index] = productToSave;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
@@ -177,22 +167,30 @@ export const updateProductStock = (id: number, quantityChange: number, size?: st
     if (productIndex === -1) return false;
     
     const product = products[productIndex];
+    const hasSizes = product.sizes && product.sizes.length > 0;
+    const hasColors = product.colors && product.colors.length > 0;
     
-    if (size || color) {
+    if (hasSizes || hasColors) {
         if (!product.variants) product.variants = [];
+        // Tìm variant khớp cả Size VÀ Color
         const vIndex = product.variants.findIndex(v => 
-            (v.size === size || (!v.size && !size)) && 
-            (v.color === color || (!v.color && !color))
+            (v.size === size || (!hasSizes && !v.size)) && 
+            (v.color === color || (!hasColors && !v.color))
         );
         
         if (vIndex !== -1) {
             product.variants[vIndex].stock = (Number(product.variants[vIndex].stock) || 0) + quantityChange;
         } else if (quantityChange > 0) {
             product.variants.push({ size: size || '', color: color || '', stock: quantityChange });
-        } else return false;
+        } else {
+            // Khi trừ kho (xuất hàng) mà không tìm thấy biến thể -> Lỗi logic dữ liệu
+            return false;
+        }
         
+        // Cập nhật lại tổng tồn kho của sản phẩm từ các biến thể
         product.stock = product.variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
     } else {
+        // Sản phẩm không phân loại
         product.stock = (Number(product.stock) || 0) + quantityChange;
     }
 
