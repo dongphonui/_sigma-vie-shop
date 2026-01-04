@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Product, HomePageSettings, Customer } from '../types';
 import Header from '../components/Header';
 import ProductCard from '../components/ProductCard';
@@ -76,67 +77,41 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
   const [settings, setSettings] = useState<HomePageSettings | null>(null);
   const [flashSaleProducts, setFlashSaleProducts] = useState<Product[]>([]);
   const [flashSaleEndTime, setFlashSaleEndTime] = useState<number | undefined>(undefined);
-  
-  // Slider State
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
-
-  // Deep Link Loading State
   const [isLookingForProduct, setIsLookingForProduct] = useState(false);
 
+  // Link for Registration QR
+  const registrationLink = `${window.location.origin}/?register=true`;
+
   useEffect(() => {
-    // 1. Initial Load from local cache
     const allProducts = getProducts();
     setProducts(allProducts);
     setFilteredProducts(allProducts);
-    
-    // Load Settings
     setSettings(getHomePageSettings());
 
-    // 2. FORCE RELOAD from Server (Important for Guest PCs)
-    forceReloadProducts().then(() => {
-        console.log("Forced reload products complete");
-    });
+    forceReloadProducts().then(() => console.log("Forced reload complete"));
     
-    // 3. Retry fetching settings (Aggressive sync)
-    // Thử lấy lại settings vài lần trong 5s đầu để đảm bảo máy khách nhận được update từ server
-    const retrySettings = setInterval(() => {
-        const freshSettings = getHomePageSettings();
-        setSettings(freshSettings);
-    }, 2000);
+    const retrySettings = setInterval(() => setSettings(getHomePageSettings()), 2000);
     setTimeout(() => clearInterval(retrySettings), 6000);
 
-    // Deep Link Check
     if (initialProductId) {
         const found = allProducts.find(p => String(p.id) === String(initialProductId));
-        if (found) {
-            setSelectedProduct(found);
-        } else {
-            setIsLookingForProduct(true);
-        }
+        if (found) setSelectedProduct(found);
+        else setIsLookingForProduct(true);
     }
 
-    // LISTENER: Update Products when DB changes
     const handleProductUpdate = () => {
         const updated = getProducts();
         setProducts(updated);
         if (!searchQuery) setFilteredProducts(updated);
-
         if (initialProductId) {
             const found = updated.find(p => String(p.id) === String(initialProductId));
-            if (found) {
-                setSelectedProduct(found);
-                setIsLookingForProduct(false); 
-            } else {
-                setIsLookingForProduct(false);
-            }
+            if (found) { setSelectedProduct(found); setIsLookingForProduct(false); }
+            else setIsLookingForProduct(false);
         }
     };
     
-    // LISTENER: Update Settings (Real-time sync)
-    const handleSettingsUpdate = () => {
-        console.log("UI received settings update event");
-        setSettings(getHomePageSettings());
-    };
+    const handleSettingsUpdate = () => setSettings(getHomePageSettings());
     
     window.addEventListener('sigma_vie_products_update', handleProductUpdate);
     window.addEventListener('sigma_vie_home_settings_update', handleSettingsUpdate);
@@ -148,7 +123,6 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
     };
   }, [initialProductId]); 
 
-  // Flash Sale Logic
   useEffect(() => {
     const now = Date.now();
     const activeFlashSales = products.filter(p => {
@@ -156,79 +130,46 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
                             (!p.flashSaleEndTime || now <= p.flashSaleEndTime);
         return p.isFlashSale === true && p.status === 'active' && isValidTime;
     });
-    
     setFlashSaleProducts(activeFlashSales);
-
     if (activeFlashSales.length > 0) {
         const sortedEndTimes = activeFlashSales
             .map(p => p.flashSaleEndTime)
             .filter((t): t is number => t !== undefined && t > now)
             .sort((a, b) => a - b);
-        
-        if (sortedEndTimes.length > 0) {
-            setFlashSaleEndTime(sortedEndTimes[0]);
-        }
+        if (sortedEndTimes.length > 0) setFlashSaleEndTime(sortedEndTimes[0]);
     }
   }, [products]);
 
   useEffect(() => {
       if (!settings || !settings.promoImageUrls || settings.promoImageUrls.length <= 1) return;
-
       const interval = setInterval(() => {
           setCurrentPromoIndex((prevIndex) => 
               prevIndex === settings.promoImageUrls.length - 1 ? 0 : prevIndex + 1
           );
       }, 5000); 
-
       return () => clearInterval(interval);
   }, [settings]);
 
   useEffect(() => {
     const lowercasedQuery = searchQuery.toLowerCase().trim();
-    if (lowercasedQuery === '') {
-        setFilteredProducts(products);
-    } else {
-        const filtered = products.filter(product =>
-            product.name.toLowerCase().includes(lowercasedQuery)
-        );
-        setFilteredProducts(filtered);
-    }
+    if (lowercasedQuery === '') setFilteredProducts(products);
+    else setFilteredProducts(products.filter(p => p.name.toLowerCase().includes(lowercasedQuery)));
   }, [searchQuery, products]);
   
-  const handleProductClick = (product: Product) => {
-    setSelectedProduct(product);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedProduct(null);
-    setIsLookingForProduct(false);
-  };
-
-  const scrollToProducts = () => {
-      const productGrid = document.getElementById('product-grid');
-      if (productGrid) {
-          productGrid.scrollIntoView({ behavior: 'smooth' });
-      }
-  };
+  const handleProductClick = (product: Product) => setSelectedProduct(product);
+  const handleCloseModal = () => { setSelectedProduct(null); setIsLookingForProduct(false); };
+  const scrollToProducts = () => document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
   
   return (
     <>
-      <Header 
-        onOpenAuth={() => onOpenAuth('LOGIN')} 
-        currentUser={currentUser} 
-        cartItemCount={cartItemCount}
-        onOpenCart={onOpenCart}
-      />
+      <Header onOpenAuth={() => onOpenAuth('LOGIN')} currentUser={currentUser} cartItemCount={cartItemCount} onOpenCart={onOpenCart} />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 relative">
         
         {isLookingForProduct && !selectedProduct && (
             <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center backdrop-blur-sm">
                 <div className="bg-white p-6 rounded-lg shadow-xl flex items-center gap-4 animate-fade-in-up">
                     <div className="w-8 h-8 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin"></div>
-                    <div>
-                        <p className="font-bold text-gray-800 text-lg">Đang tìm sản phẩm...</p>
-                        <p className="text-sm text-gray-500">Vui lòng chờ trong giây lát</p>
-                    </div>
+                    <div><p className="font-bold text-gray-800 text-lg">Đang tìm sản phẩm...</p><p className="text-sm text-gray-500">Vui lòng chờ trong giây lát</p></div>
                 </div>
             </div>
         )}
@@ -236,25 +177,8 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         <div className="text-center mb-12">
           {settings ? (
             <>
-              <h1
-                className="font-bold"
-                style={{
-                  color: settings.headlineColor,
-                  fontFamily: `'${settings.headlineFont}', serif`,
-                  fontSize: settings.headlineSize || '3rem'
-                }}
-              >
-                {settings.headlineText}
-              </h1>
-              <p
-                className="mt-4 text-lg"
-                style={{
-                  color: settings.subtitleColor,
-                  fontFamily: `'${settings.subtitleFont}', sans-serif`,
-                }}
-              >
-                {settings.subtitleText}
-              </p>
+              <h1 className="font-bold" style={{ color: settings.headlineColor, fontFamily: `'${settings.headlineFont}', serif`, fontSize: settings.headlineSize || '3rem' }}>{settings.headlineText}</h1>
+              <p className="mt-4 text-lg" style={{ color: settings.subtitleColor, fontFamily: `'${settings.subtitleFont}', sans-serif` }}>{settings.subtitleText}</p>
             </>
           ) : (
             <>
@@ -266,16 +190,8 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         
         <div className="mb-16 max-w-2xl mx-auto">
             <div className="relative">
-                <input
-                    type="text"
-                    placeholder="Tìm kiếm sản phẩm theo tên..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-5 pr-12 py-3 text-base bg-white border border-gray-300 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-shadow"
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-5 pointer-events-none">
-                   <SearchIcon className="h-6 w-6 text-gray-400" />
-                </div>
+                <input type="text" placeholder="Tìm kiếm sản phẩm theo tên..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-5 pr-12 py-3 text-base bg-white border border-gray-300 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-shadow" />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-5 pointer-events-none"><SearchIcon className="h-6 w-6 text-gray-400" /></div>
             </div>
         </div>
 
@@ -284,106 +200,37 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         <div className="mb-16 rounded-2xl overflow-hidden shadow-2xl bg-white flex flex-col md:flex-row transform transition-all hover:scale-[1.01] duration-500 min-h-[500px] md:min-h-[400px]">
             <div className="md:w-1/2 relative bg-gray-200">
                 {settings.promoImageUrls && settings.promoImageUrls.length > 0 ? (
-                    settings.promoImageUrls.map((imgUrl, index) => (
-                        <div 
-                            key={index}
-                            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentPromoIndex ? 'opacity-100' : 'opacity-0'}`}
-                        >
-                            <img 
-                                src={imgUrl} 
-                                alt={`Promotion Slide ${index + 1}`} 
-                                className="w-full h-full object-cover"
-                            />
+                    settings.promoImageUrls.map((url, idx) => (
+                        <div key={idx} className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentPromoIndex ? 'opacity-100' : 'opacity-0'}`}>
+                            <img src={url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
                              <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
                         </div>
                     ))
-                ) : (
-                     <div className="w-full h-full bg-gray-300 flex items-center justify-center text-gray-500">
-                         No Image
-                     </div>
-                )}
-                
+                ) : <div className="w-full h-full bg-gray-300 flex items-center justify-center text-gray-500">No Image</div>}
                 {settings.promoImageUrls && settings.promoImageUrls.length > 1 && (
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
-                        {settings.promoImageUrls.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => setCurrentPromoIndex(index)}
-                                className={`w-2 h-2 rounded-full transition-all ${index === currentPromoIndex ? 'bg-white w-4' : 'bg-white/50'}`}
-                                aria-label={`Go to slide ${index + 1}`}
-                            />
+                        {settings.promoImageUrls.map((_, idx) => (
+                            <button key={idx} onClick={() => setCurrentPromoIndex(idx)} className={`w-2 h-2 rounded-full transition-all ${idx === currentPromoIndex ? 'bg-white w-4' : 'bg-white/50'}`} />
                         ))}
                     </div>
                 )}
             </div>
-            
-            <div 
-                className="md:w-1/2 p-8 md:p-12 text-white flex flex-col justify-center"
-                style={{ backgroundColor: settings.promoBackgroundColor }}
-            >
+            <div className="md:w-1/2 p-8 md:p-12 text-white flex flex-col justify-center" style={{ backgroundColor: settings.promoBackgroundColor }}>
                 <div className="flex items-center gap-2 mb-4">
-                    <span 
-                        className="text-xs font-bold px-2 py-1 rounded text-white uppercase tracking-wider"
-                        style={{ 
-                            backgroundColor: settings.promoAccentColor,
-                            fontFamily: 'Poppins, sans-serif'
-                        }}
-                    >
-                        {settings.promoTag}
-                    </span>
-                    <span 
-                        className="text-sm font-medium tracking-wider uppercase" 
-                        style={{ 
-                            fontFamily: 'Poppins, sans-serif',
-                            color: settings.promoDescriptionColor || 'rgba(255,255,255,0.8)'
-                        }}
-                    >
-                        {settings.promoSubTag}
-                    </span>
+                    <span className="text-xs font-bold px-2 py-1 rounded text-white uppercase tracking-wider" style={{ backgroundColor: settings.promoAccentColor, fontFamily: 'Poppins, sans-serif' }}>{settings.promoTag}</span>
+                    <span className="text-sm font-medium tracking-wider uppercase" style={{ fontFamily: 'Poppins, sans-serif', color: settings.promoDescriptionColor || 'rgba(255,255,255,0.8)' }}>{settings.promoSubTag}</span>
                 </div>
-                <h2 
-                    className="font-bold mb-6 leading-tight"
-                    style={{ 
-                        fontFamily: `'${settings.promoTitleFont}', serif`,
-                        color: settings.promoTitleColor,
-                        fontSize: settings.promoTitleSize || '2.25rem'
-                    }}
-                >
-                    {settings.promoTitle1} <br/> 
-                    <span style={{ color: settings.promoAccentColor }}>{settings.promoTitleHighlight}</span> 
-                    {' '}{settings.promoTitle2}
-                </h2>
-                <p 
-                    className="mb-8 leading-relaxed font-light"
-                    style={{ 
-                        fontFamily: `'${settings.promoDescriptionFont}', sans-serif`,
-                        color: settings.promoDescriptionColor,
-                        fontSize: settings.promoDescriptionSize || '1.125rem'
-                    }}
-                >
-                    {settings.promoDescription}
-                </p>
-                <div>
-                    <button 
-                        onClick={scrollToProducts}
-                        className="inline-block font-semibold py-3 px-8 rounded-full transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-                        style={{ 
-                            backgroundColor: settings.promoButtonBgColor || settings.promoAccentColor,
-                            color: settings.promoButtonTextColor || '#fff',
-                            fontFamily: `'${settings.promoDescriptionFont}', sans-serif`
-                        }}
-                    >
-                        {settings.promoButtonText}
-                    </button>
-                </div>
+                <h2 className="font-bold mb-6 leading-tight" style={{ fontFamily: `'${settings.promoTitleFont}', serif`, color: settings.promoTitleColor, fontSize: settings.promoTitleSize || '2.25rem' }}>{settings.promoTitle1} <br/> <span style={{ color: settings.promoAccentColor }}>{settings.promoTitleHighlight}</span> {' '}{settings.promoTitle2}</h2>
+                <p className="mb-8 leading-relaxed font-light" style={{ fontFamily: `'${settings.promoDescriptionFont}', sans-serif`, color: settings.promoDescriptionColor, fontSize: settings.promoDescriptionSize || '1.125rem' }}>{settings.promoDescription}</p>
+                <div><button onClick={scrollToProducts} className="inline-block font-semibold py-3 px-8 rounded-full transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1" style={{ backgroundColor: settings.promoButtonBgColor || settings.promoAccentColor, color: settings.promoButtonTextColor || '#fff', fontFamily: `'${settings.promoDescriptionFont}', sans-serif` }}>{settings.promoButtonText}</button></div>
             </div>
         </div>
         )}
 
-        {/* Membership Registration Section */}
+        {/* Membership Registration Section (WITH QR CODE) */}
         {!currentUser && settings && (
             <div 
-                className="mb-16 text-center shadow-xl relative overflow-hidden"
+                className="mb-16 shadow-xl relative overflow-hidden"
                 style={{
                     background: `linear-gradient(to right, ${settings.regBgColorStart || '#111827'}, ${settings.regBgColorEnd || '#1F2937'})`,
                     padding: settings.regPadding || '3rem',
@@ -391,134 +238,51 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
                 }}
             >
                  <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-                     <svg width="100%" height="100%">
-                         <pattern id="pattern-circles" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-                             <circle cx="20" cy="20" r="2" fill="currentColor" />
-                         </pattern>
-                         <rect x="0" y="0" width="100%" height="100%" fill="url(#pattern-circles)" className="text-white" />
-                     </svg>
+                     <svg width="100%" height="100%"><pattern id="pattern-circles" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="2" fill="currentColor" /></pattern><rect x="0" y="0" width="100%" height="100%" fill="url(#pattern-circles)" className="text-white" /></svg>
                  </div>
                  
-                 <div className="relative z-10 max-w-3xl mx-auto">
-                     <UserPlusIcon className="w-12 h-12 mx-auto mb-4" style={{ color: settings.regButtonBgColor }} />
-                     <h2 
-                        className="font-bold mb-4"
-                        style={{
-                            color: settings.regHeadlineColor,
-                            fontFamily: `'${settings.regHeadlineFont}', serif`,
-                            fontSize: settings.regHeadlineSize || '1.875rem'
-                        }}
-                     >
-                        {settings.regHeadlineText}
-                     </h2>
-                     <p 
-                        className="mb-8"
-                        style={{
-                            color: settings.regDescriptionColor,
-                            fontFamily: `'${settings.regDescriptionFont}', sans-serif`,
-                            fontSize: settings.regDescriptionSize || '1.125rem'
-                        }}
-                     >
-                         {settings.regDescriptionText}
-                     </p>
-                     <button 
-                         onClick={() => onOpenAuth('REGISTER')}
-                         className="font-bold py-3 px-8 shadow-lg transition-transform transform hover:-translate-y-1 inline-flex items-center gap-2"
-                         style={{
-                             backgroundColor: settings.regButtonBgColor,
-                             color: settings.regButtonTextColor,
-                             borderRadius: '9999px', // Rounded full
-                             fontFamily: `'${settings.regButtonFont || 'Poppins'}', sans-serif`,
-                             fontSize: settings.regButtonFontSize || '1rem'
-                         }}
-                     >
-                         <span>{settings.regButtonText}</span>
-                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                     </button>
+                 <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12 max-w-5xl mx-auto">
+                     <div className="flex-1 text-center lg:text-left">
+                        <UserPlusIcon className="w-12 h-12 mx-auto lg:mx-0 mb-4" style={{ color: settings.regButtonBgColor }} />
+                        <h2 className="font-bold mb-4" style={{ color: settings.regHeadlineColor, fontFamily: `'${settings.regHeadlineFont}', serif`, fontSize: settings.regHeadlineSize || '1.875rem' }}>{settings.regHeadlineText}</h2>
+                        <p className="mb-8" style={{ color: settings.regDescriptionColor, fontFamily: `'${settings.regDescriptionFont}', sans-serif`, fontSize: settings.regDescriptionSize || '1.125rem' }}>{settings.regDescriptionText}</p>
+                        <button 
+                            onClick={() => onOpenAuth('REGISTER')}
+                            className="font-bold py-3 px-8 shadow-lg transition-transform transform hover:-translate-y-1 inline-flex items-center gap-2"
+                            style={{ backgroundColor: settings.regButtonBgColor, color: settings.regButtonTextColor, borderRadius: '9999px', fontFamily: `'${settings.regButtonFont || 'Poppins'}', sans-serif`, fontSize: settings.regButtonFontSize || '1rem' }}
+                        >
+                            <span>{settings.regButtonText}</span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                        </button>
+                     </div>
+
+                     <div className="flex flex-col items-center gap-3">
+                         <div className="bg-white p-4 rounded-2xl shadow-2xl border-4 border-white/20 transform rotate-1 hover:rotate-0 transition-transform duration-300">
+                             <QRCodeSVG value={registrationLink} size={160} />
+                         </div>
+                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 animate-pulse">Quét để Đăng ký ngay</p>
+                     </div>
                  </div>
             </div>
         )}
 
         {/* FLASH SALE SECTION */}
         {flashSaleProducts.length > 0 && settings && (
-            <div 
-                className="mb-16 rounded-2xl shadow-2xl overflow-hidden relative"
-                style={{
-                    background: `linear-gradient(to right, ${settings.flashSaleBgColorStart || '#DC2626'}, ${settings.flashSaleBgColorEnd || '#F97316'})`
-                }}
-            >
-                {/* Decoration Background */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
-                    <div className="absolute top-10 left-10 w-32 h-32 bg-yellow-300 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-10 right-10 w-40 h-40 bg-yellow-300 rounded-full blur-3xl"></div>
-                </div>
-
+            <div className="mb-16 rounded-2xl shadow-2xl overflow-hidden relative" style={{ background: `linear-gradient(to right, ${settings.flashSaleBgColorStart || '#DC2626'}, ${settings.flashSaleBgColorEnd || '#F97316'})` }}>
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none"><div className="absolute top-10 left-10 w-32 h-32 bg-yellow-300 rounded-full blur-3xl"></div><div className="absolute bottom-10 right-10 w-40 h-40 bg-yellow-300 rounded-full blur-3xl"></div></div>
                 <div className="p-8 md:p-10 relative z-10">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                        <div className="flex items-center gap-3">
-                            <LightningIcon 
-                                className="w-10 h-10 animate-pulse" 
-                                style={{ color: settings.flashSaleTextColor }}
-                            />
-                            <h2 
-                                className="font-bold font-serif italic tracking-wider shadow-sm"
-                                style={{
-                                    color: settings.flashSaleTitleColor,
-                                    fontFamily: `'${settings.flashSaleTitleFont}', serif`,
-                                    fontSize: settings.flashSaleTitleSize || '2.25rem'
-                                }}
-                            >
-                                {settings.flashSaleTitleText || 'FLASH SALE'}
-                            </h2>
-                        </div>
-                        {flashSaleEndTime && (
-                            <div className="flex items-center gap-3 bg-white/20 px-6 py-3 rounded-full backdrop-blur-sm shadow-inner">
-                                <ClockIcon className="w-5 h-5" style={{ color: settings.flashSaleTextColor }} />
-                                <p className="font-medium mr-2" style={{ color: settings.flashSaleTextColor }}>Kết thúc trong:</p>
-                                <FlashSaleTimer textColor={settings.flashSaleTextColor} targetDate={flashSaleEndTime} />
-                            </div>
-                        )}
+                        <div className="flex items-center gap-3"><LightningIcon className="w-10 h-10 animate-pulse" style={{ color: settings.flashSaleTextColor }} /><h2 className="font-bold font-serif italic tracking-wider shadow-sm" style={{ color: settings.flashSaleTitleColor, fontFamily: `'${settings.flashSaleTitleFont}', serif`, fontSize: settings.flashSaleTitleSize || '2.25rem' }}>{settings.flashSaleTitleText || 'FLASH SALE'}</h2></div>
+                        {flashSaleEndTime && <div className="flex items-center gap-3 bg-white/20 px-6 py-3 rounded-full backdrop-blur-sm shadow-inner"><ClockIcon className="w-5 h-5" style={{ color: settings.flashSaleTextColor }} /><p className="font-medium mr-2" style={{ color: settings.flashSaleTextColor }}>Kết thúc trong:</p><FlashSaleTimer textColor={settings.flashSaleTextColor} targetDate={flashSaleEndTime} /></div>}
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {flashSaleProducts.map(product => (
-                            <ProductCard 
-                                key={product.id} 
-                                product={product} 
-                                onClick={() => handleProductClick(product)} 
-                            />
-                        ))}
-                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{flashSaleProducts.map(p => <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} />)}</div>
                 </div>
             </div>
         )}
 
-        <div id="product-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {filteredProducts.length > 0 ? (
-            filteredProducts.map(product => (
-              <ProductCard 
-                key={product.id} 
-                product={product} 
-                onClick={() => handleProductClick(product)} 
-              />
-            ))
-          ) : (
-            <div className="col-span-full text-center py-12">
-                <h3 className="text-2xl font-semibold text-gray-700">Không tìm thấy sản phẩm</h3>
-                <p className="mt-2 text-gray-500">Vui lòng thử một từ khóa tìm kiếm khác.</p>
-            </div>
-          )}
-        </div>
+        <div id="product-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">{filteredProducts.length > 0 ? filteredProducts.map(p => <ProductCard key={p.id} product={p} onClick={() => handleProductClick(p)} />) : <div className="col-span-full text-center py-12"><h3 className="text-2xl font-semibold text-gray-700">Không tìm thấy sản phẩm</h3><p className="mt-2 text-gray-500">Vui lòng thử một từ khóa tìm kiếm khác.</p></div>}</div>
       </main>
-      
-      {selectedProduct && (
-        <ProductModal 
-            product={selectedProduct} 
-            onClose={handleCloseModal}
-            isLoggedIn={!!currentUser}
-            onOpenAuth={() => onOpenAuth('LOGIN')}
-        />
-      )}
+      {selectedProduct && <ProductModal product={selectedProduct} onClose={handleCloseModal} isLoggedIn={!!currentUser} onOpenAuth={() => onOpenAuth('LOGIN')} />}
       <Footer isAdminLinkVisible={isAdminLinkVisible} />
     </>
   );

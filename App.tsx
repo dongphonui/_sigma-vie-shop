@@ -37,17 +37,22 @@ const App: React.FC = () => {
       const hash = window.location.hash;
       const search = window.location.search;
       
-      // Robust URL Parsing for Deep Linking (Compatible with Zalo/FB/Direct)
-      let pid = null;
-
-      // Method 1: Standard Search Query (?product=123)
       const urlParams = new URLSearchParams(search);
-      pid = urlParams.get('product');
 
-      // Method 2: Embedded in Hash (/#/?product=123)
+      // 1. Check for Auto-Registration via QR
+      if (urlParams.get('register') === 'true') {
+          console.log("Auto-registration QR detected");
+          if (!getCurrentCustomer()) {
+              setAuthMode('REGISTER');
+              setIsAuthModalOpen(true);
+          }
+      }
+
+      // 2. Robust URL Parsing for Product Deep Linking
+      let pid = urlParams.get('product');
+
       if (!pid && hash.includes('product=')) {
           try {
-             // Split by ? to check query string after hash
              const hashParts = hash.split('?');
              if (hashParts.length > 1) {
                  const hashParams = new URLSearchParams(hashParts[1]);
@@ -56,35 +61,28 @@ const App: React.FC = () => {
           } catch(e) {}
       }
 
-      // Method 3: Fallback Regex for messy URLs
       if (!pid && fullUrl.includes('product=')) {
           try {
               const match = fullUrl.match(/[?&]product=([^&]+)/);
-              if (match) {
-                  pid = match[1];
-              }
+              if (match) pid = match[1];
           } catch (e) {}
       }
 
       if (pid) {
           console.log("Deep link detected for product:", pid);
           setInitialProductId(pid);
-          // Don't clear URL to avoid refresh issues on some mobile browsers
       }
 
       // Base route logic
-      // Remove query params from route state to ensure routing works
       const cleanHash = hash.split('?')[0] || '#/';
       setRoute(cleanHash);
     };
     
-    handleHashChange(); // Run on mount
+    handleHashChange(); 
     
-    // Check for logged in customer on init
     const user = getCurrentCustomer();
     setCurrentUser(user);
     if (user) {
-        // Automatically sync orders on app start for cross-device consistency
         forceReloadOrders().catch(e => console.error("Auto sync failed:", e));
     }
     
@@ -94,18 +92,11 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Lắng nghe thay đổi giỏ hàng VÀ thay đổi người dùng
   useEffect(() => {
     setCartItems(getCart());
-
-    const handleCartUpdate = () => {
-        setCartItems(getCart());
-    };
-
+    const handleCartUpdate = () => setCartItems(getCart());
     window.addEventListener('sigma_vie_cart_update', handleCartUpdate);
-    return () => {
-      window.removeEventListener('sigma_vie_cart_update', handleCartUpdate);
-    };
+    return () => window.removeEventListener('sigma_vie_cart_update', handleCartUpdate);
   }, [currentUser]); 
 
   useEffect(() => {
@@ -114,42 +105,29 @@ const App: React.FC = () => {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
-        return;
-      }
-      
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (e.key === 'Control') return;
 
       if (e.ctrlKey) {
         const key = e.key.toLowerCase();
-
         if (key === 'c') {
           setIsAdminLinkVisible(false);
           currentSequence = []; 
           return;
         }
-        
         if (targetSequence.includes(key)) {
             currentSequence.push(key);
-            if (currentSequence.length > targetSequence.length) {
-              currentSequence.shift();
-            }
+            if (currentSequence.length > targetSequence.length) currentSequence.shift();
             if (JSON.stringify(currentSequence) === JSON.stringify(targetSequence)) {
               setIsAdminLinkVisible(true);
               currentSequence = [];
             }
-        } else {
-            currentSequence = [];
-        }
-      } else {
-        currentSequence = [];
-      }
+        } else currentSequence = [];
+      } else currentSequence = [];
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const openAuthModal = (mode: 'LOGIN' | 'REGISTER' = 'LOGIN') => {
@@ -159,37 +137,25 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (customer: Customer) => {
       setCurrentUser(customer);
-      // Sync orders immediately on login
       forceReloadOrders().catch(e => console.error("Login sync failed:", e));
   };
 
   const handleOpenCart = () => {
-      if (!currentUser) {
-          openAuthModal('LOGIN');
-      } else {
-          setIsCartOpen(true);
-      }
+      if (!currentUser) openAuthModal('LOGIN');
+      else setIsCartOpen(true);
   };
 
   const renderPage = () => {
     const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
-    
-    // Normalize route to handle potential trailing slashes or query params if not stripped
     const currentPath = route.split('?')[0];
 
     switch (currentPath) {
-      case '#/admin':
-        return isAuthenticated ? <AdminPage /> : <LoginPage />;
-      case '#/login':
-        return <LoginPage />;
-      case '#/otp':
-        return <AdminOTPPage />;
-      case '#/about':
-        return <AboutPage isAdminLinkVisible={isAdminLinkVisible} />;
-      case '#/my-orders':
-        return <MyOrdersPage currentUser={currentUser} isAdminLinkVisible={isAdminLinkVisible} />;
+      case '#/admin': return isAuthenticated ? <AdminPage /> : <LoginPage />;
+      case '#/login': return <LoginPage />;
+      case '#/otp': return <AdminOTPPage />;
+      case '#/about': return <AboutPage isAdminLinkVisible={isAdminLinkVisible} />;
+      case '#/my-orders': return <MyOrdersPage currentUser={currentUser} isAdminLinkVisible={isAdminLinkVisible} />;
       default:
-        // Pass initialProductId to Home for Deep Linking
         return (
             <Home 
                 isAdminLinkVisible={isAdminLinkVisible} 
