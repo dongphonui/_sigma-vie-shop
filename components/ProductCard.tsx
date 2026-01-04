@@ -25,58 +25,61 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
 
   return (
     <div 
-      className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 ease-in-out cursor-pointer group relative flex flex-col h-full border border-slate-100"
+      className="bg-white rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 ease-in-out cursor-pointer group relative flex flex-col h-full border border-slate-100"
       onClick={onClick}
     >
-      <div className="relative overflow-hidden h-96">
+      <div className="relative overflow-hidden h-[400px]">
         <img 
           src={product.imageUrl} 
           alt={product.name}
-          className={`w-full h-full object-cover transform transition-transform duration-700 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
+          className={`w-full h-full object-cover transform transition-transform duration-1000 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-110'}`}
         />
         
-        {/* Permanent QR Indicator - Fixed visibility */}
+        {/* QR Indicator - Màu xanh đồng bộ chuyên nghiệp */}
         {!isOutOfStock && (
-            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md p-2.5 rounded-full shadow-xl z-10 border border-teal-50 transition-transform group-hover:scale-110">
-                <QrCodeIcon className="w-5 h-5 text-[#00695C]" />
+            <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl z-10 border border-blue-50 transition-all group-hover:scale-110 group-hover:bg-blue-700 group-hover:text-white text-blue-700">
+                <QrCodeIcon className="w-5 h-5" />
             </div>
         )}
 
         {!isOutOfStock && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-blue-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
         )}
         
         {isFlashSaleActive && !isOutOfStock && (
-          <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full shadow-md flex items-center gap-1 animate-pulse z-10">
+          <div className="absolute top-6 left-6 bg-rose-600 text-white px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 animate-pulse z-10">
             <LightningIcon className="w-3 h-3" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Flash Sale</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">Flash Sale</span>
           </div>
         )}
         
         {isOutOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px]">
-                <div className="bg-slate-900 text-white px-6 py-2 font-black tracking-widest transform -rotate-2 shadow-xl">
-                    HẾT HÀNG
+            <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[2px]">
+                <div className="bg-slate-900 text-white px-8 py-3 font-black tracking-widest transform -rotate-3 shadow-2xl text-xs uppercase">
+                    Hết hàng
                 </div>
             </div>
         )}
       </div>
-      <div className="p-6 text-center flex-1 flex flex-col justify-end">
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{product.category}</p>
-        <h3 className={`text-lg font-bold mb-3 line-clamp-2 transition-colors ${isOutOfStock ? 'text-gray-300' : 'text-slate-800 group-hover:text-[#D4AF37]'}`}>{product.name}</h3>
+      
+      <div className="p-8 text-center flex-1 flex flex-col justify-between">
+        <div>
+            <p className="text-[9px] text-blue-600 font-black uppercase tracking-[0.3em] mb-3">{product.category}</p>
+            <h3 className={`text-xl font-bold mb-4 line-clamp-2 transition-colors font-serif ${isOutOfStock ? 'text-slate-300' : 'text-slate-800 group-hover:text-blue-700'}`}>{product.name}</h3>
+        </div>
         
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-4">
             {isFlashSaleActive && !isOutOfStock ? (
                 <>
-                    <p className="text-sm font-medium text-slate-300 line-through">
+                    <p className="text-sm font-medium text-slate-300 line-through italic font-sans">
                         {product.price}
                     </p>
-                    <p className="text-xl font-black text-red-600">
+                    <p className="text-2xl font-black text-rose-600 font-sans tracking-tighter">
                         {product.salePrice}
                     </p>
                 </>
             ) : (
-                <p className={`text-lg font-black ${isOutOfStock ? 'text-gray-300' : 'text-slate-900'}`}>
+                <p className={`text-xl font-black font-sans tracking-tight ${isOutOfStock ? 'text-slate-300' : 'text-blue-900'}`}>
                     {product.price}
                 </p>
             )}
