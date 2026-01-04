@@ -72,12 +72,9 @@ const ProductTab: React.FC = () => {
 
   const handlePrintLabel = () => {
     if (!selectedQrProduct) return;
-
-    // 1. Tìm SVG của QR đang hiển thị
     const svgElement = document.querySelector('.qr-container svg') as SVGGraphicsElement;
     if (!svgElement) return;
 
-    // 2. Chuyển SVG sang Image Data URL thông qua Canvas để in ấn ổn định
     const svgData = new XMLSerializer().serializeToString(svgElement);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -92,7 +89,6 @@ const ProductTab: React.FC = () => {
         ctx?.drawImage(img, 0, 0, 300, 300);
         const qrImageDataUrl = canvas.toDataURL('image/png');
 
-        // 3. Mở cửa sổ in với layout tem nhãn chuẩn (Ép chết size 50x30mm)
         const printWindow = window.open('', '_blank', 'width=450,height=300');
         if (printWindow) {
             const finalPrice = selectedQrProduct.isFlashSale && selectedQrProduct.salePrice 
@@ -102,92 +98,24 @@ const ProductTab: React.FC = () => {
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>Print Label - ${selectedQrProduct.sku}</title>
+                    <title>In Tem - ${selectedQrProduct.sku}</title>
                     <style>
-                        @page { 
-                            margin: 0 !important; 
-                            size: 50mm 30mm;
-                        }
+                        @page { margin: 0 !important; size: 50mm 30mm; }
                         * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
-                        html, body { 
-                            margin: 0 !important; 
-                            padding: 0 !important; 
-                            width: 50mm; 
-                            height: 30mm;
-                            overflow: hidden;
-                            background: white;
-                        }
-                        .label-container {
-                            width: 50mm;
-                            height: 30mm;
-                            display: flex;
-                            flex-direction: row;
-                            align-items: center;
-                            padding: 2mm;
-                            overflow: hidden;
-                            page-break-after: avoid;
-                        }
-                        .qr-side {
-                            width: 18mm;
-                            height: 100%;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                        }
-                        .qr-side img {
-                            width: 17mm;
-                            height: 17mm;
-                            display: block;
-                        }
-                        .info-side {
-                            flex: 1;
-                            padding-left: 2mm;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: center;
-                            min-width: 0;
-                            height: 100%;
-                        }
-                        .brand { 
-                            font-size: 6pt; 
-                            font-weight: bold; 
-                            color: #444; 
-                            margin-bottom: 0.5mm; 
-                            letter-spacing: 0.3mm; 
-                            font-family: Arial, sans-serif;
-                        }
-                        .name { 
-                            font-size: 7.5pt; 
-                            font-weight: 900; 
-                            line-height: 1.1; 
-                            margin-bottom: 1mm;
-                            display: -webkit-box;
-                            -webkit-line-clamp: 2;
-                            -webkit-box-orient: vertical;
-                            overflow: hidden;
-                            text-transform: uppercase;
-                            color: black;
-                            font-family: Arial, sans-serif;
-                        }
-                        .price { 
-                            font-size: 10pt; 
-                            font-weight: 900; 
-                            color: black; 
-                            font-family: Arial, sans-serif;
-                        }
-                        .sku { 
-                            font-size: 5pt; 
-                            color: #666; 
-                            font-family: monospace; 
-                            margin-top: 0.5mm; 
-                        }
+                        html, body { margin: 0 !important; padding: 0 !important; width: 50mm; height: 30mm; overflow: hidden; background: white; font-family: Arial, sans-serif; }
+                        .label-container { width: 50mm; height: 30mm; display: flex; flex-direction: row; align-items: center; padding: 2mm; overflow: hidden; }
+                        .qr-side { width: 18mm; height: 100%; display: flex; align-items: center; justify-content: center; }
+                        .qr-side img { width: 17mm; height: 17mm; display: block; }
+                        .info-side { flex: 1; padding-left: 2mm; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+                        .brand { font-size: 6pt; font-weight: bold; color: #444; margin-bottom: 0.5mm; letter-spacing: 0.3mm; }
+                        .name { font-size: 7.5pt; font-weight: 900; line-height: 1.1; margin-bottom: 1mm; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-transform: uppercase; color: black; }
+                        .price { font-size: 10pt; font-weight: 900; color: black; }
+                        .sku { font-size: 5pt; color: #666; font-family: monospace; margin-top: 0.5mm; }
                     </style>
                 </head>
                 <body onload="setTimeout(function(){ window.print(); window.close(); }, 300);">
                     <div class="label-container">
-                        <div class="qr-side">
-                            <img src="${qrImageDataUrl}" />
-                        </div>
+                        <div class="qr-side"><img src="${qrImageDataUrl}" /></div>
                         <div class="info-side">
                             <div class="brand">SIGMA VIE</div>
                             <div class="name">${selectedQrProduct.name}</div>
@@ -282,7 +210,7 @@ const ProductTab: React.FC = () => {
       }
       const apiKey = process.env.API_KEY;
       if (!apiKey || apiKey === "undefined" || apiKey === "") {
-          showFeedback('❌ Lỗi: Web chưa nhận được API_KEY từ Vercel. Hãy Redeploy!', 'error');
+          showFeedback('❌ Lỗi: Web chưa nhận được API_KEY từ Vercel.', 'error');
           return;
       }
       setIsGeneratingAI(true);
@@ -292,7 +220,11 @@ const ProductTab: React.FC = () => {
               model: 'gemini-3-flash-preview',
               contents: [{
                   parts: [{
-                      text: `Bạn là chuyên gia Content cho hãng Sigma Vie. Hãy viết 1 đoạn mô tả ngắn (3 câu), sang trọng cho: "${newProductName}". Ngôn ngữ: Tiếng Việt. Không icon.`
+                      text: `Bạn là chuyên gia Content thời trang cao cấp cho hãng Sigma Vie. Hãy viết 1 đoạn mô tả cực kỳ sang trọng, đầy chiều sâu cho sản phẩm: "${newProductName}". 
+                      Yêu cầu:
+                      1. Văn phong tinh tế, gợi cảm hứng về phong thái tự tin và đẳng cấp sống.
+                      2. Độ dài khoảng 3-4 câu. 
+                      3. Ngôn ngữ: Tiếng Việt, không dùng icon, tập trung vào cảm xúc khi diện bộ trang phục này.`
                   }]
               }]
           });
@@ -304,11 +236,7 @@ const ProductTab: React.FC = () => {
           }
       } catch (error: any) {
           console.error("DEBUG AI:", error);
-          const errorStr = JSON.stringify(error);
-          let userMsg = "Lỗi kết nối AI.";
-          if (errorStr.includes("leaked")) userMsg = "Mã API bị lộ và bị Google khóa. Hãy tạo mã mới!";
-          else if (errorStr.includes("403")) userMsg = "API Key không hợp lệ (403).";
-          showFeedback(`❌ ${userMsg}`, 'error');
+          showFeedback(`❌ Lỗi kết nối AI.`, 'error');
       } finally {
           setIsGeneratingAI(false);
       }
@@ -361,7 +289,7 @@ const ProductTab: React.FC = () => {
             setIsSaving(false);
         }, 800);
     } catch (err) {
-        showFeedback('❌ Lỗi hệ thống khi lưu.', 'error');
+        showFeedback('❌ Lỗi hệ thống.', 'error');
         setIsSaving(false);
     }
   };
@@ -494,13 +422,13 @@ const ProductTab: React.FC = () => {
 
                         <div className="flex flex-col h-full">
                             <div className="flex justify-between items-center mb-3">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm chuyên sâu</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm (Văn phong sang trọng)</label>
                                 <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md active:scale-95 ${isGeneratingAI ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-600 text-white hover:bg-purple-700 hover:-translate-y-0.5'}`}>
                                     {isGeneratingAI ? <RefreshIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
                                     {isGeneratingAI ? 'AI ĐANG VIẾT...' : 'AI VIẾT MÔ TẢ'}
                                 </button>
                             </div>
-                            <textarea ref={descriptionRef} rows={15} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" placeholder="Hãy nhập tên sản phẩm và dùng AI để tạo nội dung..." required />
+                            <textarea ref={descriptionRef} rows={15} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" placeholder="AI sẽ giúp bạn viết mô tả chuyên sâu tại đây..." required />
                         </div>
                     </div>
                     <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
@@ -563,7 +491,6 @@ const ProductTab: React.FC = () => {
                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
                         In tem dán áo quần
                     </button>
-                    <p className="text-[9px] text-slate-400 mt-4 italic">* Định dạng tem chuẩn 50x30mm cho máy in nhiệt.</p>
                 </div>
             </div>
         )}
@@ -577,8 +504,4 @@ const ProductTab: React.FC = () => {
                 animation: slide-in-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
             }
         `}</style>
-    </div>
-  );
-};
-
-export default ProductTab;
+    
