@@ -103,7 +103,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                 setError(result.message);
             }
         } catch (err) {
-            setError('Đã có lỗi xảy ra. Vui lòng thử lại.');
+            setError('Đã có lỗi xảy ra trong quá trình đăng ký.');
         }
     } else {
         try {
@@ -123,7 +123,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up max-h-[95vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up max-h-[95vh] flex flex-col relative">
+        {isProcessing && (
+            <div className="absolute inset-0 bg-white/80 z-[60] flex flex-col items-center justify-center p-6 text-center">
+                <div className="w-12 h-12 border-4 border-[#00695C] border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="font-bold text-[#00695C] animate-pulse">Hệ thống đang xử lý...</p>
+                <p className="text-xs text-gray-500 mt-2">Vui lòng chờ trong giây lát, máy chủ đang ghi nhận thông tin của bạn.</p>
+            </div>
+        )}
+
         <div className="flex border-b">
             <button onClick={() => setMode('LOGIN')} className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${mode === 'LOGIN' ? 'text-[#00695C] border-b-4 border-[#00695C] bg-teal-50/50' : 'text-gray-400 hover:text-gray-600'}`}>Đăng Nhập</button>
             <button onClick={() => setMode('REGISTER')} className={`flex-1 py-4 text-xs font-black uppercase tracking-widest transition-all ${mode === 'REGISTER' ? 'text-[#00695C] border-b-4 border-[#00695C] bg-teal-50/50' : 'text-gray-400 hover:text-gray-600'}`}>Đăng Ký</button>
@@ -215,7 +223,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess, 
                 {successMsg && <p className="text-xs text-green-600 bg-green-50 p-3 rounded-lg border border-green-100 font-bold">{successMsg}</p>}
 
                 <button type="submit" disabled={isProcessing} className="w-full py-4 bg-[#D4AF37] text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-900/20 hover:bg-[#b89b31] transition-all flex items-center justify-center gap-2">
-                    {isProcessing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                     {mode === 'LOGIN' ? 'Đăng Nhập' : 'Hoàn tất Đăng Ký'}
                 </button>
             </form>

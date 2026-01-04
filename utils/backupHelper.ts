@@ -43,11 +43,11 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
                 const authState = sessionStorage.getItem('isAuthenticated');
                 const adminUser = sessionStorage.getItem('adminUser');
                 
-                // Xóa SẠCH TRẮNG hoàn toàn
+                // Xóa SẠCH TRẮNG hoàn toàn LocalStorage và SessionStorage
                 localStorage.clear();
                 sessionStorage.clear();
                 
-                // Chỉ khôi phục quyền Admin để không bị đăng xuất ngay lập tức
+                // Chỉ khôi phục quyền Admin tối thiểu để không bị đá ra khỏi phiên làm việc hiện tại
                 if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
                 if (authState) sessionStorage.setItem('isAuthenticated', authState);
                 if (adminUser) sessionStorage.setItem('adminUser', adminUser);
@@ -57,6 +57,10 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
                 if (scope === 'ORDERS') {
                     localStorage.removeItem(KEYS.orders);
                     localStorage.removeItem(KEYS.transactions);
+                    // Dọn các giỏ hàng cũ để tránh lỗi phục hồi đơn
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.startsWith('sigma_vie_cart_')) localStorage.removeItem(key);
+                    });
                 } else if (scope === 'PRODUCTS') {
                     localStorage.removeItem(KEYS.products);
                     localStorage.removeItem(KEYS.categories);
@@ -64,17 +68,17 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
                 }
             }
 
-            // 3. ÉP TRÌNH DUYỆT TẢI LẠI TỪ ĐẦU
-            // Dùng window.location.href thay vì reload() để phá vỡ React State đang lưu trong RAM
+            // 3. ÉP TRÌNH DUYỆT TẢI LẠI TỪ ĐẦU (HARD RELOAD)
+            // Dùng window.location.replace để thay thế lịch sử trang, ngăn chặn quay lại trạng thái cũ
             setTimeout(() => {
                 const cleanUrl = window.location.origin + window.location.pathname + "#/admin";
-                window.location.href = cleanUrl;
+                window.location.replace(cleanUrl);
                 window.location.reload(); 
             }, 1000);
 
-            return { success: true, message: 'Dữ liệu đã được dọn sạch hoàn toàn. Đang khởi động lại...' };
+            return { success: true, message: 'Hệ thống đã được làm sạch hoàn toàn. Đang khởi động lại...' };
         } else {
-            return { success: false, message: serverResult?.message || 'Lỗi server khi thực hiện reset.' };
+            return { success: false, message: serverResult?.message || 'Server từ chối yêu cầu reset.' };
         }
     } catch (err: any) {
         console.error("Lỗi chí mạng khi reset:", err);
