@@ -33,14 +33,15 @@ export const getCustomers = (): Customer[] => {
         hasLoadedFromDB = true;
         fetchCustomersFromDB().then(dbCustomers => {
             if (dbCustomers && Array.isArray(dbCustomers)) {
-                // Nếu server rỗng (vừa reset), ta phải xóa local luôn
+                // TRƯỜNG HỢP RESET: Server rỗng nhưng local còn rác
                 if (dbCustomers.length === 0 && localData.length > 0) {
+                    console.log("Xóa khách hàng cục bộ để đồng bộ với Reset của Server.");
                     localStorage.removeItem(STORAGE_KEY);
                     dispatchCustomerUpdate();
-                } else {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
-                    dispatchCustomerUpdate();
+                    return;
                 }
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
+                dispatchCustomerUpdate();
             }
         }).catch(err => console.error("Lỗi tải khách hàng:", err));
     }
@@ -55,7 +56,11 @@ export const forceReloadCustomers = async (): Promise<Customer[]> => {
     try {
         const dbCustomers = await fetchCustomersFromDB();
         if (dbCustomers && Array.isArray(dbCustomers)) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
+            if (dbCustomers.length === 0) {
+                localStorage.removeItem(STORAGE_KEY);
+            } else {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
+            }
             dispatchCustomerUpdate();
             hasLoadedFromDB = true;
             return dbCustomers;
@@ -78,12 +83,11 @@ export const registerCustomer = async (data: {
     issueDate: string;
 }): Promise<{ success: boolean; message: string; customer?: Customer }> => {
   
-  // 1. Validate đầu vào
-  if (!data.fullName || !data.password || !data.email || !data.phoneNumber || !data.cccdNumber || !data.address || !data.dob || !data.issueDate || !data.gender) {
+  if (!data.fullName || !data.password || !data.email || !data.phoneNumber) {
       return { success: false, message: 'Vui lòng điền đầy đủ thông tin.' };
   }
 
-  // 2. Lấy danh sách khách hàng MỚI NHẤT từ Local (đã được sync với server rỗng nếu có)
+  // Luôn lấy dữ liệu sạch từ local (đã được sync với server rỗng nếu có)
   const customers = getCustomers();
   
   if (customers.some(c => c.email === data.email)) {
@@ -107,19 +111,15 @@ export const registerCustomer = async (data: {
     createdAt: Date.now()
   };
 
-  // 3. Gửi lên Server (Đợi kết quả để chắc chắn không trùng trên DB thật)
   try {
       const res = await syncCustomerToDB(newCustomer);
       if (res && !res.success && !res.isNetworkError) {
-          // Nếu server báo lỗi (VD: trùng email thực tế trên DB)
-          return { success: false, message: res.message || 'Email hoặc SĐT đã tồn tại trên hệ thống.' };
+          return { success: false, message: res.message || 'Tài khoản đã tồn tại.' };
       }
-  } catch (e) {
-      console.warn("Sync error, continuing with local saving.");
-  }
+  } catch (e) {}
 
-  // 4. Lưu Local thành công
-  const updatedCustomers = [newCustomer, ...getCustomers()];
+  const currentCustomers = getCustomers();
+  const updatedCustomers = [newCustomer, ...currentCustomers];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCustomers));
   dispatchCustomerUpdate();
   

@@ -23,7 +23,7 @@ const processAndMergeData = (localData: Product[], dbProducts: any[]) => {
     if (dbProducts && Array.isArray(dbProducts)) {
         const deletedIds = getDeletedIds();
         
-        // Nếu Server rỗng, dọn sạch local (quan trọng cho reset)
+        // RESET PROTECTION: Server rỗng -> Xóa sạch local rác
         if (dbProducts.length === 0 && localData.length > 0) {
             localStorage.removeItem(STORAGE_KEY);
             return [];
@@ -35,7 +35,8 @@ const processAndMergeData = (localData: Product[], dbProducts: any[]) => {
             return !serverIdSet.has(idStr) && !deletedIds.has(idStr);
         });
 
-        if (unsavedLocalProducts.length > 0) {
+        // Chỉ sync lên nếu server không rỗng (tránh sync dữ liệu cũ sau reset)
+        if (unsavedLocalProducts.length > 0 && dbProducts.length > 0) {
             unsavedLocalProducts.forEach(p => syncProductToDB(p));
         }
 
