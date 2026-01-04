@@ -20,6 +20,14 @@
   }
 }
 
+/* Định dạng nội dung mô tả chuyên nghiệp */
+.pro-description {
+  font-family: 'Montserrat', sans-serif;
+  line-height: 1.85;
+  letter-spacing: -0.01em;
+  @apply text-[#334155] font-medium;
+}
+
 .btn-primary {
   @apply bg-[#064E3B] hover:bg-[#022c22] text-white font-bold py-4 px-6 rounded-2xl 
          transition-all duration-300 shadow-xl shadow-[#064E3B]/20 
