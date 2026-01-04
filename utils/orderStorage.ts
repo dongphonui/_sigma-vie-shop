@@ -1,5 +1,5 @@
 
-import { updateProductStock } from './productStorage';
+import { updateProductStock, getProducts } from './productStorage';
 import { addTransaction } from './inventoryStorage';
 import { fetchOrdersFromDB, syncOrderToDB } from './apiClient';
 import type { Order, Customer, Product } from '../types';
@@ -20,7 +20,6 @@ export const getOrders = (): Order[] => {
         hasLoadedFromDB = true;
         fetchOrdersFromDB().then(dbOrders => {
             if (dbOrders && Array.isArray(dbOrders)) {
-                // CHỐNG PHỤC HỒI MA: Nếu server rỗng hoàn toàn, xóa sạch local
                 if (dbOrders.length === 0 && localData.length > 0) {
                     console.log("Server rỗng, dọn sạch đơn hàng cục bộ để tránh sync ngược.");
                     localStorage.removeItem(STORAGE_KEY);
@@ -42,9 +41,6 @@ export const getOrders = (): Order[] => {
 
 const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
     const serverIdSet = new Set(dbOrders.map((o: any) => String(o.id)));
-    
-    // Chỉ lấy các đơn hàng local thực sự mới (vừa đặt xong chưa kịp sync)
-    // Nếu server không rỗng, ta mới cho phép sync các đơn local "lệch"
     const unsavedLocalOrders = localData.filter(o => !serverIdSet.has(String(o.id)));
     
     if (unsavedLocalOrders.length > 0 && dbOrders.length > 0) {
@@ -116,9 +112,17 @@ export const createOrder = (
     }
 ): { success: boolean; message: string; order?: Order } => {
     
-    let stockAvailable = product.stock;
-    if (product.variants && (size || color)) {
-        const v = product.variants.find(v => 
+    // FETCH LATEST PRODUCT FROM STORAGE FOR ACCURATE STOCK
+    const latestProducts = getProducts();
+    const latestProd = latestProducts.find(p => String(p.id) === String(product.id));
+    
+    if (!latestProd) {
+        return { success: false, message: 'Sản phẩm không còn tồn tại trên hệ thống.' };
+    }
+
+    let stockAvailable = latestProd.stock;
+    if (latestProd.variants && (size || color)) {
+        const v = latestProd.variants.find(v => 
             (v.size === size || (!v.size && !size)) && 
             (v.color === color || (!v.color && !color))
         );
@@ -126,7 +130,7 @@ export const createOrder = (
     }
 
     if (stockAvailable < quantity) {
-        return { success: false, message: `Sản phẩm này chỉ còn lại ${stockAvailable} món.` };
+        return { success: false, message: `Số lượng tồn kho không đủ (Chỉ còn ${stockAvailable}).` };
     }
 
     const pricePerUnit = parsePrice(product.price);
@@ -138,13 +142,11 @@ export const createOrder = (
         customerId: customer.id,
         customerName: customer.fullName,
         customerContact: customer.email || customer.phoneNumber || 'N/A',
-        
         shippingName: shippingInfo?.name || customer.fullName,
         shippingPhone: shippingInfo?.phone || customer.phoneNumber || '',
         shippingAddress: shippingInfo?.address || customer.address || 'Chưa cung cấp',
         note: shippingInfo?.note || '',
         customerAddress: customer.address || 'Chưa cung cấp',
-
         productId: product.id,
         productName: product.name,
         productSize: size, 
@@ -159,7 +161,7 @@ export const createOrder = (
 
     const stockUpdated = updateProductStock(product.id, -quantity, size, color);
     if (!stockUpdated) {
-        return { success: false, message: 'Lỗi cập nhật tồn kho.' };
+        return { success: false, message: 'Lỗi cập nhật tồn kho biến thể.' };
     }
 
     const orders = getOrders();

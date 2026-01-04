@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import type { Product, Order } from '../types';
 import { createOrder } from '../utils/orderStorage';
 import { getCurrentCustomer } from '../utils/customerStorage';
@@ -51,6 +51,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
   const [shipAddress, setShipAddress] = useState('');
   const [shipNote, setShipNote] = useState('');
 
+  // Tồn kho cụ thể của biến thể đã chọn
+  const variantStock = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return product.stock;
+    if (!selectedSize && !selectedColor) return product.stock;
+    
+    const variant = product.variants.find(v => 
+        (v.size === selectedSize || (!v.size && !selectedSize)) && 
+        (v.color === selectedColor || (!v.color && !selectedColor))
+    );
+    return variant ? variant.stock : 0;
+  }, [product, selectedSize, selectedColor]);
+
   useEffect(() => {
       const customer = getCurrentCustomer();
       if (customer) {
@@ -75,7 +87,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   const handleQuantityChange = (delta: number) => {
       const newQty = quantity + delta;
-      if (newQty >= 1 && newQty <= product.stock) setQuantity(newQty);
+      if (newQty >= 1 && newQty <= variantStock) setQuantity(newQty);
   };
 
   const handlePlaceOrder = async () => {
@@ -84,6 +96,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
       if (product.sizes?.length && !selectedSize) { setFeedbackMsg('Vui lòng chọn Size.'); return; }
       if (product.colors?.length && !selectedColor) { setFeedbackMsg('Vui lòng chọn Màu sắc.'); return; }
       if (!shipName || !shipPhone || !shipAddress) { setFeedbackMsg('Vui lòng điền đủ thông tin giao hàng.'); return; }
+
+      if (variantStock < quantity) {
+          setFeedbackMsg('Số lượng tồn kho không đủ cho phân loại này.');
+          return;
+      }
 
       setOrderStatus('PROCESSING');
       const result = createOrder(customer, product, quantity, paymentMethod, shippingFee, selectedSize, selectedColor, {
@@ -117,7 +134,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
             <div className="w-full md:w-[55%] p-6 md:p-10 overflow-y-auto bg-white">
                 <button onClick={onClose} className="absolute top-6 right-6 text-gray-400 hover:text-red-500 transition-colors z-20"><XIcon className="w-8 h-8"/></button>
                 
-                {/* Product Name & Description at Top */}
+                {/* Product Name & Description */}
                 <div className="mb-8">
                     <div className="flex justify-between items-start mb-2">
                         <h1 className="text-3xl font-black text-gray-900 font-serif leading-tight">{product.name}</h1>
@@ -134,7 +151,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                     </div>
                     <div className="h-0.5 w-16 bg-[#D4AF37] mb-6"></div>
                     <p className="text-gray-600 leading-relaxed text-base italic font-serif opacity-90">
-                        {product.description || 'Sản phẩm thuộc bộ sưu tập mới nhất của Sigma Vie, mang đậm dấu ấn của sự thanh lịch và tinh tế.'}
+                        {product.description || 'Sản phẩm cao cấp Sigma Vie.'}
                     </p>
                 </div>
 
@@ -149,7 +166,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                                 <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Chọn Kích thước:</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.sizes.map(s => (
-                                        <button key={s} onClick={() => setSelectedSize(s)} className={`min-w-[44px] h-11 rounded-lg border-2 font-bold transition-all ${selectedSize === s ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>{s}</button>
+                                        <button key={s} onClick={() => { setSelectedSize(s); setQuantity(1); }} className={`min-w-[44px] h-11 rounded-lg border-2 font-bold transition-all ${selectedSize === s ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>{s}</button>
                                     ))}
                                 </div>
                             </div>
@@ -161,7 +178,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                                 <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Chọn Màu sắc:</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.colors.map(c => (
-                                        <button key={c} onClick={() => setSelectedColor(c)} className={`px-5 h-11 rounded-lg border-2 font-bold transition-all ${selectedColor === c ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>{c}</button>
+                                        <button key={c} onClick={() => { setSelectedColor(c); setQuantity(1); }} className={`px-5 h-11 rounded-lg border-2 font-bold transition-all ${selectedColor === c ? 'border-[#00695C] bg-teal-50 text-[#00695C]' : 'border-white bg-white text-gray-400 hover:border-slate-200 shadow-sm'}`}>{c}</button>
                                     ))}
                                 </div>
                             </div>
@@ -172,25 +189,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                             <div className="flex items-center gap-8 bg-white p-2 rounded-full px-4 shadow-sm border border-slate-100">
                                 <button onClick={() => handleQuantityChange(-1)} className="w-10 h-10 flex items-center justify-center text-2xl text-gray-400 hover:text-gray-800 transition-colors">-</button>
                                 <span className="text-xl font-black text-gray-900 w-6 text-center">{quantity}</span>
-                                <button onClick={() => handleQuantityChange(1)} className="w-10 h-10 flex items-center justify-center text-2xl text-gray-400 hover:text-gray-800 transition-colors">+</button>
+                                <button onClick={() => handleQuantityChange(1)} className="w-10 h-10 flex items-center justify-center text-2xl text-gray-400 hover:text-gray-800 transition-colors" disabled={quantity >= variantStock}>+</button>
                             </div>
-                            <p className="text-[11px] font-bold text-gray-400">Còn lại {product.stock} sản phẩm</p>
+                            <p className={`text-[11px] font-bold ${variantStock <= 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                                {variantStock <= 0 ? 'Hết hàng cho phân loại này' : `Còn lại ${variantStock} sản phẩm`}
+                            </p>
                         </div>
 
                         {/* Price Breakdown */}
                         <div className="pt-6 border-t border-slate-200 space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-400 font-medium">Tạm tính:</span>
-                                <span className="font-bold text-gray-600">{formatCurrency(subtotal)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-400 font-medium">Phí vận chuyển:</span>
-                                <span className="font-bold text-gray-600">{formatCurrency(shippingFee)}</span>
-                            </div>
-                            <div className="flex justify-between items-center pt-2">
-                                <span className="text-base font-black text-gray-800 uppercase tracking-tighter">Tổng cộng:</span>
-                                <span className="text-xl font-black text-[#00695C]">{formatCurrency(total)}</span>
-                            </div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-400 font-medium">Tạm tính:</span><span className="font-bold text-gray-600">{formatCurrency(subtotal)}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-400 font-medium">Phí vận chuyển:</span><span className="font-bold text-gray-600">{formatCurrency(shippingFee)}</span></div>
+                            <div className="flex justify-between items-center pt-2"><span className="text-base font-black text-gray-800 uppercase tracking-tighter">Tổng cộng:</span><span className="text-xl font-black text-[#00695C]">{formatCurrency(total)}</span></div>
                         </div>
 
                         {/* Recipient Info Form */}
@@ -212,8 +222,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         </div>
 
                         {/* Submit */}
-                        <button onClick={handlePlaceOrder} disabled={orderStatus === 'PROCESSING' || product.stock <= 0} className="w-full py-5 bg-[#00695C] text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl shadow-teal-900/20 hover:bg-[#004d40] hover:-translate-y-1 transition-all disabled:opacity-50">
-                            {orderStatus === 'PROCESSING' ? 'Đang đặt hàng...' : (product.stock <= 0 ? 'Hết hàng' : 'Hoàn tất Đặt mua')}
+                        <button 
+                            onClick={handlePlaceOrder} 
+                            disabled={orderStatus === 'PROCESSING' || variantStock <= 0} 
+                            className={`w-full py-5 text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-2xl transition-all ${variantStock <= 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#00695C] shadow-teal-900/20 hover:bg-[#004d40] hover:-translate-y-1'}`}
+                        >
+                            {orderStatus === 'PROCESSING' ? 'Đang đặt hàng...' : (variantStock <= 0 ? 'Hết hàng' : 'Hoàn tất Đặt mua')}
                         </button>
                         {feedbackMsg && <p className="text-center text-xs font-bold text-red-500 mt-2">{feedbackMsg}</p>}
                     </div>

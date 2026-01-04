@@ -58,7 +58,6 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Dat
 
 // --- API ENDPOINTS ---
 
-// Products
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -99,6 +98,9 @@ app.post('/api/products/stock', async (req, res) => {
                 p.variants[vIndex].stock = (parseInt(p.variants[vIndex].stock) || 0) + quantityChange;
             } else if (quantityChange > 0) {
                 p.variants.push({ size: size || '', color: color || '', stock: quantityChange });
+            } else {
+                // Đã có lỗi xảy ra nếu không tìm thấy biến thể để trừ
+                return res.status(400).json({ success: false, message: 'Không tìm thấy phân loại hàng để cập nhật.' });
             }
             
             p.stock = p.variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
