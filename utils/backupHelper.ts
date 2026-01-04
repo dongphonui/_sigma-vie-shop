@@ -30,46 +30,50 @@ export const performFactoryReset = async (scope: 'FULL' | 'ORDERS' | 'PRODUCTS')
     console.log(`🧨 THỰC HIỆN RESET HỆ THỐNG: Scope = ${scope}`);
     
     try {
-        // 1. Gửi lệnh xóa lên Server
+        // 1. Gửi lệnh xóa lên Server TRƯỚC
         const serverResult = await resetDatabase(scope);
         
         if (serverResult && serverResult.success === true) {
             
             // 2. XÓA TRẮNG DỮ LIỆU LOCAL NGAY LẬP TỨC
-            // Việc xóa ngay tại đây cực kỳ quan trọng để các hàm useEffect/Sync không đẩy dữ liệu cũ lên lại
+            // Chúng ta xóa NGAY để các hàm Sync không có dữ liệu mà đẩy lên lại Server
             
             if (scope === 'FULL') {
-                // Sao lưu lại cài đặt admin tối thiểu để không bị mất phiên đăng nhập ngay lúc này
-                const adminBackup = localStorage.getItem(KEYS.adminSettings);
-                const authState = sessionStorage.getItem('isAuthenticated');
-                const adminUser = sessionStorage.getItem('adminUser');
+                // Nuclear Option: Xóa SẠCH LocalStorage
+                const adminSettingsBackup = localStorage.getItem(KEYS.adminSettings);
+                const authBackup = sessionStorage.getItem('isAuthenticated');
+                const userBackup = sessionStorage.getItem('adminUser');
                 
-                // Xóa SẠCH LocalStorage và SessionStorage
                 localStorage.clear();
                 sessionStorage.clear();
                 
-                // Khôi phục lại phiên làm việc admin để hiện thông báo
-                if (adminBackup) localStorage.setItem(KEYS.adminSettings, adminBackup);
-                if (authState) sessionStorage.setItem('isAuthenticated', authState);
-                if (adminUser) sessionStorage.setItem('adminUser', adminUser);
+                // Khôi phục quyền truy cập Admin để không bị out ngay lập tức
+                if (adminSettingsBackup) localStorage.setItem(KEYS.adminSettings, adminSettingsBackup);
+                if (authBackup) sessionStorage.setItem('isAuthenticated', authBackup);
+                if (userBackup) sessionStorage.setItem('adminUser', userBackup);
                 
-                console.log("Đã dọn dẹp sạch sẽ bộ nhớ trình duyệt.");
+                console.log("Đã dọn sạch bộ nhớ trình duyệt.");
             } else if (scope === 'ORDERS') {
                 localStorage.removeItem(KEYS.orders);
                 localStorage.removeItem(KEYS.transactions);
+                // Xóa các giỏ hàng cũ liên quan đến đơn hàng
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('sigma_vie_cart_')) localStorage.removeItem(key);
+                });
             } else if (scope === 'PRODUCTS') {
                 localStorage.removeItem(KEYS.products);
                 localStorage.removeItem(KEYS.categories);
+                localStorage.removeItem(KEYS.transactions);
             }
 
-            // 3. ÉP BUỘC TẢI LẠI TRANG TỪ ĐỊA CHỈ GỐC
-            // Sử dụng window.location.href để phá hủy hoàn toàn React State hiện tại
+            // 3. ÉP TRÌNH DUYỆT TẢI LẠI HOÀN TOÀN TỪ SERVER
+            // Dùng window.location.href để phá hủy hoàn toàn React State hiện tại trong bộ nhớ RAM
             setTimeout(() => {
-                const baseUrl = window.location.origin + window.location.pathname;
-                window.location.href = baseUrl + "#/admin"; // Quay lại trang admin
-            }, 1500);
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.location.href = cleanUrl + "#/admin"; 
+            }, 1000);
 
-            return { success: true, message: 'Hệ thống đã được xóa trắng hoàn toàn. Đang khởi động lại...' };
+            return { success: true, message: 'Dữ liệu đã được xóa trắng. Đang khởi động lại...' };
         } else {
             return { success: false, message: serverResult?.message || 'Lỗi từ Server khi thực hiện reset.' };
         }
