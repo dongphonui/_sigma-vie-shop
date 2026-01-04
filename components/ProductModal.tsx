@@ -237,7 +237,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                   <button onClick={() => setShowProductQr(false)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-800"><XIcon className="w-6 h-6"/></button>
                   <h4 className="font-black text-slate-800 mb-6 uppercase tracking-widest text-sm border-b pb-4 italic">Product Identifier</h4>
                   <div className="p-4 bg-white border-4 border-slate-50 rounded-3xl inline-block shadow-inner mb-6">
-                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={220} />
+                      <QRCodeSVG 
+                        value={`${window.location.origin}/?product=${product.id}`} 
+                        size={220} 
+                        level="H" 
+                        includeMargin={true}
+                      />
                   </div>
                   <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold tracking-widest">SERIAL: {product.sku}</p>
                   <p className="text-sm font-medium text-slate-600">Quét mã để truy cập trực tiếp trang sản phẩm này trên thiết bị di động.</p>

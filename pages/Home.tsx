@@ -227,7 +227,7 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
         </div>
         )}
 
-        {/* Membership Registration Section (WITH QR CODE) */}
+        {/* Membership Registration Section (WITH QR CODE - UPDATED TO BE STRAIGHT AND CLEAR) */}
         {!currentUser && settings && (
             <div 
                 className="mb-16 shadow-xl relative overflow-hidden"
@@ -257,8 +257,13 @@ const Home: React.FC<HomeProps> = ({ isAdminLinkVisible, onOpenAuth, currentUser
                      </div>
 
                      <div className="flex flex-col items-center gap-3">
-                         <div className="bg-white p-4 rounded-2xl shadow-2xl border-4 border-white/20 transform rotate-1 hover:rotate-0 transition-transform duration-300">
-                             <QRCodeSVG value={registrationLink} size={160} />
+                         <div className="bg-white p-2 rounded-2xl shadow-2xl border-4 border-white/20 transition-all duration-300 hover:scale-105">
+                             <QRCodeSVG 
+                                value={registrationLink} 
+                                size={160} 
+                                level="H" 
+                                includeMargin={true}
+                             />
                          </div>
                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 animate-pulse">Quét để Đăng ký ngay</p>
                      </div>
