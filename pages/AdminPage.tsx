@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import type { AdminUser } from '../types';
-import { BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, CheckIcon } from '../components/Icons';
+import { 
+    BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, 
+    UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, 
+    CheckIcon, SettingsIcon, MonitorIcon 
+} from '../components/Icons';
 import { checkServerConnection } from '../utils/apiClient';
 
 // Import Components
@@ -33,7 +37,7 @@ const AdminPage: React.FC = () => {
         setCurrentAdminUser({ id: 'local_master', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER', permissions: ['ALL'] });
     }
     checkStatus();
-    // Kiểm tra định kỳ mỗi 30 giây
+    // Tự động kiểm tra mỗi 30 giây
     const interval = setInterval(checkStatus, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -46,7 +50,7 @@ const AdminPage: React.FC = () => {
       } catch (e) {
           setIsServerOnline(false);
       } finally {
-          setTimeout(() => setIsCheckingConnection(false), 500); // Tạo hiệu ứng mượt
+          setTimeout(() => setIsCheckingConnection(false), 600);
       }
   };
 
@@ -80,132 +84,147 @@ const AdminPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row">
-      {/* THANH THÔNG BÁO OFFLINE CẢI TIẾN */}
+    <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row font-sans">
+      {/* THANH THÔNG BÁO OFFLINE KHI MẤT KẾT NỐI */}
       {!isServerOnline && (
-        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2.5 z-[1000] text-sm font-black flex items-center justify-center gap-4 shadow-2xl animate-bounce-short">
-          <AlertCircleIcon className="w-5 h-5" />
-          <span className="uppercase tracking-widest">Hệ thống đang hoạt động Ngoại tuyến (Offline Mode)</span>
-          <button 
-            onClick={checkStatus} 
-            disabled={isCheckingConnection}
-            className="bg-white text-rose-600 px-4 py-1 rounded-full text-[10px] hover:bg-rose-50 transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <RefreshIcon className={`w-3 h-3 ${isCheckingConnection ? 'animate-spin' : ''}`} />
-            {isCheckingConnection ? 'Đang thử...' : 'KẾT NỐI LẠI'}
-          </button>
+        <div className="fixed top-0 left-0 right-0 bg-red-600 text-white py-2 z-[1000] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl">
+          <AlertCircleIcon className="w-4 h-4 animate-pulse" />
+          Mất kết nối máy chủ - Đang hoạt động ở chế độ Ngoại tuyến
+          <button onClick={checkStatus} className="bg-white text-red-600 px-3 py-0.5 rounded-full hover:bg-red-50 transition-all">Thử lại</button>
         </div>
       )}
 
-      <aside className="bg-[#111827] text-white w-full md:w-64 flex-shrink-0 print:hidden shadow-2xl z-20">
+      {/* SIDEBAR NAVIGATION */}
+      <aside className="bg-[#111827] text-white w-full md:w-72 flex-shrink-0 print:hidden shadow-2xl z-20 flex flex-col h-screen sticky top-0">
         <div className="p-8 border-b border-gray-800 flex items-center gap-3">
-          <div className="bg-[#D4AF37] p-2.5 rounded-xl shadow-lg"><ActivityIcon className="w-6 h-6 text-white" /></div>
-          <h1 className="text-xl font-black font-sans tracking-tighter uppercase">Sigma Admin</h1>
+          <div className="bg-[#B4975A] p-2.5 rounded-xl shadow-lg shadow-amber-900/20">
+            <ActivityIcon className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-tighter uppercase leading-none">Sigma Admin</h1>
+            <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
+          </div>
         </div>
-        <nav className="p-4 space-y-1">
+
+        {/* ĐÈN BÁO KẾT NỐI SERVER TẠI MENU */}
+        <div className="px-6 py-4 border-b border-gray-800/50 bg-black/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)] ${isServerOnline ? 'bg-emerald-500 animate-pulse shadow-emerald-500/50' : 'bg-rose-500 shadow-rose-500/50'}`}></div>
+                <div className="flex flex-col">
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${isServerOnline ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isServerOnline ? 'Server Online' : 'Server Offline'}
+                    </span>
+                    <span className="text-[8px] text-gray-500 font-medium">Đồng bộ đám mây</span>
+                </div>
+            </div>
+            <button 
+                onClick={checkStatus} 
+                disabled={isCheckingConnection}
+                className="p-2 hover:bg-white/5 rounded-lg transition-all active:scale-90 disabled:opacity-30"
+                title="Làm mới kết nối"
+            >
+                <RefreshIcon className={`w-3.5 h-3.5 text-gray-400 ${isCheckingConnection ? 'animate-spin text-[#B4975A]' : ''}`} />
+            </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
            {hasPermission('dashboard') && (
-               <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <BarChart2 className="w-5 h-5" /> Tổng quan
+               <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <BarChart2 className="w-5 h-5" /> <span className="text-sm font-bold">Tổng quan</span>
               </button>
            )}
            {hasPermission('products') && (
-               <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'products' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <PackageIcon className="w-5 h-5" /> Sản phẩm
+               <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'products' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <PackageIcon className="w-5 h-5" /> <span className="text-sm font-bold">Sản phẩm</span>
               </button>
            )}
            {hasPermission('orders') && (
-              <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'orders' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <ClipboardListIcon className="w-5 h-5" /> Đơn hàng
+              <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'orders' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <ClipboardListIcon className="w-5 h-5" /> <span className="text-sm font-bold">Đơn hàng</span>
               </button>
            )}
            {hasPermission('inventory') && (
-              <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <LayersIcon className="w-5 h-5" /> Kho hàng
+              <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <LayersIcon className="w-5 h-5" /> <span className="text-sm font-bold">Kho hàng</span>
               </button>
            )}
            {hasPermission('customers') && (
-               <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'customers' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <UsersIcon className="w-5 h-5" /> Khách hàng
+               <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'customers' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <UsersIcon className="w-5 h-5" /> <span className="text-sm font-bold">Khách hàng</span>
               </button>
            )}
            {hasPermission('reports') && (
-               <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-                <FileTextIcon className="w-5 h-5" /> Báo cáo
+               <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <FileTextIcon className="w-5 h-5" /> <span className="text-sm font-bold">Báo cáo</span>
               </button>
            )}
 
            {hasPermission('settings_ui') && (
-               <div className="pt-6 mt-6 border-t border-gray-800">
-                    <p className="px-5 text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Giao diện Web</p>
-                    <button onClick={() => setActiveTab('home')} className={`w-full flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-all ${activeTab === 'home' ? 'bg-white/10 text-white font-bold' : 'text-gray-400 hover:text-white'}`}>Trang chủ</button>
-                    <button onClick={() => setActiveTab('products_ui')} className={`w-full flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-all ${activeTab === 'products_ui' ? 'bg-white/10 text-white font-bold' : 'text-gray-400 hover:text-white'}`}>Sản phẩm</button>
-                    <button onClick={() => setActiveTab('header')} className={`w-full flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-all ${activeTab === 'header' ? 'bg-white/10 text-white font-bold' : 'text-gray-400 hover:text-white'}`}>Header & Logo</button>
-                    <button onClick={() => setActiveTab('about')} className={`w-full flex items-center gap-3 px-5 py-2.5 rounded-xl text-sm transition-all ${activeTab === 'about' ? 'bg-white/10 text-white font-bold' : 'text-gray-400 hover:text-white'}`}>Giới thiệu</button>
+               <div className="pt-6 mt-6 border-t border-gray-800/50">
+                    <p className="px-5 text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                        <MonitorIcon className="w-3 h-3" /> Giao diện Website
+                    </p>
+                    <button onClick={() => setActiveTab('home')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'home' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Trang chủ</button>
+                    <button onClick={() => setActiveTab('products_ui')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'products_ui' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Trang Sản phẩm</button>
+                    <button onClick={() => setActiveTab('header')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'header' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Header & Logo</button>
+                    <button onClick={() => setActiveTab('about')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'about' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Trang Giới thiệu</button>
                </div>
            )}
-           <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl mt-6 transition-all ${activeTab === 'settings' ? 'bg-[#D4AF37] text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-            <UserIcon className="w-5 h-5" /> Cài đặt chung
-           </button>
         </nav>
+
         <div className="p-4 mt-auto border-t border-gray-800">
-             <a href="#/" className="flex items-center gap-2 text-gray-500 hover:text-white mb-4 px-5 text-sm transition-colors font-bold uppercase tracking-tighter italic">← Về Cửa hàng</a>
-             <button onClick={handleLogout} className="w-full bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Đăng xuất</button>
+             <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl mb-4 transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'}`}>
+                <UserIcon className="w-5 h-5" /> <span className="text-sm font-bold">Cấu hình hệ thống</span>
+             </button>
+             <button onClick={handleLogout} className="w-full bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Đăng xuất</button>
         </div>
       </aside>
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto">
-        <header className="flex justify-between items-start mb-10 print:hidden">
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 p-6 md:p-12 overflow-y-auto max-h-screen">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 print:hidden">
             <div>
-                <p className="text-[10px] font-black text-[#B4975A] uppercase tracking-[0.4em] mb-1">Sigma Vie Management</p>
-                <h2 className="text-3xl font-black text-[#111827] uppercase tracking-tighter">
-                    {activeTab === 'dashboard' ? 'Tổng quan' : 
-                     activeTab === 'products' ? 'Danh mục Vật phẩm' : 
-                     activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
-                     activeTab === 'inventory' ? 'Kiểm soát Kho' : 
-                     activeTab === 'customers' ? 'Tài khoản Khách hàng' : 
-                     activeTab === 'reports' ? 'Thống kê & Báo cáo' : 
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="w-8 h-[1px] bg-[#B4975A]"></span>
+                    <p className="text-[10px] font-black text-[#B4975A] uppercase tracking-[0.4em]">Sigma Vie Hub</p>
+                </div>
+                <h2 className="text-4xl font-black text-[#111827] uppercase tracking-tighter">
+                    {activeTab === 'dashboard' ? 'Bảng điều khiển' : 
+                     activeTab === 'products' ? 'Danh mục Sản phẩm' : 
+                     activeTab === 'orders' ? 'Đơn hàng' : 
+                     activeTab === 'inventory' ? 'Kho hàng' : 
+                     activeTab === 'customers' ? 'Khách hàng' : 
+                     activeTab === 'reports' ? 'Báo cáo & Thống kê' : 
                      activeTab === 'home' ? 'Giao diện Trang chủ' :
-                     activeTab === 'products_ui' ? 'Cấu hình Sản phẩm' :
+                     activeTab === 'products_ui' ? 'Giao diện Sản phẩm' :
                      activeTab === 'header' ? 'Header & Logo' :
                      activeTab === 'about' ? 'Trang Giới thiệu' : 'Hệ thống'}
                 </h2>
-                
-                {/* INDICATOR TRẠNG THÁI SERVER TRONG HEADER */}
-                <div className="flex items-center gap-2 mt-2">
-                  <div className={`w-2 h-2 rounded-full ${isServerOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${isServerOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {isServerOnline ? 'Máy chủ: Trực tuyến' : 'Máy chủ: Ngoại tuyến'}
-                  </span>
-                  <button 
-                    onClick={checkStatus} 
-                    className="p-1 hover:bg-slate-100 rounded-full transition-colors ml-1"
-                    title="Kiểm tra kết nối"
-                  >
-                    <RefreshIcon className={`w-3 h-3 text-slate-400 ${isCheckingConnection ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
             </div>
             
-            <div className="flex items-center gap-5">
-                <div className="text-right hidden sm:block">
-                    <p className="text-xs font-black text-[#111827]">{currentAdminUser?.fullname}</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Quản trị viên</p>
+            <div className="flex items-center gap-6 bg-white p-3 pr-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-[#B4975A] font-black shadow-lg text-xl">
+                    {currentAdminUser?.fullname?.charAt(0).toUpperCase() || 'A'}
                 </div>
-                <div className="w-12 h-12 bg-[#111827] rounded-2xl flex items-center justify-center text-white font-black shadow-2xl border border-white/10 text-xl">A</div>
+                <div className="text-left">
+                    <p className="text-xs font-black text-[#111827] uppercase leading-none">{currentAdminUser?.fullname}</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị tối cao' : 'Nhân viên vận hành'}
+                    </p>
+                </div>
             </div>
         </header>
-        <div className="max-w-7xl mx-auto">
+
+        <div className="max-w-[1600px] mx-auto pb-20">
             {renderContent()}
         </div>
       </main>
 
       <style>{`
-        @keyframes bounce-short {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
-        }
-        .animate-bounce-short {
-          animation: bounce-short 2s infinite;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4B5563; }
       `}</style>
     </div>
   );

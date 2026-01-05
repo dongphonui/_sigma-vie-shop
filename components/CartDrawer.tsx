@@ -145,7 +145,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
         {items.length > 0 && (
             <div className="p-10 bg-[#FCFCFB] border-t border-slate-50">
                 <div className="space-y-4 mb-10">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Bàn giao vật phẩm</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Bàn giao sản phẩm</p>
                     <input type="text" placeholder="Họ và tên người nhận" value={shipName} onChange={e => setShipName(e.target.value)} className="w-full bg-transparent border-b border-slate-200 py-2 text-xs font-bold focus:border-[#B4975A] outline-none" />
                     <div className="grid grid-cols-2 gap-4">
                         <input type="tel" placeholder="Số điện thoại" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="w-full bg-transparent border-b border-slate-200 py-2 text-xs font-bold focus:border-[#B4975A] outline-none" />
@@ -169,8 +169,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                    <button onClick={() => setPaymentMethod('COD')} className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${paymentMethod === 'COD' ? 'bg-[#111827] text-white border-[#111827] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-slate-200'}`}>Tiền mặt</button>
-                    <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#B4975A] text-white border-[#B4975A] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-slate-200'}`}>Chuyển khoản</button>
+                    <button onClick={() => setPaymentMethod('COD')} className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${paymentMethod === 'COD' ? 'bg-[#B4975A] text-white border-[#B4975A] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#B4975A]'}`}>Tiền mặt</button>
+                    <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#B4975A] text-white border-[#B4975A] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#B4975A]'}`}>Chuyển khoản</button>
                 </div>
 
                 <button 

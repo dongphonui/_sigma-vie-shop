@@ -15,11 +15,11 @@ const DEFAULT_SETTINGS: ProductPageSettings = {
   descFont: 'Roboto',
   descColor: '#6B7280',
   descSize: '14px',
-  badgeLabel: 'Mã vật phẩm',
+  badgeLabel: 'Mã sản phẩm',
   badgeBgColor: '#B4975A',
   badgeTextColor: '#FFFFFF',
   buyBtnText: 'XÁC NHẬN SỞ HỮU',
-  buyBtnBgColor: '#000000',
+  buyBtnBgColor: '#B4975A', // Đã đổi từ đen sang vàng gold
   buyBtnTextColor: '#FFFFFF',
   qrIconVisible: true
 };
