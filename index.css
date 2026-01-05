@@ -10,56 +10,54 @@
     -webkit-font-smoothing: antialiased;
   }
   
-  h1, h2, h3, h4, .font-serif {
+  /* Heading phong cách Vogue/Harper's Bazaar */
+  h1, h2, h3, h4 {
     font-family: 'Playfair Display', serif;
+    letter-spacing: -0.02em;
   }
 
-  /* Font số chuyên nghiệp cho giá tiền */
-  .font-sans {
+  .font-serif-italic {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+  }
+
+  .font-sans-luxury {
     font-family: 'Montserrat', sans-serif;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    font-weight: 800;
   }
 }
 
-/* Định dạng nội dung mô tả chuyên nghiệp */
+/* Nâng cấp nội dung mô tả sang trọng tuyệt đối */
 .pro-description {
   font-family: 'Montserrat', sans-serif;
-  line-height: 1.85;
-  letter-spacing: -0.01em;
-  @apply text-[#334155] font-medium;
+  line-height: 2;
+  letter-spacing: 0.02em;
+  @apply text-slate-600 font-normal;
 }
 
-.btn-primary {
-  @apply bg-[#064E3B] hover:bg-[#022c22] text-white font-bold py-4 px-6 rounded-2xl 
-         transition-all duration-300 shadow-xl shadow-[#064E3B]/20 
-         active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px];
+.btn-luxury-main {
+  @apply bg-[#064E3B] hover:bg-[#022c22] text-white font-black py-5 px-10 rounded-full 
+         transition-all duration-500 shadow-2xl shadow-[#064E3B]/30 
+         active:scale-95 flex items-center justify-center gap-4 uppercase tracking-[0.4em] text-[10px];
 }
 
-.btn-gold {
-  @apply bg-[#92400E] hover:bg-[#78350f] text-white font-bold py-4 px-6 rounded-2xl 
-         transition-all duration-300 shadow-xl shadow-[#92400E]/20 
-         active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px];
+.input-luxury-line {
+  @apply w-full bg-transparent border-b-2 border-slate-100 py-3 
+         focus:border-[#92400E] outline-none transition-all text-sm font-semibold;
 }
 
-.input-luxury {
-  @apply w-full bg-white border border-slate-200 rounded-xl px-4 py-3 
-         focus:border-[#92400E] focus:ring-4 focus:ring-[#92400E]/5 
-         outline-none transition-all text-sm font-medium;
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(30px); filter: blur(10px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+.animate-float-up {
+  animation: float-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes slide-in-right {
-    from { opacity: 0; transform: translateX(30px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-.animate-slide-in-right {
-    animation: slide-in-right 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+/* Hiệu ứng kính ngọc trai */
+.glass-pearl {
+  @apply bg-white/70 backdrop-blur-md border border-white/50 shadow-xl;
 }
