@@ -22,7 +22,7 @@
 
   .font-sans-luxury {
     font-family: 'Montserrat', sans-serif;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.25em;
     text-transform: uppercase;
     font-weight: 800;
   }
@@ -35,23 +35,23 @@
 
 .pro-description {
   font-family: 'Roboto', sans-serif;
-  line-height: 1.8;
-  @apply text-slate-500 font-normal text-[15px];
+  line-height: 1.7;
+  @apply text-slate-500 font-normal text-[14px];
 }
 
 .btn-luxury-main {
-  @apply bg-[#D4AF37] hover:bg-[#b89b31] text-white font-black py-5 px-10 rounded-full 
+  @apply bg-[#D4AF37] hover:bg-[#b89b31] text-white font-black py-4 px-10 rounded-full 
          transition-all duration-500 shadow-2xl shadow-amber-900/20 
-         active:scale-95 flex items-center justify-center gap-4 uppercase tracking-[0.3em] text-[10px];
+         active:scale-95 flex items-center justify-center gap-4 uppercase tracking-[0.3em] text-[9px];
 }
 
 .input-luxury-line {
-  @apply w-full bg-transparent border-b border-slate-200 py-3 
+  @apply w-full bg-transparent border-b border-slate-100 py-2 
          focus:border-[#D4AF37] outline-none transition-all text-sm font-medium;
 }
 
 @keyframes float-up {
-  from { opacity: 0; transform: translateY(30px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -69,6 +69,6 @@
   top: 0; left: 0; right: 0; bottom: 0;
   background-image: radial-gradient(circle, white 1px, transparent 1px);
   background-size: 50px 50px;
-  opacity: 0.1;
+  opacity: 0.08;
   pointer-events: none;
 }
