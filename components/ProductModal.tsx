@@ -115,7 +115,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
             {/* CỘT PHẢI: NỘI DUNG SẠCH SẼ, CÂN ĐỐI */}
             <div className="w-full md:w-[58%] p-8 md:p-14 overflow-y-auto flex flex-col bg-white">
-                <button onClick={onClose} className="hidden md:flex absolute top-10 right-10 text-slate-200 hover:text-[#064E3B] transition-all duration-300"><XIcon /></button>
+                <button onClick={onClose} className="hidden md:flex absolute top-10 right-10 text-slate-200 hover:text-[#92400E] transition-all duration-300"><XIcon /></button>
                 
                 <div className="mb-10">
                     <div className="flex items-center gap-3 mb-4">
@@ -123,8 +123,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         <span className="font-sans-luxury text-[8px] text-[#D4AF37] tracking-[0.3em]">Boutique Collection</span>
                     </div>
                     
-                    {/* SIZE TIÊU ĐỀ NHỎ LẠI CHO SANG */}
-                    <h1 className="text-3xl md:text-4xl font-serif font-black text-[#064E3B] leading-tight mb-6 uppercase tracking-tight">
+                    {/* TIÊU ĐỀ ĐỔI SANG FONT ROBOTO (SANS) VÀ MÀU VÀNG GOLD ẤM ÁP GIỐNG ẢNH MẪU */}
+                    <h1 className="text-3xl md:text-4xl font-sans font-black text-[#D4AF37] leading-tight mb-6 uppercase tracking-tighter">
                         {product.name}
                     </h1>
                     
@@ -135,8 +135,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         {product.isFlashSale && <span className="text-sm text-slate-300 line-through font-light">{product.price}</span>}
                     </div>
                     
-                    <div className="relative pl-6 border-l border-slate-100">
-                        <p className="pro-description italic opacity-80 leading-relaxed">
+                    <div className="relative pl-6 border-l-2 border-[#D4AF37]/30">
+                        <p className="pro-description italic opacity-80 leading-relaxed text-[#064E3B]/70">
                             {product.description || 'Chế tác từ những chất liệu tinh tuyển nhất, thiết kế này là tuyên ngôn của sự lịch lãm và đẳng cấp vượt thời gian, dành riêng cho những quý chủ nhân thượng lưu.'}
                         </p>
                     </div>
@@ -150,7 +150,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                                 <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Chọn Kích thước</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.sizes?.map(s => (
-                                        <button key={s} onClick={() => { setSelectedSize(s); setFeedbackMsg(''); }} className={`h-10 w-10 rounded-lg border transition-all text-[11px] font-bold ${selectedSize === s ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>{s}</button>
+                                        <button key={s} onClick={() => { setSelectedSize(s); setFeedbackMsg(''); }} className={`h-10 w-10 rounded-lg border-2 transition-all text-[11px] font-bold ${selectedSize === s ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-[#D4AF37]/50'}`}>{s}</button>
                                     ))}
                                 </div>
                             </div>
@@ -160,7 +160,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                                 <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Chọn Màu sắc</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.colors?.map(c => (
-                                        <button key={c} onClick={() => { setSelectedColor(c); setFeedbackMsg(''); }} className={`px-4 h-10 rounded-lg border transition-all text-[11px] font-bold ${selectedColor === c ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>{c}</button>
+                                        <button key={c} onClick={() => { setSelectedColor(c); setFeedbackMsg(''); }} className={`px-4 h-10 rounded-lg border-2 transition-all text-[11px] font-bold ${selectedColor === c ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-[#D4AF37]/50'}`}>{c}</button>
                                     ))}
                                 </div>
                             </div>
@@ -173,6 +173,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                              <p className={`font-sans-luxury text-[8px] mb-1 ${variantStock === 0 ? 'text-rose-500' : 'text-[#064E3B] opacity-60'}`}>
                                 {variantStock === 0 ? 'Hiện tại đã cháy hàng' : (variantStock > 0 ? `Sẵn sàng: ${variantStock} phẩm vật` : 'Quý khách vui lòng chọn phiên bản')}
                              </p>
+                             <p className="font-script text-lg text-[#D4AF37]">Nâng tầm phong thái</p>
                         </div>
                         <div className="flex items-center bg-slate-50 rounded-full h-11 px-4 gap-6">
                             <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="text-xl text-slate-300 hover:text-[#064E3B] transition-all">-</button>
@@ -181,8 +182,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                         </div>
                     </div>
 
-                    {/* KHỐI THANH TOÁN - SIZE CHỮ NHỎ LẠI HÀI HÒA */}
-                    <div className="bg-[#FBFBFB] p-6 rounded-[1.5rem] border border-slate-50 space-y-3">
+                    {/* KHỐI THANH TOÁN */}
+                    <div className="bg-[#FFFBFA] p-6 rounded-[1.5rem] border border-[#D4AF37]/5 space-y-3 shadow-sm">
                         <div className="flex justify-between items-center text-[11px] font-medium text-slate-400 uppercase tracking-wider">
                             <span>Giá trị vật phẩm</span>
                             <span className="text-slate-600">{formatCurrency(subtotal)}</span>
@@ -191,9 +192,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                             <span>Đặc quyền vận chuyển</span>
                             <span className={shippingFee === 0 ? 'text-emerald-600 font-bold' : 'text-slate-600'}>{shippingFee === 0 ? 'MIỄN PHÍ' : formatCurrency(shippingFee)}</span>
                         </div>
-                        <div className="pt-4 border-t border-dashed border-slate-200 flex justify-between items-center">
+                        <div className="pt-4 border-t border-dashed border-[#D4AF37]/20 flex justify-between items-center">
                             <span className="font-sans-luxury text-[9px] text-[#D4AF37]">Tổng trị giá thanh toán</span>
-                            {/* SIZE TIỀN NHỎ LẠI: text-3xl thay vì text-5xl */}
                             <span className="text-3xl font-black text-[#064E3B] tracking-tighter">{formatCurrency(total)}</span>
                         </div>
                     </div>
@@ -211,8 +211,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
                     {/* Action Buttons */}
                     <div className="pt-6 pb-12">
                          <div className="grid grid-cols-2 gap-3 mb-6">
-                            <button onClick={() => setPaymentMethod('COD')} className={`py-3.5 rounded-xl font-sans-luxury text-[8px] transition-all border ${paymentMethod === 'COD' ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-slate-200'}`}>Tiền mặt (COD)</button>
-                            <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-3.5 rounded-xl font-sans-luxury text-[8px] transition-all border ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#D4AF37] text-white border-[#D4AF37] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-slate-200'}`}>Chuyển khoản QR</button>
+                            <button onClick={() => setPaymentMethod('COD')} className={`py-3.5 rounded-xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'COD' ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#064E3B]/30'}`}>Tiền mặt (COD)</button>
+                            <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-3.5 rounded-xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#D4AF37] text-white border-[#D4AF37] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#D4AF37]/30'}`}>Chuyển khoản QR</button>
                          </div>
 
                          <button 
