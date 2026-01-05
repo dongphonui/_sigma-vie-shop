@@ -8,30 +8,49 @@ export interface ProductVariant {
 export interface Product {
   id: number;
   name: string;
-  price: string; // Giá bán (Giá gốc)
-  salePrice?: string; // Giá khuyến mãi
-  isFlashSale?: boolean; // Có đang chạy Flash Sale không
-  flashSaleStartTime?: number; // Thời gian bắt đầu
-  flashSaleEndTime?: number; // Thời gian kết thúc
-  importPrice: string; // Giá nhập
+  price: string;
+  salePrice?: string;
+  isFlashSale?: boolean;
+  flashSaleStartTime?: number;
+  flashSaleEndTime?: number;
+  importPrice: string;
   description: string;
   imageUrl: string;
-  stock: number; // Tổng tồn kho
-  // New "Amazon-like" fields
-  sku: string; // Stock Keeping Unit
+  stock: number;
+  sku: string;
   category: string;
   brand: string;
   status: 'active' | 'draft' | 'archived';
-  sizes?: string[]; // Danh sách size (VD: ['S', 'M', 'L'])
-  colors?: string[]; // Danh sách màu (VD: ['Đen', 'Trắng'])
-  variants?: ProductVariant[]; // NEW: Quản lý tồn kho chi tiết
+  sizes?: string[];
+  colors?: string[];
+  variants?: ProductVariant[];
+}
+
+// Cấu hình giao diện sản phẩm chi tiết
+export interface ProductPageSettings {
+  titleFont: string;
+  titleColor: string;
+  titleSize: string;
+  priceFont: string;
+  priceColor: string;
+  priceSize: string;
+  descFont: string;
+  descColor: string;
+  descSize: string;
+  badgeLabel: string; // Nhãn thay thế cho Collection/Mã hiệu
+  badgeBgColor: string;
+  badgeTextColor: string;
+  buyBtnText: string;
+  buyBtnBgColor: string;
+  buyBtnTextColor: string;
+  qrIconVisible: boolean;
 }
 
 export interface CartItem extends Product {
   quantity: number;
   selectedPrice: number;
-  selectedSize?: string; // NEW: Size khách chọn
-  selectedColor?: string; // NEW: Màu khách chọn
+  selectedSize?: string;
+  selectedColor?: string;
 }
 
 export interface Category {
@@ -48,9 +67,9 @@ export interface InventoryTransaction {
   quantity: number;
   timestamp: number;
   note?: string;
-  selectedSize?: string; // NEW: Size cụ thể
-  selectedColor?: string; // NEW: Màu cụ thể
-  stockAfter?: number; // NEW: Tồn kho sau giao dịch
+  selectedSize?: string;
+  selectedColor?: string;
+  stockAfter?: number;
 }
 
 export interface Customer {
@@ -70,22 +89,17 @@ export interface Customer {
 export interface Order {
   id: string;
   customerId: string;
-  customerName: string; // Tên tài khoản đặt (Người mua)
-  customerContact: string; // Liên hệ tài khoản đặt
-  
-  // Shipping Info (Người nhận thực tế)
+  customerName: string;
+  customerContact: string;
   shippingName: string;
   shippingPhone: string;
   shippingAddress: string;
   note?: string;
-
-  // Legacy fallback (Optional now, mapped to shipping fields usually)
   customerAddress: string; 
-
   productId: number;
   productName: string;
-  productSize?: string; // NEW: Size khách chọn
-  productColor?: string; // NEW: Màu khách chọn
+  productSize?: string;
+  productColor?: string;
   quantity: number;
   totalPrice: number; 
   shippingFee?: number; 
@@ -94,25 +108,25 @@ export interface Order {
   paymentMethod?: 'COD' | 'BANK_TRANSFER'; 
 }
 
-export interface AdminLoginLog {
-  id: string;
-  username: string;
-  method: 'EMAIL_OTP' | 'GOOGLE_AUTH' | 'PASSWORD';
-  ip_address?: string;
-  user_agent?: string;
-  timestamp: number;
-  status: 'SUCCESS' | 'FAILED';
-}
-
 export interface AdminUser {
     id: string;
     username: string;
     fullname: string;
     role: 'MASTER' | 'STAFF';
-    permissions: string[]; // e.g. ['products', 'orders'] or ['ALL']
+    permissions: string[];
     created_at?: number;
-    totp_secret?: string; // NEW: Secret for Staff 2FA
-    is_totp_enabled?: boolean; // NEW: Flag for Staff 2FA
+    totp_secret?: string;
+    is_totp_enabled?: boolean;
+}
+
+// Fixed: Added missing AdminLoginLog interface
+export interface AdminLoginLog {
+    id: number;
+    username: string;
+    method: string;
+    status: string;
+    ip_address?: string;
+    timestamp: number;
 }
 
 export interface AboutPageContent {
@@ -137,8 +151,6 @@ export interface HomePageSettings {
   subtitleText: string;
   subtitleColor: string;
   subtitleFont: string;
-  
-  // Promotion Section
   promoImageUrl: string;
   promoImageUrls: string[]; 
   promoBackgroundColor: string;
@@ -158,8 +170,6 @@ export interface HomePageSettings {
   promoButtonText: string;
   promoButtonBgColor: string;
   promoButtonTextColor: string;
-
-  // Registration Section Settings
   regHeadlineText: string;
   regHeadlineColor: string;
   regHeadlineFont: string;
@@ -177,8 +187,6 @@ export interface HomePageSettings {
   regButtonFontSize: string;
   regPadding: string; 
   regBorderRadius: string;
-
-  // Flash Sale Section Settings
   flashSaleBgColorStart: string;
   flashSaleBgColorEnd: string;
   flashSaleTitleText: string; 
@@ -204,18 +212,15 @@ export interface HeaderSettings {
   brandFont: string; 
   brandBackgroundColor: string; 
   logoUrl?: string; 
-  
   borderColor: string;
   borderWidth: string; 
   borderStyle: string; 
-
   navStoreText: string; 
   navAboutText: string; 
   navColor: string;
   navHoverColor: string;
   navFont: string;
   navFontSize: string;
-
   loginBtnText: string;
   loginBtnFont: string;
   loginBtnFontSize: string;
