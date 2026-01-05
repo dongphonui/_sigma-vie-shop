@@ -91,182 +91,166 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   return (
     <>
-      <div className="fixed inset-0 bg-[#064E3B]/95 z-50 flex items-center justify-center p-0 md:p-10 backdrop-blur-2xl transition-all duration-700" onClick={onClose}>
-        <div className="relative bg-white w-full max-w-7xl h-full md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] rounded-none md:rounded-[4rem] animate-float-up" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-[#064E3B]/90 z-50 flex items-center justify-center p-0 md:p-10 backdrop-blur-xl" onClick={onClose}>
+        <div className="relative bg-white w-full max-w-7xl h-full md:h-auto md:max-h-[92vh] overflow-hidden flex flex-col md:flex-row shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-none md:rounded-[3rem] animate-float-up" onClick={e => e.stopPropagation()}>
             
             {/* CỘT TRÁI: VISUAL GALLERY */}
-            <div className="w-full md:w-[45%] h-[400px] md:h-auto relative overflow-hidden group">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110" />
-                <div className="absolute inset-0 bg-gradient-to-tr from-[#064E3B]/40 via-transparent to-transparent"></div>
+            <div className="w-full md:w-[45%] h-[350px] md:h-auto relative overflow-hidden group">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-105" />
                 
-                {/* QR Boutique Label */}
-                <div className="absolute top-12 left-0 z-10 glass-pearl py-2 px-6 rounded-r-full border-l-0">
-                    <span className="font-sans-luxury text-[8px] text-[#92400E]">Boutique No. {product.id}</span>
+                {/* ID Tag */}
+                <div className="absolute top-8 left-8 z-10 glass-pearl py-2 px-5 rounded-full border-none">
+                    <span className="font-sans-luxury text-[7px] text-[#064E3B] opacity-70">Model ID: {product.sku}</span>
                 </div>
 
                 <button 
                     onClick={() => setShowProductQrView(true)}
-                    className="absolute bottom-10 left-10 glass-pearl p-5 rounded-[2rem] shadow-2xl hover:scale-110 active:scale-95 transition-all text-[#92400E] flex flex-col items-center gap-1 group/qr"
+                    className="absolute bottom-8 left-8 glass-pearl p-4 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all text-[#92400E]"
                 >
                     <QrIcon />
-                    <span className="font-sans-luxury text-[7px] tracking-[0.2em] group-hover/qr:tracking-[0.4em] transition-all">Identity QR</span>
                 </button>
 
-                <button onClick={onClose} className="md:hidden absolute top-8 right-8 glass-pearl p-3 rounded-full text-[#064E3B]"><XIcon /></button>
+                <button onClick={onClose} className="md:hidden absolute top-6 right-6 glass-pearl p-3 rounded-full text-[#064E3B]"><XIcon /></button>
             </div>
 
             {/* CỘT PHẢI: EDITORIAL CONTENT */}
-            <div className="w-full md:w-[55%] p-8 md:p-16 overflow-y-auto flex flex-col bg-[#FCFCF9]">
-                <button onClick={onClose} className="hidden md:flex absolute top-12 right-12 text-slate-300 hover:text-[#92400E] transition-all hover:rotate-90 duration-500"><XIcon /></button>
+            <div className="w-full md:w-[55%] p-8 md:p-14 overflow-y-auto flex flex-col bg-white">
+                <button onClick={onClose} className="hidden md:flex absolute top-10 right-10 text-slate-200 hover:text-[#064E3B] transition-all duration-300"><XIcon /></button>
                 
-                <div className="mb-14">
-                    <div className="flex items-center gap-4 mb-6">
-                        <span className="w-12 h-[1px] bg-[#92400E]"></span>
-                        <span className="font-sans-luxury text-[9px] text-[#92400E]">Exclusive Editorial</span>
+                <div className="mb-10">
+                    <div className="flex items-center gap-3 mb-5">
+                        <span className="w-8 h-[2px] bg-[#D4AF37]"></span>
+                        <span className="font-sans-luxury text-[8px] text-[#D4AF37] tracking-[0.4em]">Official Boutique Item</span>
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-serif font-black text-[#064E3B] leading-[1.1] mb-8">
-                        {product.name.split(' ').map((word, i) => i % 2 === 1 ? <span key={i} className="font-serif-italic font-normal italic text-[#92400E] ml-2">{word} </span> : word + ' ')}
+                    
+                    {/* TIÊU ĐỀ ĐỒNG NHẤT MỘT MÀU XANH LÁ */}
+                    <h1 className="text-4xl md:text-5xl font-serif font-black text-[#064E3B] leading-tight mb-6">
+                        {product.name}
                     </h1>
                     
-                    <div className="flex items-center gap-6 mb-10">
-                        <div className="bg-[#064E3B] text-white px-6 py-3 rounded-2xl shadow-xl">
-                            <span className="text-2xl font-black font-sans tracking-tighter">{product.isFlashSale ? product.salePrice : product.price}</span>
-                        </div>
-                        {product.isFlashSale && <span className="text-lg text-slate-300 line-through font-serif-italic">Original: {product.price}</span>}
+                    <div className="flex items-center gap-5 mb-8">
+                        <span className="text-3xl font-black text-[#064E3B] tracking-tighter">
+                            {product.isFlashSale ? product.salePrice : product.price}
+                        </span>
+                        {product.isFlashSale && <span className="text-base text-slate-300 line-through font-light">{product.price}</span>}
                     </div>
                     
-                    <div className="relative pl-8 border-l border-[#92400E]/30">
-                        <p className="pro-description text-sm italic opacity-80 leading-loose">
-                            {product.description || 'Nghệ thuật cắt may đỉnh cao kết hợp cùng tư duy thẩm mỹ hiện đại, thiết kế này không chỉ là trang phục mà còn là biểu ngôn cho phong cách sống thượng lưu.'}
+                    <div className="pt-6 border-t border-slate-50">
+                        <p className="pro-description">
+                            {product.description || 'Sản phẩm được chế tác từ những vật liệu cao cấp nhất, kết hợp giữa truyền thống thủ công và hơi thở đương đại, tạo nên một tuyệt phẩm dành riêng cho phong cách của quý khách.'}
                         </p>
                     </div>
                 </div>
 
-                {/* KHỐI TÙY CHỌN LIỀN MẠCH */}
-                <div className="space-y-12">
-                    
-                    {/* 1. Phân loại */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 border-t border-slate-100 pt-10">
+                <div className="space-y-10">
+                    {/* Tùy chọn phân loại */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         {hasSizes && (
                             <div>
-                                <label className="font-sans-luxury text-[10px] text-[#064E3B]/40 mb-5 block">01. Kích thước</label>
-                                <div className="flex flex-wrap gap-3">
+                                <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Chọn Kích thước</label>
+                                <div className="flex flex-wrap gap-2">
                                     {product.sizes?.map(s => (
-                                        <button key={s} onClick={() => { setSelectedSize(s); setFeedbackMsg(''); }} className={`h-12 w-12 rounded-2xl border-2 transition-all text-xs font-bold font-sans flex items-center justify-center ${selectedSize === s ? 'bg-[#92400E] text-white border-[#92400E] shadow-xl translate-y-[-4px]' : 'bg-white text-slate-400 border-slate-100 hover:border-[#92400E]/50'}`}>{s}</button>
+                                        <button key={s} onClick={() => { setSelectedSize(s); setFeedbackMsg(''); }} className={`h-11 w-11 rounded-lg border transition-all text-xs font-bold ${selectedSize === s ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg shadow-emerald-900/20' : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300'}`}>{s}</button>
                                     ))}
                                 </div>
                             </div>
                         )}
                         {hasColors && (
                             <div>
-                                <label className="font-sans-luxury text-[10px] text-[#064E3B]/40 mb-5 block">02. Màu sắc</label>
-                                <div className="flex flex-wrap gap-3">
+                                <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Chọn Màu sắc</label>
+                                <div className="flex flex-wrap gap-2">
                                     {product.colors?.map(c => (
-                                        /* Fixed syntax error: changed key(c) to key={c} which was causing a cascade of errors including invalid key type and uncallable expression errors. */
-                                        <button key={c} onClick={() => { setSelectedColor(c); setFeedbackMsg(''); }} className={`px-6 h-12 rounded-2xl border-2 transition-all text-xs font-bold font-sans ${selectedColor === c ? 'bg-[#92400E] text-white border-[#92400E] shadow-xl translate-y-[-4px]' : 'bg-white text-slate-400 border-slate-100 hover:border-[#92400E]/50'}`}>{c}</button>
+                                        <button key={c} onClick={() => { setSelectedColor(c); setFeedbackMsg(''); }} className={`px-5 h-11 rounded-lg border transition-all text-xs font-bold ${selectedColor === c ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg shadow-emerald-900/20' : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300'}`}>{c}</button>
                                     ))}
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* 2. Số lượng & Kho */}
-                    <div className="flex items-center justify-between py-10 border-y border-slate-100">
+                    {/* Số lượng & Kho */}
+                    <div className="flex items-center justify-between py-6 border-y border-slate-50">
                         <div>
-                             <p className={`font-sans-luxury text-[10px] mb-2 ${variantStock === 0 ? 'text-rose-500' : 'text-[#064E3B]'}`}>
-                                {variantStock === 0 ? 'Hết hàng (Sold Out)' : (variantStock > 0 ? `Sẵn sàng: ${variantStock} phẩm vật` : 'Vui lòng chọn phiên bản')}
+                             <p className={`font-sans-luxury text-[9px] ${variantStock === 0 ? 'text-rose-500' : 'text-[#064E3B]'}`}>
+                                {variantStock === 0 ? 'Hiện tại đã hết hàng' : (variantStock > 0 ? `Tồn kho: ${variantStock} sản phẩm` : 'Vui lòng chọn phân loại')}
                              </p>
-                             <p className="text-[10px] text-slate-400 font-serif-italic">Cập nhật kho thực tế từ Sigma Atelier</p>
                         </div>
-                        <div className="flex items-center glass-pearl rounded-full h-14 px-6 gap-6">
-                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="text-2xl text-slate-300 hover:text-[#92400E] transition-all">-</button>
-                            <span className="text-lg font-black text-[#064E3B] font-sans w-6 text-center">{quantity}</span>
-                            <button 
-                                onClick={() => setQuantity(q => q + 1)} 
-                                disabled={variantStock !== -1 && quantity >= variantStock}
-                                className="text-2xl text-slate-300 hover:text-[#92400E] transition-all"
-                            >+</button>
+                        <div className="flex items-center bg-slate-50 rounded-full h-11 px-4 gap-5">
+                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="text-xl text-slate-400 hover:text-[#064E3B]">-</button>
+                            <span className="text-sm font-bold text-[#064E3B] w-4 text-center">{quantity}</span>
+                            <button onClick={() => setQuantity(q => q + 1)} disabled={variantStock !== -1 && quantity >= variantStock} className="text-xl text-slate-400 hover:text-[#064E3B] disabled:opacity-10">+</button>
                         </div>
                     </div>
 
-                    {/* 3. Thông báo giá Premium */}
-                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 space-y-5">
-                        <div className="flex justify-between items-center text-xs font-bold tracking-widest text-slate-400">
-                            <span>GIÁ NIÊM YẾT</span>
-                            <span className="text-[#064E3B] font-sans">{formatCurrency(basePrice)} x {quantity}</span>
+                    {/* Tổng tiền Simple */}
+                    <div className="bg-[#F9FAF9] p-7 rounded-[2rem] space-y-3">
+                        <div className="flex justify-between items-center text-xs font-medium text-slate-400">
+                            <span>Sản phẩm: {formatCurrency(basePrice)} x {quantity}</span>
+                            <span className="text-slate-600">{formatCurrency(subtotal)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-xs font-bold tracking-widest text-slate-400">
-                            <span>VẬN CHUYỂN</span>
-                            <span className={shippingFee === 0 ? 'text-emerald-600' : 'text-[#064E3B] font-sans'}>{shippingFee === 0 ? 'FREE DELIVERY' : formatCurrency(shippingFee)}</span>
+                        <div className="flex justify-between items-center text-xs font-medium text-slate-400">
+                            <span>Phí vận chuyển:</span>
+                            <span className={shippingFee === 0 ? 'text-emerald-600 font-bold' : 'text-slate-600'}>{shippingFee === 0 ? 'Miễn phí' : formatCurrency(shippingFee)}</span>
                         </div>
-                        <div className="pt-6 border-t border-dashed border-slate-200 flex justify-between items-end">
-                            <div className="flex flex-col">
-                                <span className="font-sans-luxury text-[9px] text-[#92400E]">Tổng cộng thanh toán</span>
-                                <span className="text-[10px] text-slate-400 italic">Bao gồm các loại thuế phí</span>
-                            </div>
-                            <span className="text-5xl font-black text-[#064E3B] tracking-tighter font-sans">{formatCurrency(total)}</span>
+                        <div className="pt-4 border-t border-slate-200/50 flex justify-between items-center">
+                            <span className="font-sans-luxury text-[10px] text-[#92400E]">Tổng thanh toán</span>
+                            <span className="text-3xl font-black text-[#064E3B] tracking-tighter">{formatCurrency(total)}</span>
                         </div>
                     </div>
 
-                    {/* 4. Delivery Info */}
-                    <div className="space-y-6 pt-6">
-                        <label className="font-sans-luxury text-[10px] text-[#064E3B]/40 block">03. Thông tin nhận hàng</label>
-                        <input type="text" placeholder="Quý danh khách hàng" value={shipName} onChange={e => setShipName(e.target.value)} className="input-luxury-line" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <input type="tel" placeholder="Số điện thoại liên lạc" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="input-luxury-line font-sans" />
-                            <input type="text" placeholder="Địa chỉ giao hỏa tốc" value={shipAddress} onChange={e => setShipAddress(e.target.value)} className="input-luxury-line" />
+                    {/* Giao hàng Info */}
+                    <div className="space-y-4 pt-4">
+                        <label className="font-sans-luxury text-[9px] text-slate-400 block">Thông tin nhận hàng</label>
+                        <input type="text" placeholder="Họ và tên khách hàng" value={shipName} onChange={e => setShipName(e.target.value)} className="input-luxury-line" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <input type="tel" placeholder="Số điện thoại" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="input-luxury-line" />
+                            <input type="text" placeholder="Địa chỉ giao hàng" value={shipAddress} onChange={e => setShipAddress(e.target.value)} className="input-luxury-line" />
                         </div>
                     </div>
 
-                    {/* ACTIONS */}
-                    <div className="pt-10 pb-10">
-                         <div className="flex gap-4 mb-8">
-                            <button onClick={() => setPaymentMethod('COD')} className={`flex-1 py-4 rounded-2xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'COD' ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#064E3B]/30'}`}>Thanh toán COD</button>
-                            <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`flex-1 py-4 rounded-2xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#92400E] text-white border-[#92400E] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#92400E]/30'}`}>Chuyển khoản QR</button>
+                    {/* Actions */}
+                    <div className="pt-6 pb-10">
+                         <div className="grid grid-cols-2 gap-4 mb-6">
+                            <button onClick={() => setPaymentMethod('COD')} className={`py-4 rounded-xl font-sans-luxury text-[8px] transition-all border ${paymentMethod === 'COD' ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-xl' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>Tiền mặt (COD)</button>
+                            <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-4 rounded-xl font-sans-luxury text-[8px] transition-all border ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#92400E] text-white border-[#92400E] shadow-xl' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>Quét mã Bank</button>
                          </div>
 
                          <button 
                             onClick={handlePlaceOrder} 
                             disabled={orderStatus === 'PROCESSING' || variantStock === 0}
-                            className={`btn-luxury-main w-full hover:scale-[1.02] ${variantStock === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : ''}`}
+                            className={`btn-luxury-main w-full ${variantStock === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : ''}`}
                          >
-                            {orderStatus === 'PROCESSING' ? 'Đang khởi tạo...' : (variantStock === 0 ? 'Sản phẩm đã hết' : 'Hoàn tất đặt mua')}
+                            {orderStatus === 'PROCESSING' ? 'Đang gửi yêu cầu...' : (variantStock === 0 ? 'Sản phẩm tạm hết' : 'Đặt mua ngay')}
                          </button>
                          
-                         {feedbackMsg && <p className="mt-6 text-center font-sans-luxury text-[8px] text-rose-500 animate-pulse">{feedbackMsg}</p>}
+                         {feedbackMsg && <p className="mt-5 text-center font-sans-luxury text-[8px] text-rose-500 animate-pulse">{feedbackMsg}</p>}
                     </div>
                 </div>
 
-                {/* OVERLAY THÀNH CÔNG KIỂU TẠP CHÍ */}
+                {/* Overlay Thành công */}
                 {orderStatus === 'SUCCESS' && (
-                    <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-12 animate-float-up backdrop-blur-3xl">
-                        <div className="text-center space-y-10 max-w-md">
-                            <div className="w-24 h-24 bg-[#064E3B] rounded-full flex items-center justify-center text-white mx-auto shadow-3xl">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                            </div>
-                            <h2 className="text-6xl font-serif font-black text-[#064E3B] leading-tight">Tuyệt phẩm<br/><span className="font-serif-italic font-normal italic text-[#92400E]">đã được chọn</span></h2>
-                            <p className="pro-description text-sm opacity-70 italic">Chúng tôi đã nhận được yêu cầu của quý khách. Một chuyên viên tư vấn của Sigma Vie sẽ liên hệ xác nhận trong giây lát.</p>
-                            <button onClick={onClose} className="btn-luxury-main mx-auto">Trở về cửa hàng</button>
+                    <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-12 animate-float-up">
+                        <div className="w-20 h-20 bg-[#064E3B] rounded-full flex items-center justify-center text-white mb-8 shadow-xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
+                        <h2 className="text-4xl font-serif font-black text-[#064E3B] mb-4 text-center">Cảm ơn quý khách</h2>
+                        <p className="pro-description text-center max-w-xs mb-10">Đơn hàng của quý khách đã được ghi nhận. Sigma Vie sẽ liên hệ xác nhận trong giây lát.</p>
+                        <button onClick={onClose} className="btn-luxury-main">Tiếp tục mua sắm</button>
                     </div>
                 )}
             </div>
         </div>
       </div>
 
-      {/* MODAL QR IDENTITY */}
+      {/* Modal QR Identity */}
       {showProductQrView && (
           <div className="fixed inset-0 bg-[#064E3B]/98 z-[150] flex items-center justify-center p-6 backdrop-blur-3xl" onClick={() => setShowProductQrView(false)}>
-              <div className="bg-white rounded-[4rem] p-16 max-w-md w-full text-center relative shadow-[0_50px_100px_rgba(0,0,0,0.8)] border-t-[12px] border-[#92400E]" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setShowProductQrView(false)} className="absolute top-10 right-10 text-slate-300 hover:text-[#064E3B] transition-all"><XIcon/></button>
-                  <h4 className="font-sans-luxury text-[10px] text-[#92400E] mb-12">Product Signature QR</h4>
-                  <div className="bg-white p-8 border border-slate-100 rounded-[3rem] inline-block shadow-inner mb-10">
-                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={240} />
+              <div className="bg-white rounded-[3rem] p-12 max-w-sm w-full text-center relative shadow-2xl animate-float-up" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setShowProductQrView(false)} className="absolute top-8 right-8 text-slate-300 hover:text-[#064E3B]"><XIcon/></button>
+                  <h4 className="font-sans-luxury text-[9px] text-[#92400E] mb-10">Product Identification</h4>
+                  <div className="bg-white p-6 border border-slate-50 rounded-[2.5rem] inline-block shadow-inner mb-8">
+                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={200} />
                   </div>
-                  <div className="space-y-4">
-                      <p className="font-sans-luxury text-[9px] text-slate-400">Reference: {product.sku}</p>
-                      <p className="text-xs text-slate-500 font-serif-italic leading-relaxed px-6">Quét mã định danh này để truy xuất nguồn gốc và thông tin chế tác của sản phẩm trên mọi thiết bị.</p>
-                  </div>
+                  <p className="text-xs text-slate-500 font-normal leading-relaxed italic">Quét mã để truy cập nhanh hoặc chia sẻ sản phẩm này.</p>
               </div>
           </div>
       )}
