@@ -19,7 +19,7 @@ const XIcon = () => (
 );
 
 const QrIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M12 21v-1"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M12 21v-1"/></svg>
 );
 
 const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedIn, onOpenAuth }) => {
@@ -91,152 +91,156 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
 
   return (
     <>
-      <div className="fixed inset-0 bg-[#04382c]/95 z-50 flex items-center justify-center p-0 md:p-10 backdrop-blur-2xl" onClick={onClose}>
-        <div className="relative bg-white w-full max-w-7xl h-full md:h-auto md:max-h-[95vh] overflow-hidden flex flex-col md:flex-row shadow-[0_50px_100px_rgba(0,0,0,0.5)] rounded-none md:rounded-[2.5rem] animate-float-up" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-[#04382c]/95 z-50 flex items-center justify-center p-0 md:p-6 backdrop-blur-xl transition-all duration-500" onClick={onClose}>
+        <div className="relative bg-white w-full max-w-6xl h-full md:h-auto md:max-h-[92vh] overflow-hidden flex flex-col md:flex-row shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] rounded-none md:rounded-3xl animate-float-up" onClick={e => e.stopPropagation()}>
             
-            {/* CỘT TRÁI: VISUAL GALLERY */}
-            <div className="w-full md:w-[42%] h-[350px] md:h-auto relative overflow-hidden group bg-luxury-teal sparkle-effect">
-                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-[4000ms] group-hover:scale-105 opacity-90" />
+            {/* LEFT SIDE: HIGH-END VISUALS */}
+            <div className="w-full md:w-[45%] h-[400px] md:h-auto relative overflow-hidden group bg-[#f3f4f6]">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover transition-transform duration-[4000ms] group-hover:scale-105" />
                 
-                <div className="absolute top-10 left-8 z-10">
-                    <p className="font-sans-luxury text-[7px] text-white/50 mb-1">Sigma Vie Archive</p>
-                    <p className="font-script text-2xl text-[#D4AF37]">Nâng tầm chuẩn sống sang</p>
+                {/* Visual Accent */}
+                <div className="absolute top-10 left-10 z-10 flex flex-col gap-2">
+                    <span className="bg-white/90 backdrop-blur px-3 py-1 rounded text-[8px] font-black uppercase tracking-[0.2em] text-[#064E3B] shadow-sm">Collection 2025</span>
+                    <p className="font-script text-2xl text-white drop-shadow-md">Sigma Vie Signature</p>
                 </div>
 
-                <button 
-                    onClick={() => setShowProductQrView(true)}
-                    className="absolute bottom-8 left-8 bg-white/5 backdrop-blur-lg border border-white/10 p-4 rounded-2xl shadow-2xl hover:bg-white/15 transition-all text-[#D4AF37]"
-                >
-                    <QrIcon />
-                </button>
+                <div className="absolute bottom-8 left-8 flex gap-3">
+                  <button 
+                      onClick={() => setShowProductQrView(true)}
+                      className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shadow-xl hover:bg-white/30 transition-all text-white"
+                  >
+                      <QrIcon />
+                  </button>
+                </div>
 
-                <button onClick={onClose} className="md:hidden absolute top-6 right-6 bg-white/10 backdrop-blur-md p-2.5 rounded-full text-white"><XIcon /></button>
+                <button onClick={onClose} className="md:hidden absolute top-6 right-6 bg-white/20 backdrop-blur-md p-3 rounded-full text-white"><XIcon /></button>
             </div>
 
-            {/* CỘT PHẢI: NỘI DUNG SẠCH SẼ, CÂN ĐỐI */}
-            <div className="w-full md:w-[58%] p-8 md:p-14 overflow-y-auto flex flex-col bg-white">
-                <button onClick={onClose} className="hidden md:flex absolute top-10 right-10 text-slate-200 hover:text-[#92400E] transition-all duration-300"><XIcon /></button>
+            {/* RIGHT SIDE: PREMIUM CONTENT */}
+            <div className="w-full md:w-[55%] p-8 md:p-14 overflow-y-auto flex flex-col bg-white">
+                <button onClick={onClose} className="hidden md:flex absolute top-8 right-8 text-slate-300 hover:text-[#064E3B] transition-all"><XIcon /></button>
                 
                 <div className="mb-10">
-                    <div className="flex items-center gap-3 mb-4">
-                        <span className="w-8 h-[1px] bg-[#D4AF37]"></span>
-                        <span className="font-sans-luxury text-[8px] text-[#D4AF37] tracking-[0.3em]">Boutique Collection</span>
+                    <div className="flex items-center gap-2 mb-3">
+                        <span className="font-sans-luxury text-[8px] text-[#D4AF37] tracking-[0.3em]">Masterpiece Selection</span>
+                        <div className="h-[1px] flex-1 bg-slate-100"></div>
                     </div>
                     
-                    {/* TIÊU ĐỀ ĐỔI SANG FONT ROBOTO (SANS) VÀ MÀU VÀNG GOLD ẤM ÁP GIỐNG ẢNH MẪU */}
-                    <h1 className="text-3xl md:text-4xl font-sans font-black text-[#D4AF37] leading-tight mb-6 uppercase tracking-tighter">
+                    {/* TITLE RE-STYLED: ROBOTO BOLD AND WARM GOLD */}
+                    <h1 className="text-3xl md:text-5xl font-sans font-black text-[#92400E] leading-none mb-6 uppercase tracking-tighter">
                         {product.name}
                     </h1>
                     
-                    <div className="flex items-baseline gap-4 mb-8">
+                    <div className="flex items-center gap-6 mb-8">
                         <span className="text-2xl font-black text-[#064E3B] tracking-tighter">
                             {product.isFlashSale ? product.salePrice : product.price}
                         </span>
                         {product.isFlashSale && <span className="text-sm text-slate-300 line-through font-light">{product.price}</span>}
+                        <div className="h-4 w-[1px] bg-slate-200"></div>
+                        <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded uppercase tracking-widest">In Stock</span>
                     </div>
                     
-                    <div className="relative pl-6 border-l-2 border-[#D4AF37]/30">
-                        <p className="pro-description italic opacity-80 leading-relaxed text-[#064E3B]/70">
-                            {product.description || 'Chế tác từ những chất liệu tinh tuyển nhất, thiết kế này là tuyên ngôn của sự lịch lãm và đẳng cấp vượt thời gian, dành riêng cho những quý chủ nhân thượng lưu.'}
-                        </p>
-                    </div>
+                    <p className="pro-description text-slate-400 italic font-light leading-relaxed">
+                        {product.description || 'Chế tác từ những chất liệu tinh tuyển nhất, thiết kế này là tuyên ngôn của sự lịch lãm và đẳng cấp vượt thời gian.'}
+                    </p>
                 </div>
 
                 <div className="space-y-10">
-                    {/* Phân loại sản phẩm */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-8 border-t border-slate-50">
+                    {/* Selectors */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-slate-50">
                         {hasSizes && (
                             <div>
-                                <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Chọn Kích thước</label>
+                                <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Kích thước</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.sizes?.map(s => (
-                                        <button key={s} onClick={() => { setSelectedSize(s); setFeedbackMsg(''); }} className={`h-10 w-10 rounded-lg border-2 transition-all text-[11px] font-bold ${selectedSize === s ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-[#D4AF37]/50'}`}>{s}</button>
+                                        <button key={s} onClick={() => { setSelectedSize(s); setFeedbackMsg(''); }} className={`h-11 w-11 rounded-xl border-2 transition-all text-[11px] font-bold ${selectedSize === s ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{s}</button>
                                     ))}
                                 </div>
                             </div>
                         )}
                         {hasColors && (
                             <div>
-                                <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Chọn Màu sắc</label>
+                                <label className="font-sans-luxury text-[9px] text-slate-400 mb-4 block">Màu sắc</label>
                                 <div className="flex flex-wrap gap-2">
                                     {product.colors?.map(c => (
-                                        <button key={c} onClick={() => { setSelectedColor(c); setFeedbackMsg(''); }} className={`px-4 h-10 rounded-lg border-2 transition-all text-[11px] font-bold ${selectedColor === c ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-[#D4AF37]/50'}`}>{c}</button>
+                                        <button key={c} onClick={() => { setSelectedColor(c); setFeedbackMsg(''); }} className={`px-4 h-11 rounded-xl border-2 transition-all text-[11px] font-bold ${selectedColor === c ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}>{c}</button>
                                     ))}
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Tồn kho & Số lượng */}
-                    <div className="flex items-center justify-between py-8 border-y border-slate-50">
-                        <div>
-                             <p className={`font-sans-luxury text-[8px] mb-1 ${variantStock === 0 ? 'text-rose-500' : 'text-[#064E3B] opacity-60'}`}>
-                                {variantStock === 0 ? 'Hiện tại đã cháy hàng' : (variantStock > 0 ? `Sẵn sàng: ${variantStock} phẩm vật` : 'Quý khách vui lòng chọn phiên bản')}
-                             </p>
-                             <p className="font-script text-lg text-[#D4AF37]">Nâng tầm phong thái</p>
+                    {/* Quantity Selector */}
+                    <div className="flex items-center justify-between py-6 border-y border-slate-50">
+                        <div className="flex flex-col">
+                             <span className="font-sans-luxury text-[8px] text-slate-400">Số lượng sở hữu</span>
+                             <span className="text-[10px] font-bold text-[#064E3B] mt-1 uppercase tracking-tight">{variantStock > 0 ? `Chỉ còn ${variantStock} phẩm vật` : 'Chọn phân loại'}</span>
                         </div>
-                        <div className="flex items-center bg-slate-50 rounded-full h-11 px-4 gap-6">
-                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="text-xl text-slate-300 hover:text-[#064E3B] transition-all">-</button>
-                            <span className="text-sm font-bold text-[#064E3B] w-4 text-center">{quantity}</span>
-                            <button onClick={() => setQuantity(q => q + 1)} disabled={variantStock !== -1 && quantity >= variantStock} className="text-xl text-slate-300 hover:text-[#064E3B] disabled:opacity-5 transition-all">+</button>
+                        <div className="flex items-center bg-slate-50 rounded-2xl h-12 px-3 gap-6 shadow-inner">
+                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center text-xl text-slate-300 hover:text-[#064E3B] transition-all">-</button>
+                            <span className="text-sm font-black text-[#064E3B] w-4 text-center">{quantity}</span>
+                            <button onClick={() => setQuantity(q => q + 1)} disabled={variantStock !== -1 && quantity >= variantStock} className="w-8 h-8 flex items-center justify-center text-xl text-slate-300 hover:text-[#064E3B] disabled:opacity-5 transition-all">+</button>
                         </div>
                     </div>
 
-                    {/* KHỐI THANH TOÁN */}
-                    <div className="bg-[#FFFBFA] p-6 rounded-[1.5rem] border border-[#D4AF37]/5 space-y-3 shadow-sm">
-                        <div className="flex justify-between items-center text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                    {/* Billing Block */}
+                    <div className="bg-[#fcfcfc] p-8 rounded-3xl border border-slate-50 space-y-4">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">
                             <span>Giá trị vật phẩm</span>
                             <span className="text-slate-600">{formatCurrency(subtotal)}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[11px] font-medium text-slate-400 uppercase tracking-wider">
-                            <span>Đặc quyền vận chuyển</span>
-                            <span className={shippingFee === 0 ? 'text-emerald-600 font-bold' : 'text-slate-600'}>{shippingFee === 0 ? 'MIỄN PHÍ' : formatCurrency(shippingFee)}</span>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">
+                            <span>Dịch vụ vận chuyển</span>
+                            <span className={shippingFee === 0 ? 'text-emerald-600' : 'text-slate-600'}>{shippingFee === 0 ? 'MIỄN PHÍ' : formatCurrency(shippingFee)}</span>
                         </div>
-                        <div className="pt-4 border-t border-dashed border-[#D4AF37]/20 flex justify-between items-center">
-                            <span className="font-sans-luxury text-[9px] text-[#D4AF37]">Tổng trị giá thanh toán</span>
-                            <span className="text-3xl font-black text-[#064E3B] tracking-tighter">{formatCurrency(total)}</span>
+                        <div className="pt-6 border-t border-dashed border-slate-200 flex justify-between items-end">
+                            <div className="flex flex-col">
+                                <span className="font-sans-luxury text-[8px] text-[#D4AF37]">Trị giá thanh toán</span>
+                                <p className="font-script text-lg text-slate-400">Sigma Vie Experience</p>
+                            </div>
+                            <span className="text-4xl font-black text-[#064E3B] tracking-tighter leading-none">{formatCurrency(total)}</span>
                         </div>
                     </div>
 
-                    {/* Thông tin khách hàng */}
+                    {/* Shipping Info */}
                     <div className="space-y-4 pt-4">
-                        <label className="font-sans-luxury text-[9px] text-slate-400 block tracking-widest">Danh tính người sở hữu</label>
-                        <input type="text" placeholder="Họ tên Quý khách" value={shipName} onChange={e => setShipName(e.target.value)} className="input-luxury-line" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <input type="tel" placeholder="Số điện thoại" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="input-luxury-line" />
-                            <input type="text" placeholder="Địa chỉ bàn giao" value={shipAddress} onChange={e => setShipAddress(e.target.value)} className="input-luxury-line" />
+                        <label className="font-sans-luxury text-[8px] text-slate-300 block uppercase tracking-widest">Thông tin bàn giao</label>
+                        <input type="text" placeholder="Họ tên Quý khách" value={shipName} onChange={e => setShipName(e.target.value)} className="input-luxury-line py-3" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <input type="tel" placeholder="Số điện thoại" value={shipPhone} onChange={e => setShipPhone(e.target.value)} className="input-luxury-line py-3" />
+                            <input type="text" placeholder="Địa chỉ giao hàng" value={shipAddress} onChange={e => setShipAddress(e.target.value)} className="input-luxury-line py-3" />
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="pt-6 pb-12">
-                         <div className="grid grid-cols-2 gap-3 mb-6">
-                            <button onClick={() => setPaymentMethod('COD')} className={`py-3.5 rounded-xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'COD' ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#064E3B]/30'}`}>Tiền mặt (COD)</button>
-                            <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-3.5 rounded-xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#D4AF37] text-white border-[#D4AF37] shadow-xl' : 'bg-white text-slate-300 border-slate-100 hover:border-[#D4AF37]/30'}`}>Chuyển khoản QR</button>
+                    {/* Actions */}
+                    <div className="pt-10 pb-16">
+                         <div className="grid grid-cols-2 gap-4 mb-8">
+                            <button onClick={() => setPaymentMethod('COD')} className={`py-4 rounded-2xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'COD' ? 'bg-[#064E3B] text-white border-[#064E3B] shadow-xl' : 'bg-white text-slate-300 border-slate-50 hover:border-slate-200'}`}>Tiền mặt (COD)</button>
+                            <button onClick={() => setPaymentMethod('BANK_TRANSFER')} className={`py-4 rounded-2xl font-sans-luxury text-[8px] transition-all border-2 ${paymentMethod === 'BANK_TRANSFER' ? 'bg-[#92400E] text-white border-[#92400E] shadow-xl' : 'bg-white text-slate-300 border-slate-50 hover:border-slate-200'}`}>Chuyển khoản QR</button>
                          </div>
 
                          <button 
                             onClick={handlePlaceOrder} 
                             disabled={orderStatus === 'PROCESSING' || variantStock === 0}
-                            className={`btn-luxury-main w-full ${variantStock === 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : ''}`}
+                            className={`btn-luxury-main w-full py-6 text-[10px] ${variantStock === 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none' : ''}`}
                          >
-                            {orderStatus === 'PROCESSING' ? 'Đang khởi tạo...' : (variantStock === 0 ? 'Vật phẩm tạm hết' : 'Xác nhận sở hữu ngay')}
+                            {orderStatus === 'PROCESSING' ? 'ĐANG KHỞI TẠO...' : (variantStock === 0 ? 'VẬT PHẨM TẠM HẾT' : 'XÁC NHẬN SỞ HỮU')}
                          </button>
                          
-                         {feedbackMsg && <p className="mt-5 text-center font-sans-luxury text-[8px] text-rose-500 animate-pulse">{feedbackMsg}</p>}
+                         {feedbackMsg && <p className="mt-6 text-center font-sans-luxury text-[8px] text-rose-500 animate-pulse">{feedbackMsg}</p>}
                     </div>
                 </div>
 
-                {/* Success Overlay */}
+                {/* SUCCESS SCREEN OVERLAY */}
                 {orderStatus === 'SUCCESS' && (
-                    <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-12 animate-float-up backdrop-blur-3xl">
-                        <div className="text-center space-y-6 max-w-sm">
-                            <div className="w-16 h-16 bg-[#064E3B] rounded-full flex items-center justify-center text-[#D4AF37] mx-auto shadow-xl">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-12 animate-float-up">
+                        <div className="text-center space-y-10 max-w-sm">
+                            <div className="w-20 h-20 bg-[#064E3B] rounded-full flex items-center justify-center text-white mx-auto shadow-2xl">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             </div>
-                            <h2 className="text-3xl font-serif font-black text-[#064E3B] leading-tight">Yêu cầu đã được tiếp nhận</h2>
-                            <p className="pro-description text-center italic opacity-70">Cảm ơn quý khách đã tin chọn Sigma Vie. Một chuyên viên tư vấn sẽ liên hệ ngay để hoàn tất thủ tục bàn giao.</p>
-                            <button onClick={onClose} className="btn-luxury-main mx-auto">Về cửa hàng</button>
+                            <h2 className="text-4xl font-sans font-black text-[#064E3B] leading-tight uppercase tracking-tighter">Giao dịch<br/>đã sẵn sàng</h2>
+                            <p className="pro-description text-center italic opacity-60 leading-relaxed">Cảm ơn quý khách đã tin chọn Sigma Vie. Một chuyên viên sẽ sớm liên hệ để hoàn tất thủ tục bàn giao.</p>
+                            <button onClick={onClose} className="btn-luxury-main mx-auto border-2 border-transparent">VỀ CỬA HÀNG</button>
                         </div>
                     </div>
                 )}
@@ -244,24 +248,30 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, isLoggedI
         </div>
       </div>
 
-      {/* Modal QR */}
+      {/* QR MODAL */}
       {showProductQrView && (
           <div className="fixed inset-0 bg-[#04382c]/98 z-[150] flex items-center justify-center p-6 backdrop-blur-3xl" onClick={() => setShowProductQrView(false)}>
-              <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full text-center relative shadow-2xl animate-float-up" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setShowProductQrView(false)} className="absolute top-8 right-8 text-slate-300 hover:text-[#064E3B] transition-all"><XIcon/></button>
-                  <h4 className="font-sans-luxury text-[9px] text-[#D4AF37] mb-8">Product Signature Code</h4>
-                  <div className="bg-white p-5 border border-slate-50 rounded-[2rem] inline-block shadow-inner mb-6">
-                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={200} />
+              <div className="bg-white rounded-[3rem] p-16 max-w-md w-full text-center relative shadow-[0_50px_100px_rgba(0,0,0,0.8)] border-t-[8px] border-[#92400E]" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setShowProductQrView(false)} className="absolute top-10 right-10 text-slate-200 hover:text-[#064E3B] transition-all"><XIcon/></button>
+                  <h4 className="font-sans-luxury text-[9px] text-[#92400E] mb-12">Signature Identity Code</h4>
+                  <div className="bg-white p-8 border-2 border-slate-50 rounded-[3rem] inline-block shadow-inner mb-10">
+                      <QRCodeSVG value={`${window.location.origin}/?product=${product.id}`} size={220} />
                   </div>
-                  <div className="space-y-3">
-                      <p className="font-sans-luxury text-[8px] text-slate-400">Model Ref: {product.sku}</p>
-                      <p className="font-script text-xl text-[#064E3B]">Sigma Vie Signature</p>
+                  <div className="space-y-4">
+                      <p className="font-sans-luxury text-[8px] text-slate-300">Model Ref: {product.sku}</p>
+                      <p className="font-script text-2xl text-[#064E3B]">Sigma Vie Authentic</p>
                   </div>
               </div>
           </div>
       )}
 
-      <PaymentModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} orderId={createdOrder?.id || ''} amount={total} onConfirmPayment={() => { setShowQrModal(false); setOrderStatus('SUCCESS'); }} />
+      <PaymentModal 
+          isOpen={showQrModal} 
+          onClose={() => setShowQrModal(false)} 
+          orderId={createdOrder?.id || ''} 
+          amount={total} 
+          onConfirmPayment={() => { setShowQrModal(false); setOrderStatus('SUCCESS'); }} 
+      />
     </>
   );
 };
