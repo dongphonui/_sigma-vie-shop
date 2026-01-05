@@ -5,70 +5,35 @@
 
 @layer base {
   body {
+    /* Thiết lập Roboto là font chủ đạo cho toàn hệ thống */
     font-family: 'Roboto', sans-serif;
-    @apply bg-[#FCFCF9] text-[#064E3B];
+    @apply bg-[#FCFCFB] text-[#111827];
     -webkit-font-smoothing: antialiased;
   }
   
-  h1, h2, h3, h4 {
-    font-family: 'Playfair Display', serif;
-    letter-spacing: -0.01em;
-  }
-
-  /* Font chữ mềm mại nghệ thuật như ảnh mẫu */
-  .font-script {
-    font-family: 'Dancing Script', cursive;
-  }
-
-  .font-sans-luxury {
-    font-family: 'Montserrat', sans-serif;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    font-weight: 800;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    @apply text-[#111827] tracking-tighter;
   }
 }
 
-/* Nền Gradient Deep Teal như banner mẫu */
-.bg-luxury-teal {
-  background: radial-gradient(circle at center, #085e4b 0%, #04382c 100%);
+@layer components {
+  .btn-luxury-main {
+    @apply bg-[#111827] text-white py-4 px-10 rounded-full font-bold text-[11px] uppercase tracking-[0.3em] transition-all shadow-xl hover:bg-black active:scale-95 disabled:opacity-50;
+  }
+
+  .input-luxury-line {
+    @apply w-full bg-transparent border-b border-slate-100 py-3 focus:border-[#B4975A] outline-none transition-all text-sm font-bold text-[#111827] placeholder:text-slate-200;
+  }
 }
 
-.pro-description {
-  font-family: 'Roboto', sans-serif;
-  line-height: 1.7;
-  @apply text-slate-500 font-normal text-[14px];
-}
-
-.btn-luxury-main {
-  @apply bg-[#D4AF37] hover:bg-[#b89b31] text-white font-black py-4 px-10 rounded-full 
-         transition-all duration-500 shadow-2xl shadow-amber-900/20 
-         active:scale-95 flex items-center justify-center gap-4 uppercase tracking-[0.3em] text-[9px];
-}
-
-.input-luxury-line {
-  @apply w-full bg-transparent border-b border-slate-100 py-2 
-         focus:border-[#D4AF37] outline-none transition-all text-sm font-medium;
-}
-
-@keyframes float-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
+/* Hiệu ứng chuyển động mượt mà cho Boutique */
 .animate-float-up {
-  animation: float-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: floatUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Hiệu ứng ánh sáng lấp lánh như trong ảnh */
-.sparkle-effect {
-  position: relative;
-}
-.sparkle-effect::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-image: radial-gradient(circle, white 1px, transparent 1px);
-  background-size: 50px 50px;
-  opacity: 0.08;
-  pointer-events: none;
+@keyframes floatUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
