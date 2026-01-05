@@ -15,35 +15,43 @@
     letter-spacing: -0.01em;
   }
 
+  /* Font chữ mềm mại nghệ thuật như ảnh mẫu */
+  .font-script {
+    font-family: 'Dancing Script', cursive;
+  }
+
   .font-sans-luxury {
     font-family: 'Montserrat', sans-serif;
-    letter-spacing: 0.25em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     font-weight: 800;
   }
 }
 
-/* Nội dung mô tả Roboto sịn xò */
+/* Nền Gradient Deep Teal như banner mẫu */
+.bg-luxury-teal {
+  background: radial-gradient(circle at center, #085e4b 0%, #04382c 100%);
+}
+
 .pro-description {
   font-family: 'Roboto', sans-serif;
   line-height: 1.8;
-  letter-spacing: 0.01em;
   @apply text-slate-500 font-normal text-[15px];
 }
 
 .btn-luxury-main {
-  @apply bg-[#064E3B] hover:bg-[#022c22] text-white font-black py-5 px-10 rounded-full 
-         transition-all duration-500 shadow-2xl shadow-[#064E3B]/30 
+  @apply bg-[#D4AF37] hover:bg-[#b89b31] text-white font-black py-5 px-10 rounded-full 
+         transition-all duration-500 shadow-2xl shadow-amber-900/20 
          active:scale-95 flex items-center justify-center gap-4 uppercase tracking-[0.3em] text-[10px];
 }
 
 .input-luxury-line {
   @apply w-full bg-transparent border-b border-slate-200 py-3 
-         focus:border-[#064E3B] outline-none transition-all text-sm font-medium;
+         focus:border-[#D4AF37] outline-none transition-all text-sm font-medium;
 }
 
 @keyframes float-up {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -51,6 +59,16 @@
   animation: float-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.glass-pearl {
-  @apply bg-white/80 backdrop-blur-md border border-white shadow-lg;
+/* Hiệu ứng ánh sáng lấp lánh như trong ảnh */
+.sparkle-effect {
+  position: relative;
+}
+.sparkle-effect::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: radial-gradient(circle, white 1px, transparent 1px);
+  background-size: 50px 50px;
+  opacity: 0.1;
+  pointer-events: none;
 }
