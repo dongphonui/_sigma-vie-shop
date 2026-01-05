@@ -4,7 +4,7 @@ import type { AdminUser } from '../types';
 import { 
     BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, 
     UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, 
-    CheckIcon, SettingsIcon, MonitorIcon 
+    CheckIcon, SettingsIcon, MonitorIcon, HomeIcon 
 } from '../components/Icons';
 import { checkServerConnection } from '../utils/apiClient';
 
@@ -172,8 +172,11 @@ const AdminPage: React.FC = () => {
            )}
         </nav>
 
-        <div className="p-4 mt-auto border-t border-gray-800">
-             <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl mb-4 transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'}`}>
+        <div className="p-4 mt-auto border-t border-gray-800 space-y-2">
+             <a href="#/" className="w-full flex items-center gap-3 px-5 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all group">
+                <HomeIcon className="w-5 h-5 group-hover:text-[#B4975A]" /> <span className="text-sm font-bold">Về trang chủ</span>
+             </a>
+             <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'}`}>
                 <UserIcon className="w-5 h-5" /> <span className="text-sm font-bold">Cấu hình hệ thống</span>
              </button>
              <button onClick={handleLogout} className="w-full bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Đăng xuất</button>
