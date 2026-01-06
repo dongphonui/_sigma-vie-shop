@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import AdminOTPPage from './pages/AdminOTPPage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import ChatWidget from './components/ChatWidget';
+import CustomerSupportChat from './components/CustomerSupportChat';
 import AuthModal from './components/AuthModal';
 import CartDrawer from './components/CartDrawer';
 import { getCurrentCustomer } from './utils/customerStorage';
@@ -30,50 +31,21 @@ const App: React.FC = () => {
   // Deep Link State
   const [initialProductId, setInitialProductId] = useState<string | null>(null);
 
-  // Khởi tạo và lắng nghe thay đổi route / user
   useEffect(() => {
     const handleHashChange = () => {
       const fullUrl = window.location.href;
       const hash = window.location.hash;
       const search = window.location.search;
-      
       const urlParams = new URLSearchParams(search);
 
-      // 1. Check for Auto-Registration via QR
-      if (urlParams.get('register') === 'true') {
-          console.log("Auto-registration QR detected");
-          if (!getCurrentCustomer()) {
-              setAuthMode('REGISTER');
-              setIsAuthModalOpen(true);
-          }
+      if (urlParams.get('register') === 'true' && !getCurrentCustomer()) {
+          setAuthMode('REGISTER');
+          setIsAuthModalOpen(true);
       }
 
-      // 2. Robust URL Parsing for Product Deep Linking
       let pid = urlParams.get('product');
+      if (pid) setInitialProductId(pid);
 
-      if (!pid && hash.includes('product=')) {
-          try {
-             const hashParts = hash.split('?');
-             if (hashParts.length > 1) {
-                 const hashParams = new URLSearchParams(hashParts[1]);
-                 pid = hashParams.get('product');
-             }
-          } catch(e) {}
-      }
-
-      if (!pid && fullUrl.includes('product=')) {
-          try {
-              const match = fullUrl.match(/[?&]product=([^&]+)/);
-              if (match) pid = match[1];
-          } catch (e) {}
-      }
-
-      if (pid) {
-          console.log("Deep link detected for product:", pid);
-          setInitialProductId(pid);
-      }
-
-      // Base route logic
       const cleanHash = hash.split('?')[0] || '#/';
       setRoute(cleanHash);
     };
@@ -82,14 +54,10 @@ const App: React.FC = () => {
     
     const user = getCurrentCustomer();
     setCurrentUser(user);
-    if (user) {
-        forceReloadOrders().catch(e => console.error("Auto sync failed:", e));
-    }
+    if (user) forceReloadOrders().catch(e => console.error(e));
     
     window.addEventListener('hashchange', handleHashChange);
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-    };
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   useEffect(() => {
@@ -102,30 +70,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const targetSequence = ['x', 'y', 'z'];
     let currentSequence: string[] = [];
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-      if (e.key === 'Control') return;
-
       if (e.ctrlKey) {
         const key = e.key.toLowerCase();
-        if (key === 'c') {
-          setIsAdminLinkVisible(false);
-          currentSequence = []; 
-          return;
-        }
-        if (targetSequence.includes(key)) {
-            currentSequence.push(key);
-            if (currentSequence.length > targetSequence.length) currentSequence.shift();
-            if (JSON.stringify(currentSequence) === JSON.stringify(targetSequence)) {
-              setIsAdminLinkVisible(true);
-              currentSequence = [];
-            }
-        } else currentSequence = [];
-      } else currentSequence = [];
+        if (key === 'c') { setIsAdminLinkVisible(false); return; }
+        currentSequence.push(key);
+        if (currentSequence.length > 3) currentSequence.shift();
+        if (JSON.stringify(currentSequence) === JSON.stringify(targetSequence)) setIsAdminLinkVisible(true);
+      }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
@@ -137,7 +90,7 @@ const App: React.FC = () => {
 
   const handleLoginSuccess = (customer: Customer) => {
       setCurrentUser(customer);
-      forceReloadOrders().catch(e => console.error("Login sync failed:", e));
+      forceReloadOrders().catch(e => console.error(e));
   };
 
   const handleOpenCart = () => {
@@ -178,7 +131,11 @@ const App: React.FC = () => {
           onOpenCart: handleOpenCart
       })}
       
+      {/* Bot AI Sigma Vie */}
       <ChatWidget />
+      
+      {/* NÚT CHAT HỖ TRỢ ADMIN - LUÔN LUÔN Ở CUỐI CÙNG ĐỂ CHÈN LÊN TRÊN */}
+      <CustomerSupportChat />
       
       <AuthModal 
         isOpen={isAuthModalOpen} 

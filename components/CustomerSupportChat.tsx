@@ -11,14 +11,16 @@ const CustomerSupportChat: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const [sessionId, setSessionId] = useState('');
     const [user, setUser] = useState<Customer | null>(null);
-    const [showTooltip, setShowTooltip] = useState(false);
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
+    const [shouldShake, setShouldShake] = useState(false);
+    
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    // 1. Khởi tạo & Cấu hình session
     useEffect(() => {
-        console.log("Sigma Vie Support Chat: Mounting...");
+        // Log để kiểm tra trong Console (F12)
+        console.log("%c[Sigma Support] Component đã được nạp!", "color: gold; font-weight: bold; font-size: 16px;");
+        
         audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
         
         let sid = localStorage.getItem('sigma_vie_support_sid');
@@ -28,37 +30,23 @@ const CustomerSupportChat: React.FC = () => {
         }
         setSessionId(sid);
 
-        // Hiển thị lời chào sau 2 giây
-        const timer = setTimeout(() => {
-            if (!isOpen) setShowTooltip(true);
-        }, 2000);
-
+        // Hiệu ứng lắc sau 3 giây để khách chú ý
+        const timer = setTimeout(() => setShouldShake(true), 3000);
         return () => clearTimeout(timer);
     }, []);
 
-    // 2. Lắng nghe sự kiện "Mở Chat" từ bất kỳ đâu (Ví dụ từ Header hoặc Modal Sản phẩm)
     useEffect(() => {
         const handleForceOpen = (e: any) => {
-            console.log("Sigma Vie Support Chat: Trigger Open Event received!");
             setIsOpen(true);
-            setShowTooltip(false);
             if (e.detail?.message) setInputValue(e.detail.message);
-            
-            // Cuộn xuống tin nhắn mới nhất
-            setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 500);
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 500);
         };
-
         window.addEventListener('sigma_vie_open_chat', handleForceOpen);
         return () => window.removeEventListener('sigma_vie_open_chat', handleForceOpen);
     }, []);
 
-    // 3. Đồng bộ tin nhắn liên tục
     useEffect(() => {
-        const currentUser = getCurrentCustomer();
-        setUser(currentUser);
-
+        setUser(getCurrentCustomer());
         let interval: any;
         if (isOpen) {
             loadMessages(sessionId);
@@ -66,7 +54,6 @@ const CustomerSupportChat: React.FC = () => {
             setHasUnreadChat(false);
             interval = setInterval(() => loadMessages(sessionId), 4000);
         } else {
-            // Khi đóng vẫn check tin nhắn mới để hiện Badge đỏ
             interval = setInterval(() => loadMessages(sessionId), 10000);
         }
         return () => clearInterval(interval);
@@ -88,22 +75,13 @@ const CustomerSupportChat: React.FC = () => {
                     isRead: m.is_read
                 }));
                 
-                // Nếu có tin nhắn mới từ Admin mà chat đang đóng
-                if (formatted.length > messages.length) {
-                    const lastMsg = formatted[formatted.length-1];
-                    if (lastMsg.senderRole === 'admin') {
-                        if (audioRef.current) audioRef.current.play().catch(() => {});
-                        if (!isOpen) {
-                            setHasUnreadChat(true);
-                            setShowTooltip(true);
-                        }
-                    }
+                if (formatted.length > messages.length && formatted[formatted.length-1].senderRole === 'admin') {
+                    if (audioRef.current) audioRef.current.play().catch(() => {});
+                    if (!isOpen) setHasUnreadChat(true);
                 }
                 setMessages(formatted);
             }
-        } catch (e) {
-            console.error("Chat Sync Error:", e);
-        }
+        } catch (e) {}
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
@@ -130,128 +108,134 @@ const CustomerSupportChat: React.FC = () => {
     };
 
     return (
-        /* VỊ TRÍ MỚI: GÓC PHẢI DƯỚI (PHÍA TRÊN BOT AI) - ĐẢM BẢO KHÔNG BỊ CHE KHUẤT */
         <div 
-            className="fixed bottom-24 right-6 sm:right-10 z-[2147483647] flex flex-col items-end pointer-events-none"
-            id="sigma-support-v2-root"
+            id="sigma-concierge-chat-v3"
+            style={{
+                position: 'fixed',
+                bottom: '160px', // Cao hơn Chat AI cũ
+                right: '24px',
+                zIndex: 2147483647,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                pointerEvents: 'none'
+            }}
         >
-            {/* Tooltip Gợi Ý */}
-            {showTooltip && !isOpen && (
-                <div className="bg-[#111827] text-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] mb-4 animate-bounce pointer-events-auto border-2 border-[#D4AF37] max-w-[280px] relative">
-                    <button onClick={() => setShowTooltip(false)} className="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full text-[8px] border border-white">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg>
-                    </button>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed">
-                        Sigma Vie đã sẵn sàng hỗ trợ quý khách! ✨
-                    </p>
-                    <div className="absolute -bottom-1.5 right-8 w-4 h-4 bg-[#111827] rotate-45 border-r-2 border-b-2 border-[#D4AF37]"></div>
-                </div>
-            )}
-
-            {/* Hộp thoại Chat */}
+            {/* Box Chat */}
             {isOpen && (
-                <div className="bg-white w-[90vw] sm:w-[400px] h-[550px] max-h-[70vh] rounded-[2.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-slide-up-luxury pointer-events-auto ring-1 ring-black/5">
-                    {/* Header Sang Trọng */}
-                    <div className="bg-[#111827] text-white p-6 flex justify-between items-center shrink-0 border-b border-white/5">
+                <div 
+                    className="bg-white rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up"
+                    style={{ 
+                        width: '380px', 
+                        height: '500px', 
+                        maxHeight: '70vh', 
+                        maxWidth: '90vw',
+                        pointerEvents: 'auto' 
+                    }}
+                >
+                    <div className="bg-[#111827] text-white p-6 flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#B4975A] to-[#D4AF37] rounded-xl flex items-center justify-center font-black text-white shadow-xl text-xl">Σ</div>
+                            <div className="w-10 h-10 bg-[#D4AF37] rounded-xl flex items-center justify-center font-black">Σ</div>
                             <div>
-                                <h3 className="font-black text-[11px] tracking-[0.3em] uppercase">Sigma Concierge</h3>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></span>
-                                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">Trực tuyến hỗ trợ</span>
-                                </div>
+                                <h3 className="font-black text-[11px] tracking-widest uppercase">Hỗ trợ Sigma Vie</h3>
+                                <p className="text-[8px] text-emerald-400 font-bold uppercase animate-pulse">Nhân viên đang online</p>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="bg-white/10 hover:bg-rose-500/20 text-white p-2.5 rounded-full transition-all">
+                        <button onClick={() => setIsOpen(false)} className="bg-white/10 hover:bg-rose-500/20 p-2 rounded-full transition-all">
                             <XIcon className="w-5 h-5" />
                         </button>
                     </div>
 
-                    {/* Vùng Tin nhắn */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#FAFAFA] custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#FAFAFA] custom-scrollbar">
                         {messages.length === 0 && (
                             <div className="text-center py-20 opacity-30">
-                                <MessageSquareIcon className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                                <p className="text-[9px] font-black uppercase tracking-[0.3em] leading-loose">Quý khách cần tư vấn về size<br/>hoặc chất liệu?</p>
+                                <MessageSquareIcon className="w-10 h-10 mx-auto mb-3" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Quý khách cần tư vấn<br/>về sản phẩm hoặc đơn hàng?</p>
                             </div>
                         )}
                         {messages.map((msg, idx) => (
                             <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] px-5 py-3 rounded-2xl text-[13px] shadow-sm ${
+                                <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-[13px] shadow-sm ${
                                     msg.senderRole === 'customer' 
-                                        ? 'bg-[#B4975A] text-white rounded-tr-none' 
+                                        ? 'bg-[#D4AF37] text-white rounded-tr-none' 
                                         : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                                 }`}>
                                     <p className="font-bold leading-relaxed">{msg.text}</p>
-                                    <p className={`text-[8px] font-black uppercase mt-1.5 opacity-40 ${msg.senderRole === 'customer' ? 'text-right' : 'text-left'}`}>
-                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </p>
                                 </div>
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Ô nhập liệu */}
-                    <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-100 flex items-center gap-3 shrink-0">
+                    <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-50 flex items-center gap-2 pointer-events-auto">
                         <input 
                             type="text" 
                             value={inputValue} 
                             onChange={(e) => setInputValue(e.target.value)} 
-                            placeholder="Nhập yêu cầu của quý khách..." 
-                            className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-xl px-5 py-3.5 text-sm focus:border-[#B4975A] focus:bg-white transition-all outline-none font-bold"
+                            placeholder="Nhập lời nhắn..." 
+                            className="flex-1 bg-slate-50 border-none rounded-xl px-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all"
                         />
-                        <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white p-4 rounded-xl shadow-lg disabled:opacity-20 active:scale-90 transition-all">
+                        <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white p-3.5 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
                             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                         </button>
                     </form>
                 </div>
             )}
 
-            {/* NÚT BẤM KÍCH HOẠT - GÓC PHẢI - RỰC RỠ NHẤT */}
-            <div className="relative pointer-events-auto group">
-                <button 
-                    onClick={() => { setIsOpen(!isOpen); setShowTooltip(false); setHasUnreadChat(false); }} 
-                    className={`flex items-center justify-center w-20 h-20 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all transform hover:scale-110 active:scale-95 border-4 border-white overflow-hidden relative
-                        ${isOpen ? 'bg-rose-500 rotate-90' : 'bg-[#111827] animate-pulse-luxury'}`}
-                >
-                    {isOpen ? <XIcon className="w-9 h-9 text-white" /> : <MessageSquareIcon className="w-9 h-9 text-[#B4975A]" />}
-                    
-                    {/* Badge tin nhắn chưa đọc thực tế */}
-                    {!isOpen && hasUnreadChat && (
-                         <span className="absolute top-4 right-4 w-5 h-5 bg-rose-500 rounded-full border-2 border-white shadow-lg animate-bounce flex items-center justify-center text-[10px] font-black text-white">1</span>
-                    )}
-                </button>
-                
+            {/* NÚT KÍCH HOẠT CHÍNH */}
+            <div 
+                className={`flex flex-col items-end gap-3 pointer-events-auto ${shouldShake && !isOpen ? 'animate-shake' : ''}`}
+                onMouseEnter={() => setShouldShake(false)}
+            >
                 {!isOpen && (
-                    <div className="absolute top-1/2 -left-32 -translate-y-1/2 pr-4 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
-                        <div className="bg-white/90 backdrop-blur-md border border-slate-100 px-4 py-2 rounded-xl shadow-xl text-[10px] font-black text-[#111827] uppercase tracking-[0.2em] whitespace-nowrap">
-                            Trò chuyện với Admin
-                        </div>
+                    <div className="bg-[#111827] text-white px-4 py-2 rounded-2xl shadow-2xl border border-[#D4AF37] animate-bounce-slow">
+                        <p className="text-[10px] font-black uppercase tracking-widest">Chat với chúng tôi ✨</p>
                     </div>
                 )}
+                
+                <button 
+                    onClick={() => { setIsOpen(!isOpen); setHasUnreadChat(false); }} 
+                    className={`group flex items-center justify-center w-20 h-20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all transform hover:scale-110 active:scale-95 border-4 border-white relative
+                        ${isOpen ? 'bg-rose-500 rotate-90' : 'bg-[#111827] hover:bg-black'}`}
+                >
+                    {isOpen ? (
+                        <XIcon className="w-10 h-10 text-white" />
+                    ) : (
+                        <MessageSquareIcon className="w-10 h-10 text-[#D4AF37]" />
+                    )}
+                    
+                    {!isOpen && hasUnreadChat && (
+                         <span className="absolute -top-1 -right-1 w-6 h-6 bg-rose-500 rounded-full border-4 border-white shadow-lg animate-ping"></span>
+                    )}
+                </button>
             </div>
 
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar { width: 3px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
                 
-                @keyframes pulse-luxury {
-                    0% { box-shadow: 0 0 0 0 rgba(180, 151, 90, 0.7), 0 20px 50px rgba(0,0,0,0.4); }
-                    70% { box-shadow: 0 0 0 35px rgba(180, 151, 90, 0), 0 20px 50px rgba(0,0,0,0.4); }
-                    100% { box-shadow: 0 0 0 0 rgba(180, 151, 90, 0), 0 20px 50px rgba(0,0,0,0.4); }
-                }
-                .animate-pulse-luxury {
-                    animation: pulse-luxury 2s infinite;
+                @keyframes floatUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
 
-                @keyframes slideUpLuxury {
-                    from { opacity: 0; transform: translateY(50px) scale(0.9); }
-                    to { opacity: 1; transform: translateY(0) scale(1); }
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+                    20%, 40%, 60%, 80% { transform: translateX(5px); }
                 }
-                .animate-slide-up-luxury {
-                    animation: slideUpLuxury 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                .animate-shake {
+                    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+                    animation-delay: 5s;
+                    animation-iteration-count: 2;
+                }
+
+                @keyframes bounceSlow {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-10px); }
+                }
+                .animate-bounce-slow {
+                    animation: bounceSlow 3s infinite ease-in-out;
                 }
             `}</style>
         </div>
