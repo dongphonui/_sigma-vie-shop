@@ -40,41 +40,41 @@ const AdminPage: React.FC = () => {
         setCurrentAdminUser({ id: 'local_master', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER', permissions: ['ALL'] });
     }
     
-    // Server status periodic check
+    // Kiểm tra trạng thái máy chủ
+    const checkStatus = async () => {
+        setIsCheckingConnection(true);
+        try {
+            const online = await checkServerConnection();
+            setIsServerOnline(online);
+        } catch (e) {
+            setIsServerOnline(false);
+        } finally {
+            setTimeout(() => setIsCheckingConnection(false), 600);
+        }
+    };
+
     checkStatus();
-    const interval = setInterval(checkStatus, 30000);
+    const statusInterval = setInterval(checkStatus, 30000);
     
-    // Poll unread chat count
-    const chatInterval = setInterval(updateUnreadCount, 10000);
+    // Theo dõi tin nhắn chat chưa đọc
+    const updateUnreadCount = async () => {
+        try {
+            const sessions = await fetchChatSessions();
+            if (sessions) {
+                const totalUnread = sessions.reduce((acc: number, s: any) => acc + (s.unreadCount || 0), 0);
+                setUnreadChatCount(totalUnread);
+            }
+        } catch (e) {}
+    };
+
     updateUnreadCount();
+    const chatInterval = setInterval(updateUnreadCount, 10000);
 
     return () => {
-        clearInterval(interval);
+        clearInterval(statusInterval);
         clearInterval(chatInterval);
     };
   }, []);
-
-  const updateUnreadCount = async () => {
-      try {
-          const sessions = await fetchChatSessions();
-          if (sessions) {
-              const totalUnread = sessions.reduce((acc: number, s: any) => acc + (s.unreadCount || 0), 0);
-              setUnreadChatCount(totalUnread);
-          }
-      } catch (e) {}
-  };
-
-  const checkStatus = async () => {
-      setIsCheckingConnection(true);
-      try {
-          const online = await checkServerConnection();
-          setIsServerOnline(online);
-      } catch (e) {
-          setIsServerOnline(false);
-      } finally {
-          setTimeout(() => setIsCheckingConnection(false), 600);
-      }
-  };
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAuthenticated');
@@ -111,8 +111,8 @@ const AdminPage: React.FC = () => {
       {!isServerOnline && (
         <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2.5 z-[1000] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl animate-bounce">
           <AlertCircleIcon className="w-4 h-4" />
-          Hệ thống đang ngoại tuyến - Vui lòng kiểm tra đường truyền
-          <button onClick={checkStatus} className="bg-white text-rose-600 px-3 py-0.5 rounded-full hover:bg-rose-50 font-black">Thử lại</button>
+          Máy chủ đang mất kết nối - Một số chức năng có thể bị gián đoạn
+          <button onClick={() => window.location.reload()} className="bg-white text-rose-600 px-3 py-0.5 rounded-full hover:bg-rose-50 font-black">Thử lại</button>
         </div>
       )}
 
@@ -127,7 +127,7 @@ const AdminPage: React.FC = () => {
                 {/* ĐÈN BÁO SIDEBAR ADMIN */}
                 <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)] ${isServerOnline ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}`}></span>
             </div>
-            <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
+            <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Hệ thống Quản trị Luxury</p>
           </div>
         </div>
 
@@ -142,7 +142,7 @@ const AdminPage: React.FC = () => {
               <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-xl transition-all ${activeTab === 'chat' ? 'bg-[#D4AF37] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <div className="flex items-center gap-3">
                     <MessageSquareIcon className="w-5 h-5" />
-                    <span className="text-sm font-bold">Live Chat Hỗ trợ</span>
+                    <span className="text-sm font-bold">Hỗ trợ trực tuyến</span>
                 </div>
                 {unreadChatCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce">
@@ -183,46 +183,46 @@ const AdminPage: React.FC = () => {
            {hasPermission('settings_ui') && (
                <div className="pt-6 mt-6 border-t border-gray-800/50">
                     <p className="px-5 text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
-                        <MonitorIcon className="w-3 h-3" /> Giao diện Website
+                        <MonitorIcon className="w-3 h-3" /> Tùy chỉnh Website
                     </p>
-                    <button onClick={() => setActiveTab('home')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'home' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Trang chủ</button>
-                    <button onClick={() => setActiveTab('products_ui')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'products_ui' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Trang Sản phẩm</button>
-                    <button onClick={() => setActiveTab('header')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'header' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Header & Logo</button>
-                    <button onClick={() => setActiveTab('about')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'about' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Trang Giới thiệu</button>
+                    <button onClick={() => setActiveTab('home')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'home' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Trang chủ</button>
+                    <button onClick={() => setActiveTab('products_ui')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'products_ui' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Sản phẩm</button>
+                    <button onClick={() => setActiveTab('header')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'header' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Header & Logo</button>
+                    <button onClick={() => setActiveTab('about')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'about' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Giới thiệu</button>
                </div>
            )}
         </nav>
 
         <div className="p-4 mt-auto border-t border-gray-800 space-y-2">
              <a href="#/" className="w-full flex items-center gap-3 px-5 py-3 rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition-all group">
-                <HomeIcon className="w-5 h-5 group-hover:text-[#B4975A]" /> <span className="text-sm font-bold">Về trang chủ</span>
+                <HomeIcon className="w-5 h-5 group-hover:text-[#B4975A]" /> <span className="text-sm font-bold">Về cửa hàng</span>
              </a>
              <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-5 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5'}`}>
-                <UserIcon className="w-5 h-5" /> <span className="text-sm font-bold">Cấu hình hệ thống</span>
+                <UserIcon className="w-5 h-5" /> <span className="text-sm font-bold">Cấu hình Hệ thống</span>
              </button>
              <button onClick={handleLogout} className="w-full bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Đăng xuất</button>
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-12 overflow-y-auto max-h-screen">
+      <main className="flex-1 p-6 md:p-12 overflow-y-auto max-h-screen relative">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 print:hidden">
             <div>
                 <div className="flex items-center gap-2 mb-1">
                     <span className="w-8 h-[1px] bg-[#B4975A]"></span>
-                    <p className="text-[10px] font-black text-[#B4975A] uppercase tracking-[0.4em]">Sigma Vie Hub</p>
+                    <p className="text-[10px] font-black text-[#B4975A] uppercase tracking-[0.4em]">Sigma Central Command</p>
                 </div>
                 <h2 className="text-4xl font-black text-[#111827] uppercase tracking-tighter">
                     {activeTab === 'dashboard' ? 'Bảng điều khiển' : 
                      activeTab === 'products' ? 'Danh mục Sản phẩm' : 
-                     activeTab === 'orders' ? 'Đơn hàng' : 
-                     activeTab === 'chat' ? 'Hỗ trợ khách hàng' : 
-                     activeTab === 'inventory' ? 'Kho hàng' : 
-                     activeTab === 'customers' ? 'Khách hàng' : 
-                     activeTab === 'reports' ? 'Báo cáo' : 
-                     activeTab === 'home' ? 'Giao diện Trang chủ' :
-                     activeTab === 'products_ui' ? 'Giao diện Sản phẩm' :
+                     activeTab === 'orders' ? 'Quản lý Đơn hàng' : 
+                     activeTab === 'chat' ? 'Trung tâm Tư vấn' : 
+                     activeTab === 'inventory' ? 'Sổ kho' : 
+                     activeTab === 'customers' ? 'Dữ liệu Khách hàng' : 
+                     activeTab === 'reports' ? 'Báo cáo Kinh doanh' : 
+                     activeTab === 'home' ? 'Thiết lập Trang chủ' :
+                     activeTab === 'products_ui' ? 'Thiết lập Giao diện SP' :
                      activeTab === 'header' ? 'Header & Logo' :
-                     activeTab === 'about' ? 'Trang Giới thiệu' : 'Hệ thống'}
+                     activeTab === 'about' ? 'Trang Giới thiệu' : 'Cài đặt hệ thống'}
                 </h2>
             </div>
             
@@ -233,7 +233,7 @@ const AdminPage: React.FC = () => {
                 <div className="text-left">
                     <div className="flex items-center gap-3">
                         <p className="text-sm font-black text-[#111827] uppercase leading-none">{currentAdminUser?.fullname}</p>
-                        {/* ĐÈN BÁO TRỰC TIẾP TRÊN CARD ADMIN */}
+                        {/* ĐÈN BÁO TRỰC TIẾP TRÊN THẺ ADMIN */}
                         <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-full border border-slate-100">
                             <span className={`w-2 h-2 rounded-full ${isServerOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse'}`}></span>
                             <span className={`text-[8px] font-black uppercase tracking-tighter ${isServerOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -243,7 +243,7 @@ const AdminPage: React.FC = () => {
                     </div>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
                         <ShieldCheckIcon className="w-3 h-3 text-[#B4975A]" />
-                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị tối cao' : 'Nhân viên hệ thống'}
+                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị viên Tối cao' : 'Cố vấn Hệ thống'}
                     </p>
                 </div>
             </div>

@@ -15,6 +15,7 @@ const CustomerSupportChat: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // 1. Khởi tạo Session và Âm thanh
     useEffect(() => {
         audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
         
@@ -25,16 +26,6 @@ const CustomerSupportChat: React.FC = () => {
         }
         setSessionId(sid);
 
-        // Lắng nghe sự kiện mở chat từ Header hoặc Menu
-        const handleOpenExternal = (e: any) => {
-            setIsOpen(true);
-            setShowTooltip(false);
-            if (e.detail?.message && messages.length === 0) {
-                setInputValue(e.detail.message);
-            }
-        };
-        window.addEventListener('sigma_vie_open_chat', handleOpenExternal);
-        
         // Hiện tooltip lời chào sau 5s nếu user đã login nhưng chưa mở chat
         const timer = setTimeout(() => {
             if (getCurrentCustomer() && !isOpen && messages.length === 0) {
@@ -42,12 +33,25 @@ const CustomerSupportChat: React.FC = () => {
             }
         }, 5000);
 
-        return () => {
-            window.removeEventListener('sigma_vie_open_chat', handleOpenExternal);
-            clearTimeout(timer);
-        };
-    }, [messages.length, isOpen]);
+        return () => clearTimeout(timer);
+    }, []);
 
+    // 2. Lắng nghe sự kiện mở chat từ các Component khác (Header, Product Modal...)
+    useEffect(() => {
+        const handleOpenExternal = (e: any) => {
+            console.log("Sự kiện mở Chat nhận được:", e.detail);
+            setIsOpen(true);
+            setShowTooltip(false);
+            if (e.detail?.message) {
+                setInputValue(e.detail.message);
+            }
+        };
+
+        window.addEventListener('sigma_vie_open_chat', handleOpenExternal);
+        return () => window.removeEventListener('sigma_vie_open_chat', handleOpenExternal);
+    }, []);
+
+    // 3. Tải tin nhắn và theo dõi trạng thái online
     useEffect(() => {
         const currentUser = getCurrentCustomer();
         setUser(currentUser);
@@ -58,13 +62,16 @@ const CustomerSupportChat: React.FC = () => {
             markChatAsRead(sessionId);
             interval = setInterval(() => loadMessages(sessionId), 4000);
         } else {
+            // Check tin nhắn mới ở chế độ nền
             interval = setInterval(() => loadMessages(sessionId), 10000);
         }
         return () => clearInterval(interval);
     }, [isOpen, sessionId]);
 
     useEffect(() => {
-        if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (isOpen) {
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
     }, [messages, isOpen]);
 
     const loadMessages = async (sid: string) => {
@@ -83,8 +90,8 @@ const CustomerSupportChat: React.FC = () => {
             }));
             
             // Phát âm thanh nếu có tin mới từ admin
-            if (formatted.length > messages.length && formatted[formatted.length-1].senderRole === 'admin' && audioRef.current) {
-                audioRef.current.play().catch(() => {});
+            if (formatted.length > messages.length && formatted[formatted.length-1].senderRole === 'admin') {
+                if (audioRef.current) audioRef.current.play().catch(() => {});
                 if (!isOpen) setShowTooltip(true);
             }
             
@@ -115,22 +122,22 @@ const CustomerSupportChat: React.FC = () => {
     };
 
     return (
-        <div className="fixed bottom-6 right-32 z-[200] flex flex-col items-end font-sans">
-            {/* Tooltip lời chào bồng bềnh */}
+        <div className="fixed bottom-6 right-6 sm:right-32 z-[200] flex flex-col items-end font-sans pointer-events-none">
+            {/* Tooltip lời chào */}
             {showTooltip && !isOpen && (
-                <div className="bg-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-100 mb-4 animate-float-up max-w-[240px] relative">
+                <div className="bg-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-100 mb-4 animate-float-up max-w-[240px] relative pointer-events-auto">
                     <button onClick={() => setShowTooltip(false)} className="absolute -top-2 -right-2 bg-slate-100 p-1 rounded-full text-slate-400 hover:text-black">
                         <XIcon className="w-3 h-3" />
                     </button>
                     <p className="text-xs font-bold text-slate-700 leading-relaxed">
-                        {user ? `Chào ${user.fullName.split(' ').pop()}! Sigma Vie đang online, bạn cần tư vấn thêm về sản phẩm không?` : 'Kính chào quý khách! Chúng tôi có thể giúp gì cho bạn?'}
+                        {user ? `Chào ${user.fullName.split(' ').pop()}! Cố vấn Sigma Vie đang online, bạn cần hỗ trợ gì không?` : 'Kính chào quý khách! Chúng tôi có thể giúp gì cho bạn?'}
                     </p>
                     <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-r border-b border-slate-100 rotate-45"></div>
                 </div>
             )}
 
             {isOpen && (
-                <div className="bg-white w-[340px] sm:w-[400px] h-[550px] rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.25)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up">
+                <div className="bg-white w-[90vw] sm:w-[400px] h-[550px] rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.25)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up pointer-events-auto">
                     {/* Header Chat */}
                     <div className="bg-[#111827] text-white p-6 flex justify-between items-center relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none">
@@ -160,10 +167,10 @@ const CustomerSupportChat: React.FC = () => {
                             </div>
                         )}
                         {messages.map((msg, idx) => (
-                            <div key={msg.id} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+                            <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
                                 <div className={`max-w-[85%] px-5 py-4 rounded-3xl text-sm shadow-sm ${
                                     msg.senderRole === 'customer' 
-                                        ? 'bg-[#B4975A] text-white rounded-tr-none shadow-amber-900/10' 
+                                        ? 'bg-[#B4975A] text-white rounded-tr-none' 
                                         : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                                 }`}>
                                     <p className="leading-relaxed font-medium">{msg.text}</p>
@@ -185,7 +192,7 @@ const CustomerSupportChat: React.FC = () => {
                             type="text" 
                             value={inputValue} 
                             onChange={(e) => setInputValue(e.target.value)} 
-                            placeholder="Nhập nội dung cần hỗ trợ..." 
+                            placeholder="Nhập nội dung tư vấn..." 
                             className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl px-6 py-4 text-sm focus:border-[#B4975A] focus:bg-white transition-all outline-none font-bold placeholder:text-slate-300"
                         />
                         <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white p-4 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-20">
@@ -197,7 +204,7 @@ const CustomerSupportChat: React.FC = () => {
 
             <button 
                 onClick={() => { setIsOpen(!isOpen); setShowTooltip(false); }} 
-                className={`group flex items-center gap-3 bg-[#111827] text-white pr-8 pl-5 py-5 rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-all transform hover:scale-105 active:scale-95 border-4 border-white ${isOpen ? 'rotate-90 ring-4 ring-[#B4975A]/20' : ''} ${user ? 'ring-4 ring-[#D4AF37]/20' : ''}`}
+                className={`group flex items-center gap-3 bg-[#111827] text-white pr-8 pl-5 py-5 rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-all transform hover:scale-105 active:scale-95 border-4 border-white pointer-events-auto ${isOpen ? 'rotate-90 ring-4 ring-[#B4975A]/20' : ''}`}
             >
                 <div className="relative">
                     <MessageSquareIcon className="w-6 h-6" />
