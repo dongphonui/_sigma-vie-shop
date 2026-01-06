@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { getHeaderSettings } from '../utils/headerSettingsStorage';
 import { getCurrentCustomer, logoutCustomer } from '../utils/customerStorage';
-import { MessageSquareIcon, ActivityIcon } from './Icons';
+import { MessageSquareIcon } from './Icons';
 import { fetchChatMessages, checkServerConnection } from '../utils/apiClient';
 import type { HeaderSettings, Customer } from '../types';
 
@@ -30,7 +30,6 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
   useEffect(() => {
     setSettings(getHeaderSettings());
     
-    // Check Server Status
     const checkStatus = async () => {
         const status = await checkServerConnection();
         setIsOnline(status);
@@ -38,27 +37,25 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
     checkStatus();
     const statusInterval = setInterval(checkStatus, 30000);
 
-    // Kiểm tra tin nhắn chưa đọc định kỳ
-    if (currentUser) {
-        const checkUnread = async () => {
-            const sid = localStorage.getItem('sigma_vie_support_sid');
-            if (sid) {
-                const messages = await fetchChatMessages(sid);
-                if (Array.isArray(messages)) {
-                    const hasUnread = messages.some((m: any) => m.sender_role === 'admin' && !m.is_read);
-                    setHasUnreadChat(hasUnread);
-                }
+    // Kiểm tra tin nhắn chưa đọc (Dùng SID từ localstorage cho cả khách vãng lai)
+    const checkUnread = async () => {
+        const sid = localStorage.getItem('sigma_vie_support_sid');
+        if (sid) {
+            const messages = await fetchChatMessages(sid);
+            if (Array.isArray(messages)) {
+                const hasUnread = messages.some((m: any) => m.sender_role === 'admin' && !m.is_read);
+                setHasUnreadChat(hasUnread);
             }
-        };
-        checkUnread();
-        const chatInterval = setInterval(checkUnread, 10000);
-        return () => {
-            clearInterval(statusInterval);
-            clearInterval(chatInterval);
-        };
-    }
-    return () => clearInterval(statusInterval);
-  }, [currentUser]);
+        }
+    };
+    checkUnread();
+    const chatInterval = setInterval(checkUnread, 10000);
+    
+    return () => {
+        clearInterval(statusInterval);
+        clearInterval(chatInterval);
+    };
+  }, []);
 
   const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     e.preventDefault();
@@ -73,10 +70,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
 
   const handleOpenChat = (e: React.MouseEvent) => {
       e.preventDefault();
-      // Phát sự kiện để component CustomerSupportChat mở ra
+      // Gửi sự kiện mở chat
       window.dispatchEvent(new CustomEvent('sigma_vie_open_chat', { 
           detail: { 
-              message: `Chào Sigma Vie, tôi là ${currentUser?.fullName}. Tôi cần được tư vấn.` 
+              message: currentUser ? `Chào Sigma Vie, tôi là ${currentUser.fullName}.` : "Chào Sigma Vie, tôi cần tư vấn sản phẩm."
           } 
       }));
       setUserMenuVisible(false);
@@ -103,11 +100,10 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                 )}
               </a>
 
-              {/* ĐÈN BÁO SERVER KHÁCH HÀNG */}
               <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-full border border-slate-100/50 scale-75 md:scale-100">
                   <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]'}`}></span>
                   <span className={`text-[7px] font-black uppercase tracking-tighter ${isOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {isOnline ? 'Server Ready' : 'Connecting...'}
+                      {isOnline ? 'Cloud Active' : 'Connecting...'}
                   </span>
               </div>
           </div>
@@ -117,21 +113,17 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                 <a href="#/" onClick={(e) => handleNavigate(e, '/')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Bộ sưu tập</a>
                 <a href="#/about" onClick={(e) => handleNavigate(e, '/about')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Về chúng tôi</a>
                 
-                {currentUser && (
-                    <button 
-                        onClick={handleOpenChat} 
-                        className="relative text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors flex items-center gap-2 group animate-fade-in"
-                    >
-                        <MessageSquareIcon className="w-4 h-4 group-hover:animate-bounce" />
-                        Live Chat Hỗ Trợ
-                        {hasUnreadChat && (
-                            <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
-                        )}
-                        {hasUnreadChat && (
-                            <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full shadow-[0_0_5px_rgba(244,63,94,1)]"></span>
-                        )}
-                    </button>
-                )}
+                {/* BỎ ĐIỀU KIỆN ĐĂNG NHẬP: HIỆN CHO TẤT CẢ MỌI NGƯỜI */}
+                <button 
+                    onClick={handleOpenChat} 
+                    className="relative text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors flex items-center gap-2 group"
+                >
+                    <MessageSquareIcon className="w-4 h-4 group-hover:animate-bounce" />
+                    Live Chat Hỗ Trợ
+                    {hasUnreadChat && (
+                        <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
+                    )}
+                </button>
             </nav>
 
             <div className="flex items-center gap-6">
@@ -163,13 +155,6 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                                         <p className="text-sm font-bold text-[#064E3B] truncate">{currentUser.fullName}</p>
                                     </div>
                                     <a href="#/my-orders" onClick={(e) => handleNavigate(e, '/my-orders')} className="block px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50">Lịch sử đơn hàng</a>
-                                    <button 
-                                        onClick={handleOpenChat} 
-                                        className="w-full text-left px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50 flex items-center gap-2"
-                                    >
-                                        <MessageSquareIcon className="w-4 h-4 text-[#D4AF37]" />
-                                        Chat với tư vấn viên
-                                    </button>
                                     <div className="border-t border-slate-50 mt-2">
                                         <button onClick={handleLogout} className="block w-full text-left px-5 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50">Đăng xuất</button>
                                     </div>
