@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Content } from "@google/genai";
 import { getProducts } from '../utils/productStorage';
@@ -62,20 +61,8 @@ const ChatWidget: React.FC = () => {
       const products = getProducts();
       const productContext = products.map(p => `${p.name} (${p.price})`).join(', ');
 
-      const apiKey = process.env.API_KEY;
-      
-      if (!apiKey || apiKey === "undefined" || apiKey === "") {
-        setMessages(prev => [...prev, {
-            id: Date.now().toString(),
-            role: 'model',
-            text: "⚠️ Lỗi: Web chưa nhận được API_KEY. Hãy vào Vercel Settings để cấu hình và Redeploy!",
-            timestamp: Date.now(),
-        }]);
-        setIsLoading(false);
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey: apiKey });
+      /* // Fix: Initialization according to @google/genai guidelines - use process.env.API_KEY directly and assume its availability. */
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const history: Content[] = messages.slice(-10).map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
@@ -93,6 +80,7 @@ const ChatWidget: React.FC = () => {
           message: userMessage.text 
       });
       
+      /* // Fix: Extract text output using property access as per guidelines. */
       const responseText = result.text;
 
       setMessages(prev => [...prev, {

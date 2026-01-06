@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { GoogleGenAI } from "@google/genai";
@@ -208,14 +207,11 @@ const ProductTab: React.FC = () => {
           showFeedback('⚠️ Hãy nhập Tên sản phẩm trước.', 'info');
           return;
       }
-      const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === "undefined" || apiKey === "") {
-          showFeedback('❌ Lỗi: Web chưa nhận được API_KEY từ Vercel.', 'error');
-          return;
-      }
+
       setIsGeneratingAI(true);
       try {
-          const ai = new GoogleGenAI({ apiKey: apiKey });
+          /* // Fix: Initialization according to @google/genai guidelines - use process.env.API_KEY directly and assume its availability. */
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview',
               contents: [{
@@ -229,6 +225,7 @@ const ProductTab: React.FC = () => {
                   }]
               }]
           });
+          /* // Fix: Extract text output using property access as per guidelines. */
           if (response.text) {
               setNewProductDescription(response.text.trim());
               showFeedback('✨ AI đã viết xong!', 'success');
@@ -432,7 +429,7 @@ const ProductTab: React.FC = () => {
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
                                 <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 shadow-lg"><QrCodeIcon className="w-5 h-5" /></button>
                                 <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 shadow-lg"><EditIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2.5 bg-white rounded-full text-red-600 hover:scale-110 shadow-lg"><Trash2Icon className="w-5 h-5" /></button>
+                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2.5 bg-white rounded-full text-red-600 hover:scale-110 shadow-lg"><Trash2Icon className="w-4 h-4" /></button>
                             </div>
                         </div>
                         <h3 className="font-bold text-slate-800 truncate leading-tight mb-2">{product.name}</h3>
