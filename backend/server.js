@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -33,7 +32,7 @@ const pool = new Pool({
 
 const initDb = async () => {
   if (!dbUrl) {
-      console.error("❌ DATABASE_URL is missing! Please set it in environment variables.");
+      console.error("❌ DATABASE_URL is missing!");
       return;
   }
   let client;
@@ -48,7 +47,8 @@ const initDb = async () => {
         `CREATE TABLE IF NOT EXISTS inventory_transactions (id TEXT PRIMARY KEY, product_id BIGINT, type TEXT, quantity INTEGER, timestamp BIGINT, data JSONB);`,
         `CREATE TABLE IF NOT EXISTS admin_users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, fullname TEXT, role TEXT, permissions JSONB, created_at BIGINT, totp_secret TEXT, is_totp_enabled BOOLEAN DEFAULT FALSE);`,
         `CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value JSONB);`,
-        `CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, username TEXT, method TEXT, status TEXT, ip_address TEXT, timestamp BIGINT);`
+        `CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, username TEXT, method TEXT, status TEXT, ip_address TEXT, timestamp BIGINT);`,
+        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE);`
     ];
     for (let q of queries) await client.query(q);
     console.log("✅ Database Schema Ready");
@@ -58,16 +58,72 @@ const initDb = async () => {
 
 initDb();
 
-// --- SETTINGS ROUTES ---
+// --- CHAT API ---
+app.get('/api/chat/messages/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const result = await pool.query('SELECT * FROM chat_messages WHERE session_id = $1 ORDER BY timestamp ASC', [sessionId]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/chat/messages', async (req, res) => {
+    try {
+        const m = req.body;
+        await pool.query(
+            'INSERT INTO chat_messages (id, session_id, customer_id, customer_name, sender_role, text, timestamp, is_read) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+            [m.id, m.sessionId, m.customerId || null, m.customerName, m.senderRole, m.text, m.timestamp, m.isRead]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/chat/sessions', async (req, res) => {
+    try {
+        // Lấy tin nhắn cuối cùng và đếm số tin chưa đọc (unreadCount) của mỗi session
+        const query = `
+            WITH LastMessages AS (
+                SELECT session_id, customer_name, text, timestamp, customer_id,
+                ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC) as rn
+                FROM chat_messages
+            ),
+            UnreadCounts AS (
+                SELECT session_id, COUNT(*) as unread_count
+                FROM chat_messages
+                WHERE sender_role = 'customer' AND is_read = FALSE
+                GROUP BY session_id
+            )
+            SELECT 
+                lm.session_id as "sessionId", 
+                lm.customer_name as "customerName", 
+                lm.text as "lastMessage", 
+                lm.timestamp as "lastTimestamp",
+                lm.customer_id as "customerId",
+                COALESCE(uc.unread_count, 0) as "unreadCount"
+            FROM LastMessages lm
+            LEFT JOIN UnreadCounts uc ON lm.session_id = uc.session_id
+            WHERE lm.rn = 1
+            ORDER BY lm.timestamp DESC
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/chat/read/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        await pool.query('UPDATE chat_messages SET is_read = TRUE WHERE session_id = $1 AND sender_role = \'customer\'', [sessionId]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- SETTINGS & OTHER APIS (Giữ nguyên phần còn lại của file) ---
 app.get('/api/settings/:key', async (req, res) => {
     try {
         const { key } = req.params;
         const result = await pool.query('SELECT value FROM app_settings WHERE key = $1', [key]);
-        if (result.rows.length > 0) {
-            res.json(result.rows[0].value);
-        } else {
-            res.json({});
-        }
+        res.json(result.rows.length > 0 ? result.rows[0].value : {});
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -75,18 +131,13 @@ app.post('/api/settings/:key', async (req, res) => {
     try {
         const { key } = req.params;
         const value = req.body;
-        console.log(`💾 Saving setting: ${key}`);
         await pool.query('INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, value]);
         res.json({ success: true });
-    } catch (err) { 
-        console.error(`❌ Error saving setting ${key}:`, err.message);
-        res.status(500).json({ error: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: Date.now() }));
 
-// --- PRODUCTS ---
 app.get('/api/products', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -97,12 +148,9 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', async (req, res) => {
     const p = req.body;
     try {
-        const currentStock = parseInt(p.stock) || 0;
-        await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, currentStock, p, Date.now()]);
+        await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, p.stock, p, Date.now()]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-// ... (Các route khác giữ nguyên hoặc tương tự)
 
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
