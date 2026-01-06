@@ -1,32 +1,29 @@
 
 export const API_BASE_URL = (() => {
-    try {
-        if (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
-            return process.env.VITE_API_URL;
-        }
-    } catch(e) {}
-
+    // 1. Kiểm tra biến môi trường được inject bởi Vite
     try {
         // @ts-ignore
-        const meta = import.meta;
-        if (meta && meta.env && meta.env.VITE_API_URL) {
-            return meta.env.VITE_API_URL;
+        if (import.meta.env && import.meta.env.VITE_API_URL) {
+            return import.meta.env.VITE_API_URL;
         }
     } catch (e) {}
     
+    // 2. Kiểm tra nếu đang chạy ở Localhost
     let isLocalhost = false;
     try {
         if (typeof window !== 'undefined' && window.location && window.location.hostname) {
             const h = window.location.hostname;
-            if (h === 'localhost' || h === '127.0.0.1') {
+            if (h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.')) {
                 isLocalhost = true;
             }
         }
-    } catch (e) { }
+    } catch (e) {}
 
+    // 3. Trả về URL tương ứng
     if (isLocalhost) {
         return 'http://localhost:3000/api';
     } else {
+        // Luôn trỏ về URL production của bạn trên Render
         return 'https://sigmavie-backend.onrender.com/api';
     }
 })();
@@ -101,7 +98,7 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
         return await res.json();
     } catch (e) {
         if (!isOffline) isOffline = true;
-        return { success: false, message: `Offline Mode: Data saved locally only.`, isNetworkError: true };
+        return { success: false, message: `Offline Mode: Dữ liệu chưa được đẩy lên Server.`, isNetworkError: true };
     }
 };
 
@@ -127,9 +124,7 @@ export const updateCustomerInDB = (customer: any) => syncData(`customers/${custo
 export const deleteCustomerFromDB = (id: string) => syncData(`customers/${id}`, {}, 'DELETE');
 export const verifyCustomerLoginOnServer = (identifier: string, passwordHash: string) => syncData('customers/login', { identifier, passwordHash }, 'POST');
 
-// Fix: Export requestCustomerForgotPassword
 export const requestCustomerForgotPassword = (identifier: string) => syncData('customers/forgot-password', { identifier });
-// Fix: Export confirmCustomerResetPassword
 export const confirmCustomerResetPassword = (identifier: string, passwordHash: string) => syncData('customers/reset-password', { identifier, passwordHash });
 
 // Orders
@@ -141,15 +136,14 @@ export const fetchTransactionsFromDB = () => fetchData('inventory');
 export const syncTransactionToDB = (transaction: any) => syncData('inventory', transaction);
 
 // Admin Logs & Email
-// Fix: Export loginAdminUser
 export const loginAdminUser = (credentials: any) => syncData('admin/login', credentials);
 export const recordAdminLogin = (method: string, status: string, username?: string) => syncData('admin/login', { method, status, username });
 export const fetchAdminLoginLogs = () => fetchData('admin/logs');
 export const sendEmail = (to: string, subject: string, html: string) => syncData('admin/email', { to, subject, html });
 
 // Home Page Settings
-export const fetchHomePageSettingsFromDB = () => fetchData('settings/home');
-export const syncHomePageSettingsToDB = (settings: any) => syncData('settings/home', settings);
+export const fetchHomePageSettingsFromDB = () => fetchSettingFromDB('home');
+export const syncHomePageSettingsToDB = (settings: any) => syncSettingToDB('home', settings);
 
 // Specialized UI Settings
 export const fetchHeaderSettingsFromDB = () => fetchSettingFromDB('header');
@@ -158,37 +152,26 @@ export const syncHeaderSettingsToDB = (settings: any) => syncSettingToDB('header
 export const fetchProductPageSettingsFromDB = () => fetchSettingFromDB('product-ui');
 export const syncProductPageSettingsToDB = (settings: any) => syncSettingToDB('product-ui', settings);
 
-// Fix: Export fetchBankSettingsFromDB
 export const fetchBankSettingsFromDB = () => fetchSettingFromDB('bank');
-// Fix: Export syncBankSettingsToDB
 export const syncBankSettingsToDB = (settings: any) => syncSettingToDB('bank', settings);
 
-// Fix: Export fetchStoreSettingsFromDB
 export const fetchStoreSettingsFromDB = () => fetchSettingFromDB('store');
-// Fix: Export syncStoreSettingsToDB
 export const syncStoreSettingsToDB = (settings: any) => syncSettingToDB('store', settings);
 
-// Fix: Export fetchShippingSettingsFromDB
 export const fetchShippingSettingsFromDB = () => fetchSettingFromDB('shipping');
-// Fix: Export syncShippingSettingsToDB
 export const syncShippingSettingsToDB = (settings: any) => syncSettingToDB('shipping', settings);
 
 // About Page
-export const fetchAboutContentFromDB = () => fetchData('settings/about-content');
-export const syncAboutContentToDB = (content: any) => syncData('settings/about-content', content);
+export const fetchAboutContentFromDB = () => fetchSettingFromDB('about-content');
+export const syncAboutContentToDB = (content: any) => syncSettingToDB('about-content', content);
 
-export const fetchAboutSettingsFromDB = () => fetchData('settings/about-settings');
-export const syncAboutSettingsToDB = (settings: any) => syncData('settings/about-settings', settings);
+export const fetchAboutSettingsFromDB = () => fetchSettingFromDB('about-settings');
+export const syncAboutSettingsToDB = (settings: any) => syncSettingToDB('about-settings', settings);
 
-// Fix: Export changeAdminPassword
 export const changeAdminPassword = (data: any) => syncData('admin/change-password', data, 'PUT');
-// Fix: Export fetchAdminUsers
 export const fetchAdminUsers = () => fetchData('admin/users');
-// Fix: Export createAdminUser
 export const createAdminUser = (user: any) => syncData('admin/users', user, 'POST');
-// Fix: Export deleteAdminUser
 export const deleteAdminUser = (id: string) => syncData(`admin/users/${id}`, {}, 'DELETE');
-// Fix: Export updateAdminUser
 export const updateAdminUser = (id: string, data: any) => syncData(`admin/users/${id}`, data, 'PUT');
 
 // DB Management
