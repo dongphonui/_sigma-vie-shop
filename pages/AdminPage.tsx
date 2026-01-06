@@ -4,9 +4,9 @@ import type { AdminUser } from '../types';
 import { 
     BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, 
     UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, 
-    CheckIcon, SettingsIcon, MonitorIcon, HomeIcon 
+    CheckIcon, SettingsIcon, MonitorIcon, HomeIcon, MessageSquareIcon
 } from '../components/Icons';
-import { checkServerConnection } from '../utils/apiClient';
+import { checkServerConnection, fetchChatSessions } from '../utils/apiClient';
 
 // Import Components
 import DashboardTab from '../components/admin/DashboardTab';
@@ -16,6 +16,7 @@ import InventoryTab from '../components/admin/InventoryTab';
 import CustomerTab from '../components/admin/CustomerTab';
 import SettingsTab from '../components/admin/SettingsTab';
 import ReportsTab from '../components/admin/ReportsTab';
+import LiveChatTab from '../components/admin/LiveChatTab';
 
 // Import Setting Components
 import HomePageSettingsTab from '../components/admin/settings/HomePageSettingsTab';
@@ -24,10 +25,11 @@ import AboutPageSettingsTab from '../components/admin/settings/AboutPageSettings
 import ProductPageSettingsTab from '../components/admin/settings/ProductPageSettingsTab';
 
 const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reports' | 'settings' | 'home' | 'header' | 'about' | 'products_ui'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reports' | 'chat' | 'settings' | 'home' | 'header' | 'about' | 'products_ui'>('dashboard');
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [isServerOnline, setIsServerOnline] = useState(true);
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
     const userStr = sessionStorage.getItem('adminUser');
@@ -37,10 +39,27 @@ const AdminPage: React.FC = () => {
         setCurrentAdminUser({ id: 'local_master', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER', permissions: ['ALL'] });
     }
     checkStatus();
-    // Tự động kiểm tra mỗi 30 giây
     const interval = setInterval(checkStatus, 30000);
-    return () => clearInterval(interval);
+    
+    // Poll unread chat count
+    const chatInterval = setInterval(updateUnreadCount, 10000);
+    updateUnreadCount();
+
+    return () => {
+        clearInterval(interval);
+        clearInterval(chatInterval);
+    };
   }, []);
+
+  const updateUnreadCount = async () => {
+      try {
+          const sessions = await fetchChatSessions();
+          if (sessions) {
+              const totalUnread = sessions.reduce((acc: number, s: any) => acc + (s.unreadCount || 0), 0);
+              setUnreadChatCount(totalUnread);
+          }
+      } catch (e) {}
+  };
 
   const checkStatus = async () => {
       setIsCheckingConnection(true);
@@ -74,6 +93,7 @@ const AdminPage: React.FC = () => {
       case 'inventory': return <InventoryTab />;
       case 'customers': return <CustomerTab />;
       case 'reports': return <ReportsTab />; 
+      case 'chat': return <LiveChatTab />; 
       case 'home': return <HomePageSettingsTab />;     
       case 'header': return <HeaderSettingsTab />;     
       case 'about': return <AboutPageSettingsTab />;   
@@ -85,46 +105,23 @@ const AdminPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row font-sans">
-      {/* THANH THÔNG BÁO OFFLINE KHI MẤT KẾT NỐI */}
       {!isServerOnline && (
         <div className="fixed top-0 left-0 right-0 bg-red-600 text-white py-2 z-[1000] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl">
           <AlertCircleIcon className="w-4 h-4 animate-pulse" />
-          Mất kết nối máy chủ - Đang hoạt động ở chế độ Ngoại tuyến
-          <button onClick={checkStatus} className="bg-white text-red-600 px-3 py-0.5 rounded-full hover:bg-red-50 transition-all">Thử lại</button>
+          Mất kết nối máy chủ - Chế độ Ngoại tuyến
+          <button onClick={checkStatus} className="bg-white text-red-600 px-3 py-0.5 rounded-full hover:bg-red-50">Thử lại</button>
         </div>
       )}
 
-      {/* SIDEBAR NAVIGATION */}
       <aside className="bg-[#111827] text-white w-full md:w-72 flex-shrink-0 print:hidden shadow-2xl z-20 flex flex-col h-screen sticky top-0">
         <div className="p-8 border-b border-gray-800 flex items-center gap-3">
           <div className="bg-[#B4975A] p-2.5 rounded-xl shadow-lg shadow-amber-900/20">
             <ActivityIcon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tighter uppercase leading-none">Sigma Admin</h1>
+            <h1 className="text-xl font-black tracking-tighter uppercase leading-none text-white">Sigma Admin</h1>
             <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
           </div>
-        </div>
-
-        {/* ĐÈN BÁO KẾT NỐI SERVER TẠI MENU */}
-        <div className="px-6 py-4 border-b border-gray-800/50 bg-black/20 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)] ${isServerOnline ? 'bg-emerald-500 animate-pulse shadow-emerald-500/50' : 'bg-rose-500 shadow-rose-500/50'}`}></div>
-                <div className="flex flex-col">
-                    <span className={`text-[9px] font-black uppercase tracking-wider ${isServerOnline ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isServerOnline ? 'Server Online' : 'Server Offline'}
-                    </span>
-                    <span className="text-[8px] text-gray-500 font-medium">Đồng bộ đám mây</span>
-                </div>
-            </div>
-            <button 
-                onClick={checkStatus} 
-                disabled={isCheckingConnection}
-                className="p-2 hover:bg-white/5 rounded-lg transition-all active:scale-90 disabled:opacity-30"
-                title="Làm mới kết nối"
-            >
-                <RefreshIcon className={`w-3.5 h-3.5 text-gray-400 ${isCheckingConnection ? 'animate-spin text-[#B4975A]' : ''}`} />
-            </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
@@ -133,28 +130,46 @@ const AdminPage: React.FC = () => {
                 <BarChart2 className="w-5 h-5" /> <span className="text-sm font-bold">Tổng quan</span>
               </button>
            )}
+
+           {/* Live Chat Menu Item - Move up and make more prominent */}
+           {(hasPermission('chat') || hasPermission('orders')) && (
+              <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-xl transition-all ${activeTab === 'chat' ? 'bg-[#D4AF37] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <div className="flex items-center gap-3">
+                    <MessageSquareIcon className="w-5 h-5" />
+                    <span className="text-sm font-bold">Live Chat Hỗ trợ</span>
+                </div>
+                {unreadChatCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-bounce">
+                        {unreadChatCount}
+                    </span>
+                )}
+              </button>
+           )}
+
+           <div className="py-2"></div>
+
            {hasPermission('products') && (
-               <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'products' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+               <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'products' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <PackageIcon className="w-5 h-5" /> <span className="text-sm font-bold">Sản phẩm</span>
               </button>
            )}
            {hasPermission('orders') && (
-              <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'orders' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+              <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'orders' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <ClipboardListIcon className="w-5 h-5" /> <span className="text-sm font-bold">Đơn hàng</span>
               </button>
            )}
            {hasPermission('inventory') && (
-              <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+              <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <LayersIcon className="w-5 h-5" /> <span className="text-sm font-bold">Kho hàng</span>
               </button>
            )}
            {hasPermission('customers') && (
-               <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'customers' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+               <button onClick={() => setActiveTab('customers')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'customers' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <UsersIcon className="w-5 h-5" /> <span className="text-sm font-bold">Khách hàng</span>
               </button>
            )}
            {hasPermission('reports') && (
-               <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-[#B4975A] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+               <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <FileTextIcon className="w-5 h-5" /> <span className="text-sm font-bold">Báo cáo</span>
               </button>
            )}
@@ -183,7 +198,6 @@ const AdminPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
       <main className="flex-1 p-6 md:p-12 overflow-y-auto max-h-screen">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 print:hidden">
             <div>
@@ -195,9 +209,10 @@ const AdminPage: React.FC = () => {
                     {activeTab === 'dashboard' ? 'Bảng điều khiển' : 
                      activeTab === 'products' ? 'Danh mục Sản phẩm' : 
                      activeTab === 'orders' ? 'Đơn hàng' : 
+                     activeTab === 'chat' ? 'Hỗ trợ khách hàng' : 
                      activeTab === 'inventory' ? 'Kho hàng' : 
                      activeTab === 'customers' ? 'Khách hàng' : 
-                     activeTab === 'reports' ? 'Báo cáo & Thống kê' : 
+                     activeTab === 'reports' ? 'Báo cáo' : 
                      activeTab === 'home' ? 'Giao diện Trang chủ' :
                      activeTab === 'products_ui' ? 'Giao diện Sản phẩm' :
                      activeTab === 'header' ? 'Header & Logo' :
@@ -211,8 +226,8 @@ const AdminPage: React.FC = () => {
                 </div>
                 <div className="text-left">
                     <p className="text-xs font-black text-[#111827] uppercase leading-none">{currentAdminUser?.fullname}</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị tối cao' : 'Nhân viên vận hành'}
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị tối cao' : 'Nhân viên'}
                     </p>
                 </div>
             </div>
@@ -227,7 +242,6 @@ const AdminPage: React.FC = () => {
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4B5563; }
       `}</style>
     </div>
   );

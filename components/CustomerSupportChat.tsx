@@ -1,7 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, Customer } from '../types';
 import { sendChatMessage, fetchChatMessages } from '../utils/apiClient';
 import { getCurrentCustomer } from '../utils/customerStorage';
+/* // Fix: Added missing MessageSquareIcon to imports from ./Icons to resolve usage error */
+import { MessageSquareIcon } from './Icons';
 
 const CustomerSupportChat: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -21,6 +24,16 @@ const CustomerSupportChat: React.FC = () => {
             localStorage.setItem('sigma_vie_support_sid', sid);
         }
         setSessionId(sid);
+
+        // Lắng nghe sự kiện mở chat từ Product Modal
+        const handleOpenExternal = (e: any) => {
+            setIsOpen(true);
+            if (e.detail?.message) {
+                setInputValue(e.detail.message);
+            }
+        };
+        window.addEventListener('sigma_vie_open_chat', handleOpenExternal);
+        return () => window.removeEventListener('sigma_vie_open_chat', handleOpenExternal);
     }, []);
 
     useEffect(() => {
@@ -86,7 +99,7 @@ const CustomerSupportChat: React.FC = () => {
     };
 
     return (
-        <div className="fixed bottom-6 right-28 z-[100] flex flex-col items-end font-sans">
+        <div className="fixed bottom-6 right-32 z-[200] flex flex-col items-end font-sans">
             {isOpen && (
                 <div className="bg-white w-[340px] sm:w-[400px] h-[550px] rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.25)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up">
                     {/* Header */}
@@ -113,7 +126,7 @@ const CustomerSupportChat: React.FC = () => {
                     <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#F9F9F8] custom-scrollbar">
                         {messages.length === 0 && (
                             <div className="text-center py-12 px-6">
-                                <p className="text-sm text-slate-400 font-medium mb-2 italic">Kính chào Quý khách đến với Sigma Vie.</p>
+                                <p className="text-sm text-slate-400 font-medium mb-2 italic">Kính chào Quý khách {user?.fullName || ''} đến với Sigma Vie.</p>
                                 <p className="text-[10px] text-[#B4975A] uppercase font-black tracking-[0.2em]">Đội ngũ tư vấn sẵn sàng hỗ trợ bạn.</p>
                             </div>
                         )}
@@ -155,7 +168,7 @@ const CustomerSupportChat: React.FC = () => {
                 className={`group flex items-center gap-3 bg-[#111827] text-white pr-8 pl-5 py-5 rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-all transform hover:scale-105 active:scale-95 border-4 border-white ${isOpen ? 'rotate-90 ring-4 ring-[#B4975A]/20' : ''}`}
             >
                 <div className="relative">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <MessageSquareIcon className="w-6 h-6" />
                     {messages.some(m => m.senderRole === 'admin' && !m.isRead) && !isOpen && (
                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#111827] animate-pulse"></span>
                     )}
