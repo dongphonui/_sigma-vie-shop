@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import type { ProductPageSettings } from '../../../types';
 import { getProductPageSettings, updateProductPageSettings } from '../../../utils/productPageSettingsStorage';
-import { RefreshIcon } from '../../Icons';
+import { RefreshIcon, AlertCircleIcon } from '../../Icons';
 
 const ProductPageSettingsTab: React.FC = () => {
     const [settings, setSettings] = useState<ProductPageSettings | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const [feedback, setFeedback] = useState<{ msg: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
     useEffect(() => {
         setSettings(getProductPageSettings());
@@ -31,13 +31,20 @@ const ProductPageSettingsTab: React.FC = () => {
             if (result.success) {
                 setFeedback({ msg: '✅ Giao diện sản phẩm đã được đẩy lên server!', type: 'success' });
             } else {
-                setFeedback({ msg: '⚠️ Lỗi đồng bộ. Dữ liệu mới chỉ lưu tại trình duyệt.', type: 'error' });
+                setFeedback({ 
+                    msg: `⚠️ Lỗi: ${result.message || 'Server không phản hồi.'}`, 
+                    type: 'warning' 
+                });
             }
-        } catch (error) {
-            setFeedback({ msg: '❌ Thất bại: Không thể kết nối máy chủ.', type: 'error' });
+        } catch (error: any) {
+            console.error("Submit Error:", error);
+            setFeedback({ 
+                msg: '❌ Thất bại: Không thể kết nối máy chủ. Vui lòng kiểm tra cấu hình Backend.', 
+                type: 'error' 
+            });
         } finally {
             setIsSaving(false);
-            setTimeout(() => setFeedback(null), 5000);
+            setTimeout(() => setFeedback(null), 8000);
         }
     };
 
@@ -45,12 +52,17 @@ const ProductPageSettingsTab: React.FC = () => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in-up bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                 <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Giao diện chi tiết sản phẩm</h3>
                 {feedback && (
-                    <span className={`text-[10px] font-bold uppercase tracking-widest ${feedback.type === 'success' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold animate-pulse shadow-sm border ${
+                        feedback.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 
+                        feedback.type === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-600' : 
+                        'bg-rose-50 border-rose-100 text-rose-600'
+                    }`}>
+                        {feedback.type !== 'success' && <AlertCircleIcon className="w-4 h-4" />}
                         {feedback.msg}
-                    </span>
+                    </div>
                 )}
             </div>
 
@@ -149,7 +161,9 @@ const ProductPageSettingsTab: React.FC = () => {
                     {isSaving && <RefreshIcon className="w-4 h-4 animate-spin" />}
                     {isSaving ? 'ĐANG ĐỒNG BỘ MÁY CHỦ...' : 'XÁC NHẬN LƯU THAY ĐỔI'}
                 </button>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">Thay đổi sẽ áp dụng ngay lập tức cho toàn bộ khách hàng</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic text-center">
+                    Gợi ý: Nếu vẫn lỗi kết nối, hãy kiểm tra xem bạn đã cấu hình <code className="bg-slate-100 px-1">VITE_API_URL</code> trong trang quản lý của Render chưa.
+                </p>
             </div>
         </form>
     );

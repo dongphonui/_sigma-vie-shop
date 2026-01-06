@@ -1,6 +1,6 @@
 
 export const API_BASE_URL = (() => {
-    // 1. Kiểm tra biến môi trường được inject bởi Vite
+    // 1. Ưu tiên biến môi trường VITE_API_URL (Cấu hình trên Vercel/Render)
     try {
         // @ts-ignore
         if (import.meta.env && import.meta.env.VITE_API_URL) {
@@ -8,7 +8,7 @@ export const API_BASE_URL = (() => {
         }
     } catch (e) {}
     
-    // 2. Kiểm tra nếu đang chạy ở Localhost
+    // 2. Kiểm tra môi trường Local
     let isLocalhost = false;
     try {
         if (typeof window !== 'undefined' && window.location && window.location.hostname) {
@@ -19,11 +19,13 @@ export const API_BASE_URL = (() => {
         }
     } catch (e) {}
 
-    // 3. Trả về URL tương ứng
     if (isLocalhost) {
         return 'http://localhost:3000/api';
     } else {
-        // Luôn trỏ về URL production của bạn trên Render
+        /**
+         * QUAN TRỌNG: Nếu bạn đã deploy Backend lên Render, hãy thay URL dưới đây 
+         * bằng URL thực tế của ứng dụng Backend của bạn (ví dụ: https://my-backend.onrender.com/api)
+         */
         return 'https://sigmavie-backend.onrender.com/api';
     }
 })();
@@ -32,47 +34,34 @@ let isOffline = false;
 
 export const checkServerConnection = async (): Promise<boolean> => {
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        
         const res = await fetch(`${API_BASE_URL}/health?t=${Date.now()}`, { 
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(5000)
+            signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
         if (res.ok) {
-            if (isOffline) {
-                console.log('[API] Connection restored.');
-                isOffline = false;
-            }
+            isOffline = false;
             return true;
         }
         return false;
     } catch (e) {
-        if (!isOffline) {
-            console.warn(`[API] Health check failed at ${API_BASE_URL}.`, e);
-            isOffline = true;
-        }
+        isOffline = true;
         return false;
     }
 };
 
 const fetchData = async (endpoint: string) => {
     try {
-        const separator = endpoint.includes('?') ? '&' : '?';
-        const url = `${API_BASE_URL}/${endpoint}${separator}_t=${Date.now()}`;
-        
-        const res = await fetch(url, {
-            headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            }
-        });
-        
+        const url = `${API_BASE_URL}/${endpoint}${endpoint.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+        const res = await fetch(url);
         if (!res.ok) return null;
-        if (isOffline) isOffline = false;
         return await res.json();
     } catch (e) {
-        if (!isOffline) isOffline = true;
         return null;
     }
 };
@@ -86,19 +75,18 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
         });
         
         if (!res.ok) {
-            let errorText = res.statusText;
-            try {
-                const errJson = await res.json();
-                if (errJson && errJson.error) errorText = errJson.error;
-            } catch (e) { }
-            return { success: false, message: `Server error (${res.status}): ${errorText}` };
+            const errorMsg = `Server trả về lỗi ${res.status}`;
+            return { success: false, message: errorMsg };
         }
         
-        if (isOffline) isOffline = false;
         return await res.json();
-    } catch (e) {
-        if (!isOffline) isOffline = true;
-        return { success: false, message: `Offline Mode: Dữ liệu chưa được đẩy lên Server.`, isNetworkError: true };
+    } catch (e: any) {
+        console.error("[API Sync Error]", e);
+        return { 
+            success: false, 
+            message: "Không thể kết nối máy chủ Backend. Vui lòng kiểm tra địa chỉ API_BASE_URL.",
+            isNetworkError: true 
+        };
     }
 };
 
@@ -141,11 +129,10 @@ export const recordAdminLogin = (method: string, status: string, username?: stri
 export const fetchAdminLoginLogs = () => fetchData('admin/logs');
 export const sendEmail = (to: string, subject: string, html: string) => syncData('admin/email', { to, subject, html });
 
-// Home Page Settings
+// Specialized UI Settings
 export const fetchHomePageSettingsFromDB = () => fetchSettingFromDB('home');
 export const syncHomePageSettingsToDB = (settings: any) => syncSettingToDB('home', settings);
 
-// Specialized UI Settings
 export const fetchHeaderSettingsFromDB = () => fetchSettingFromDB('header');
 export const syncHeaderSettingsToDB = (settings: any) => syncSettingToDB('header', settings);
 
