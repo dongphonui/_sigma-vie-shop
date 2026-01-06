@@ -1,7 +1,9 @@
 
 import type { HeaderSettings } from '../types';
+import { fetchHeaderSettingsFromDB, syncHeaderSettingsToDB } from './apiClient';
 
 const STORAGE_KEY = 'sigma_vie_header_settings';
+const EVENT_KEY = 'sigma_vie_header_update';
 
 const DEFAULT_SETTINGS: HeaderSettings = {
   brandName: 'Sigma Vie',
@@ -10,21 +12,15 @@ const DEFAULT_SETTINGS: HeaderSettings = {
   brandFont: 'Playfair Display',
   brandBackgroundColor: 'rgba(255, 255, 255, 0.8)',
   logoUrl: '',
-  
-  // Border Defaults
-  borderColor: '#E5E7EB', // gray-200
-  borderWidth: '0px',     // No border by default
+  borderColor: '#E5E7EB',
+  borderWidth: '0px',
   borderStyle: 'solid',
-
-  // Navigation Defaults
   navStoreText: 'Cửa Hàng',
   navAboutText: 'Về Chúng Tôi',
-  navColor: '#4B5563', // text-gray-600
+  navColor: '#4B5563',
   navHoverColor: '#D4AF37',
   navFont: 'Poppins',
   navFontSize: '16px',
-
-  // Login Button Defaults
   loginBtnText: 'Đăng nhập',
   loginBtnFont: 'Poppins',
   loginBtnFontSize: '14px',
@@ -35,20 +31,40 @@ const DEFAULT_SETTINGS: HeaderSettings = {
 export const getHeaderSettings = (): HeaderSettings => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
+    let localData = DEFAULT_SETTINGS;
+
     if (stored) {
-      const parsed = JSON.parse(stored);
-      // Merge with defaults to ensure new fields exist
-      return { ...DEFAULT_SETTINGS, ...parsed };
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
-      return DEFAULT_SETTINGS;
+      localData = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
     }
+
+    // Background Sync
+    fetchHeaderSettingsFromDB().then(dbSettings => {
+        if (dbSettings && Object.keys(dbSettings).length > 0) {
+            const merged = { ...DEFAULT_SETTINGS, ...dbSettings };
+            const currentStr = localStorage.getItem(STORAGE_KEY);
+            const newStr = JSON.stringify(merged);
+            
+            if (currentStr !== newStr) {
+                localStorage.setItem(STORAGE_KEY, newStr);
+                window.dispatchEvent(new Event(EVENT_KEY));
+            }
+        }
+    }).catch(() => {});
+
+    return localData;
   } catch (error) {
-    console.error("Failed to parse header settings from localStorage", error);
     return DEFAULT_SETTINGS;
   }
 };
 
-export const updateHeaderSettings = (settings: HeaderSettings): void => {
+export const updateHeaderSettings = async (settings: HeaderSettings): Promise<{ success: boolean }> => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  window.dispatchEvent(new Event(EVENT_KEY));
+  
+  try {
+      const res = await syncHeaderSettingsToDB(settings);
+      return { success: !!(res && res.success) };
+  } catch (e) {
+      return { success: false };
+  }
 };

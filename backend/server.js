@@ -54,6 +54,28 @@ const initDb = async () => {
 
 initDb();
 
+// --- SETTINGS ROUTES (NEW) ---
+app.get('/api/settings/:key', async (req, res) => {
+    try {
+        const { key } = req.params;
+        const result = await pool.query('SELECT value FROM app_settings WHERE key = $1', [key]);
+        if (result.rows.length > 0) {
+            res.json(result.rows[0].value);
+        } else {
+            res.json({});
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings/:key', async (req, res) => {
+    try {
+        const { key } = req.params;
+        const value = req.body;
+        await pool.query('INSERT INTO app_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, value]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.get('/api/products', async (req, res) => {
@@ -92,7 +114,6 @@ app.post('/api/products/stock', async (req, res) => {
         
         if (hasSizes || hasColors) {
             if (!p.variants) p.variants = [];
-            // Tìm biến thể khớp CẢ Size VÀ Color
             const vIndex = p.variants.findIndex(v => 
                 (v.size === (size || '') || (!hasSizes && !v.size)) && 
                 (v.color === (color || '') || (!hasColors && !v.color))
