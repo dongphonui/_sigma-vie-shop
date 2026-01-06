@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { getHeaderSettings } from '../utils/headerSettingsStorage';
 import { getCurrentCustomer, logoutCustomer } from '../utils/customerStorage';
-import { hardResetProducts } from '../utils/productStorage';
+import { MessageSquareIcon } from './Icons';
+import { fetchChatMessages } from '../utils/apiClient';
 import type { HeaderSettings, Customer } from '../types';
 
 interface HeaderProps {
@@ -23,10 +24,28 @@ const ShoppingBagIcon: React.FC<{className?: string}> = ({className}) => (
 const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount = 0, onOpenCart }) => {
   const [settings, setSettings] = useState<HeaderSettings | null>(null);
   const [userMenuVisible, setUserMenuVisible] = useState(false);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
 
   useEffect(() => {
     setSettings(getHeaderSettings());
-  }, []);
+    
+    // Kiểm tra tin nhắn chưa đọc định kỳ
+    if (currentUser) {
+        const checkUnread = async () => {
+            const sid = localStorage.getItem('sigma_vie_support_sid');
+            if (sid) {
+                const messages = await fetchChatMessages(sid);
+                if (Array.isArray(messages)) {
+                    const hasUnread = messages.some((m: any) => m.sender_role === 'admin' && !m.is_read);
+                    setHasUnreadChat(hasUnread);
+                }
+            }
+        };
+        checkUnread();
+        const interval = setInterval(checkUnread, 10000);
+        return () => clearInterval(interval);
+    }
+  }, [currentUser]);
 
   const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
     e.preventDefault();
@@ -37,6 +56,15 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
       logoutCustomer();
       window.location.hash = '#/'; 
       window.location.reload(); 
+  };
+
+  const handleOpenChat = (e: React.MouseEvent) => {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('sigma_vie_open_chat', { 
+          detail: { message: `Chào Sigma Vie, tôi là ${currentUser?.fullName}. Tôi cần hỗ trợ.` } 
+      }));
+      setUserMenuVisible(false);
+      setHasUnreadChat(false);
   };
 
   return (
@@ -62,6 +90,21 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
             <nav className="hidden lg:flex items-center space-x-10">
                 <a href="#/" onClick={(e) => handleNavigate(e, '/')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Bộ sưu tập</a>
                 <a href="#/about" onClick={(e) => handleNavigate(e, '/about')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Về chúng tôi</a>
+                {currentUser && (
+                    <button 
+                        onClick={handleOpenChat} 
+                        className="relative text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors flex items-center gap-2 group"
+                    >
+                        <MessageSquareIcon className="w-4 h-4 group-hover:animate-bounce" />
+                        Live Chat Hỗ Trợ
+                        {hasUnreadChat && (
+                            <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
+                        )}
+                        {hasUnreadChat && (
+                            <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
+                        )}
+                    </button>
+                )}
             </nav>
 
             <div className="flex items-center gap-6">
@@ -87,13 +130,22 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                                 </div>
                             </button>
                             {userMenuVisible && (
-                                <div className="absolute right-0 mt-4 w-56 bg-white rounded-2xl shadow-2xl py-3 border border-[#064E3B]/5 animate-fade-in-up">
+                                <div className="absolute right-0 mt-4 w-64 bg-white rounded-2xl shadow-2xl py-3 border border-[#064E3B]/5 animate-fade-in-up overflow-hidden">
                                     <div className="px-5 py-3 border-b border-slate-50 mb-2">
                                         <p className="text-[10px] font-black text-[#92400E] uppercase tracking-widest">Tài khoản</p>
                                         <p className="text-sm font-bold text-[#064E3B] truncate">{currentUser.fullName}</p>
                                     </div>
-                                    <a href="#/my-orders" onClick={(e) => handleNavigate(e, '/my-orders')} className="block px-5 py-2 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50">Lịch sử đơn hàng</a>
-                                    <button onClick={handleLogout} className="block w-full text-left px-5 py-2 text-xs font-bold text-rose-500 hover:bg-rose-50">Đăng xuất</button>
+                                    <a href="#/my-orders" onClick={(e) => handleNavigate(e, '/my-orders')} className="block px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50">Lịch sử đơn hàng</a>
+                                    <button 
+                                        onClick={handleOpenChat} 
+                                        className="w-full text-left px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50 flex items-center gap-2"
+                                    >
+                                        <MessageSquareIcon className="w-4 h-4 text-[#D4AF37]" />
+                                        Chat với tư vấn viên
+                                    </button>
+                                    <div className="border-t border-slate-50 mt-2">
+                                        <button onClick={handleLogout} className="block w-full text-left px-5 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50">Đăng xuất</button>
+                                    </div>
                                 </div>
                             )}
                         </div>

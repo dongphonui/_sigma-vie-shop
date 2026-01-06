@@ -4,7 +4,9 @@ import type { AdminUser } from '../types';
 import { 
     BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, 
     UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, 
-    CheckIcon, SettingsIcon, MonitorIcon, HomeIcon, MessageSquareIcon
+    CheckIcon, SettingsIcon, MonitorIcon, HomeIcon, MessageSquareIcon,
+    /* // Fix: Added ShieldCheckIcon to imports */
+    ShieldCheckIcon
 } from '../components/Icons';
 import { checkServerConnection, fetchChatSessions } from '../utils/apiClient';
 
@@ -106,20 +108,24 @@ const AdminPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F7F5F2] flex flex-col md:flex-row font-sans">
       {!isServerOnline && (
-        <div className="fixed top-0 left-0 right-0 bg-red-600 text-white py-2 z-[1000] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl">
-          <AlertCircleIcon className="w-4 h-4 animate-pulse" />
-          Mất kết nối máy chủ - Chế độ Ngoại tuyến
-          <button onClick={checkStatus} className="bg-white text-red-600 px-3 py-0.5 rounded-full hover:bg-red-50">Thử lại</button>
+        <div className="fixed top-0 left-0 right-0 bg-rose-600 text-white py-2.5 z-[1000] text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl animate-bounce">
+          <AlertCircleIcon className="w-4 h-4" />
+          Hệ thống đang ngoại tuyến - Vui lòng kiểm tra đường truyền
+          <button onClick={checkStatus} className="bg-white text-rose-600 px-3 py-0.5 rounded-full hover:bg-rose-50 font-black">Thử lại</button>
         </div>
       )}
 
       <aside className="bg-[#111827] text-white w-full md:w-72 flex-shrink-0 print:hidden shadow-2xl z-20 flex flex-col h-screen sticky top-0">
-        <div className="p-8 border-b border-gray-800 flex items-center gap-3">
-          <div className="bg-[#B4975A] p-2.5 rounded-xl shadow-lg shadow-amber-900/20">
+        <div className="p-8 border-b border-gray-800 flex items-center gap-3 relative group">
+          <div className="bg-[#B4975A] p-2.5 rounded-xl shadow-lg shadow-amber-900/20 transition-transform group-hover:scale-110">
             <ActivityIcon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tighter uppercase leading-none text-white">Sigma Admin</h1>
+            <div className="flex items-center gap-2">
+                <h1 className="text-xl font-black tracking-tighter uppercase leading-none text-white">Sigma Admin</h1>
+                {/* ĐÈN BÁO SIDEBAR */}
+                <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)] ${isServerOnline ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}`}></span>
+            </div>
             <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
           </div>
         </div>
@@ -131,7 +137,6 @@ const AdminPage: React.FC = () => {
               </button>
            )}
 
-           {/* Live Chat Menu Item - Move up and make more prominent */}
            {(hasPermission('chat') || hasPermission('orders')) && (
               <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center justify-between px-5 py-3.5 rounded-xl transition-all ${activeTab === 'chat' ? 'bg-[#D4AF37] text-white shadow-xl translate-x-1' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <div className="flex items-center gap-3">
@@ -220,14 +225,24 @@ const AdminPage: React.FC = () => {
                 </h2>
             </div>
             
-            <div className="flex items-center gap-6 bg-white p-3 pr-6 rounded-2xl shadow-sm border border-slate-100">
-                <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-[#B4975A] font-black shadow-lg text-xl">
+            <div className="flex items-center gap-6 bg-white p-4 pr-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.03)] border border-slate-100 hover:shadow-lg transition-all duration-500">
+                <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-[#B4975A] font-black shadow-xl text-2xl border-b-4 border-[#B4975A]">
                     {currentAdminUser?.fullname?.charAt(0).toUpperCase() || 'A'}
                 </div>
                 <div className="text-left">
-                    <p className="text-xs font-black text-[#111827] uppercase leading-none">{currentAdminUser?.fullname}</p>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị tối cao' : 'Nhân viên'}
+                    <div className="flex items-center gap-3">
+                        <p className="text-sm font-black text-[#111827] uppercase leading-none">{currentAdminUser?.fullname}</p>
+                        {/* ĐÈN BÁO TRỰC TIẾP TRÊN CARD ADMIN */}
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-full border border-slate-100">
+                            <span className={`w-2 h-2 rounded-full ${isServerOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse'}`}></span>
+                            <span className={`text-[8px] font-black uppercase tracking-tighter ${isServerOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {isServerOnline ? 'Online' : 'Offline'}
+                            </span>
+                        </div>
+                    </div>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
+                        <ShieldCheckIcon className="w-3 h-3 text-[#B4975A]" />
+                        {currentAdminUser?.role === 'MASTER' ? 'Quản trị tối cao' : 'Nhân viên hệ thống'}
                     </p>
                 </div>
             </div>

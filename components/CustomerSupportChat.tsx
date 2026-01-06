@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, Customer } from '../types';
-import { sendChatMessage, fetchChatMessages } from '../utils/apiClient';
+import { sendChatMessage, fetchChatMessages, markChatAsRead } from '../utils/apiClient';
 import { getCurrentCustomer } from '../utils/customerStorage';
-/* // Fix: Added missing MessageSquareIcon to imports from ./Icons to resolve usage error */
-import { MessageSquareIcon } from './Icons';
+import { MessageSquareIcon, XIcon, CheckIcon } from './Icons';
 
 const CustomerSupportChat: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -12,6 +11,7 @@ const CustomerSupportChat: React.FC = () => {
     const [inputValue, setInputValue] = useState('');
     const [sessionId, setSessionId] = useState('');
     const [user, setUser] = useState<Customer | null>(null);
+    const [showTooltip, setShowTooltip] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -25,16 +25,28 @@ const CustomerSupportChat: React.FC = () => {
         }
         setSessionId(sid);
 
-        // Lắng nghe sự kiện mở chat từ Product Modal
+        // Lắng nghe sự kiện mở chat từ Header hoặc Product Modal
         const handleOpenExternal = (e: any) => {
             setIsOpen(true);
-            if (e.detail?.message) {
+            setShowTooltip(false);
+            if (e.detail?.message && messages.length === 0) {
                 setInputValue(e.detail.message);
             }
         };
         window.addEventListener('sigma_vie_open_chat', handleOpenExternal);
-        return () => window.removeEventListener('sigma_vie_open_chat', handleOpenExternal);
-    }, []);
+        
+        // Hiện tooltip lời chào sau 5s nếu user đã login
+        const timer = setTimeout(() => {
+            if (getCurrentCustomer() && !isOpen && messages.length === 0) {
+                setShowTooltip(true);
+            }
+        }, 5000);
+
+        return () => {
+            window.removeEventListener('sigma_vie_open_chat', handleOpenExternal);
+            clearTimeout(timer);
+        };
+    }, [messages.length, isOpen]);
 
     useEffect(() => {
         const currentUser = getCurrentCustomer();
@@ -43,14 +55,18 @@ const CustomerSupportChat: React.FC = () => {
         let interval: any;
         if (isOpen) {
             loadMessages(sessionId);
-            interval = setInterval(() => loadMessages(sessionId), 3000);
+            markChatAsRead(sessionId);
+            interval = setInterval(() => loadMessages(sessionId), 4000);
+        } else {
+            // Vẫn check tin nhắn mới ở chế độ nền để báo hiệu Header
+            interval = setInterval(() => loadMessages(sessionId), 10000);
         }
         return () => clearInterval(interval);
     }, [isOpen, sessionId]);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, isOpen]);
 
     const loadMessages = async (sid: string) => {
         if (!sid) return;
@@ -70,6 +86,7 @@ const CustomerSupportChat: React.FC = () => {
             // Phát âm thanh nếu có tin mới từ admin
             if (formatted.length > messages.length && formatted[formatted.length-1].senderRole === 'admin' && audioRef.current) {
                 audioRef.current.play().catch(() => {});
+                if (!isOpen) setShowTooltip(true);
             }
             
             setMessages(formatted);
@@ -100,6 +117,19 @@ const CustomerSupportChat: React.FC = () => {
 
     return (
         <div className="fixed bottom-6 right-32 z-[200] flex flex-col items-end font-sans">
+            {/* Tooltip lời chào */}
+            {showTooltip && !isOpen && (
+                <div className="bg-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-100 mb-4 animate-float-up max-w-[240px] relative">
+                    <button onClick={() => setShowTooltip(false)} className="absolute -top-2 -right-2 bg-slate-100 p-1 rounded-full text-slate-400 hover:text-black">
+                        <XIcon className="w-3 h-3" />
+                    </button>
+                    <p className="text-xs font-bold text-slate-700 leading-relaxed">
+                        {user ? `Chào ${user.fullName.split(' ').pop()}! Cố vấn Sigma Vie đang online, bạn cần hỗ trợ gì không?` : 'Kính chào quý khách! Chúng tôi có thể giúp gì cho bạn?'}
+                    </p>
+                    <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-r border-b border-slate-100 rotate-45"></div>
+                </div>
+            )}
+
             {isOpen && (
                 <div className="bg-white w-[340px] sm:w-[400px] h-[550px] rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.25)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up">
                     {/* Header */}
@@ -118,7 +148,7 @@ const CustomerSupportChat: React.FC = () => {
                             </div>
                         </div>
                         <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white p-2 transition-colors relative z-10">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            <XIcon className="w-6 h-6" />
                         </button>
                     </div>
 
@@ -138,9 +168,12 @@ const CustomerSupportChat: React.FC = () => {
                                         : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                                 }`}>
                                     <p className="leading-relaxed font-medium">{msg.text}</p>
-                                    <span className={`text-[8px] block mt-1 uppercase font-black tracking-tighter opacity-40 ${msg.senderRole === 'customer' ? 'text-right' : 'text-left'}`}>
-                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
+                                    <div className={`flex items-center gap-1 mt-1 opacity-40 ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
+                                        <span className="text-[8px] uppercase font-black tracking-tighter">
+                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        {msg.senderRole === 'customer' && <CheckIcon className="w-2.5 h-2.5" />}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -164,16 +197,16 @@ const CustomerSupportChat: React.FC = () => {
             )}
 
             <button 
-                onClick={() => setIsOpen(!isOpen)} 
-                className={`group flex items-center gap-3 bg-[#111827] text-white pr-8 pl-5 py-5 rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-all transform hover:scale-105 active:scale-95 border-4 border-white ${isOpen ? 'rotate-90 ring-4 ring-[#B4975A]/20' : ''}`}
+                onClick={() => { setIsOpen(!isOpen); setShowTooltip(false); }} 
+                className={`group flex items-center gap-3 bg-[#111827] text-white pr-8 pl-5 py-5 rounded-full shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-all transform hover:scale-105 active:scale-95 border-4 border-white ${isOpen ? 'rotate-90 ring-4 ring-[#B4975A]/20' : ''} ${user ? 'ring-4 ring-[#D4AF37]/20' : ''}`}
             >
                 <div className="relative">
                     <MessageSquareIcon className="w-6 h-6" />
-                    {messages.some(m => m.senderRole === 'admin' && !m.isRead) && !isOpen && (
+                    {(messages.some(m => m.senderRole === 'admin' && !m.isRead) || (user && messages.length === 0)) && !isOpen && (
                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#111827] animate-pulse"></span>
                     )}
                 </div>
-                {!isOpen && <span className="text-[11px] font-black uppercase tracking-[0.3em]">Hỗ trợ</span>}
+                {!isOpen && <span className="text-[11px] font-black uppercase tracking-[0.3em]">{user ? 'Tư vấn ngay' : 'Hỗ trợ'}</span>}
             </button>
         </div>
     );
