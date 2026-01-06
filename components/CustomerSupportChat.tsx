@@ -25,7 +25,7 @@ const CustomerSupportChat: React.FC = () => {
         }
         setSessionId(sid);
 
-        // Lắng nghe sự kiện mở chat từ Header hoặc Product Modal
+        // Lắng nghe sự kiện mở chat từ Header hoặc Menu
         const handleOpenExternal = (e: any) => {
             setIsOpen(true);
             setShowTooltip(false);
@@ -35,7 +35,7 @@ const CustomerSupportChat: React.FC = () => {
         };
         window.addEventListener('sigma_vie_open_chat', handleOpenExternal);
         
-        // Hiện tooltip lời chào sau 5s nếu user đã login
+        // Hiện tooltip lời chào sau 5s nếu user đã login nhưng chưa mở chat
         const timer = setTimeout(() => {
             if (getCurrentCustomer() && !isOpen && messages.length === 0) {
                 setShowTooltip(true);
@@ -58,7 +58,6 @@ const CustomerSupportChat: React.FC = () => {
             markChatAsRead(sessionId);
             interval = setInterval(() => loadMessages(sessionId), 4000);
         } else {
-            // Vẫn check tin nhắn mới ở chế độ nền để báo hiệu Header
             interval = setInterval(() => loadMessages(sessionId), 10000);
         }
         return () => clearInterval(interval);
@@ -117,14 +116,14 @@ const CustomerSupportChat: React.FC = () => {
 
     return (
         <div className="fixed bottom-6 right-32 z-[200] flex flex-col items-end font-sans">
-            {/* Tooltip lời chào */}
+            {/* Tooltip lời chào bồng bềnh */}
             {showTooltip && !isOpen && (
                 <div className="bg-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-100 mb-4 animate-float-up max-w-[240px] relative">
                     <button onClick={() => setShowTooltip(false)} className="absolute -top-2 -right-2 bg-slate-100 p-1 rounded-full text-slate-400 hover:text-black">
                         <XIcon className="w-3 h-3" />
                     </button>
                     <p className="text-xs font-bold text-slate-700 leading-relaxed">
-                        {user ? `Chào ${user.fullName.split(' ').pop()}! Cố vấn Sigma Vie đang online, bạn cần hỗ trợ gì không?` : 'Kính chào quý khách! Chúng tôi có thể giúp gì cho bạn?'}
+                        {user ? `Chào ${user.fullName.split(' ').pop()}! Sigma Vie đang online, bạn cần tư vấn thêm về sản phẩm không?` : 'Kính chào quý khách! Chúng tôi có thể giúp gì cho bạn?'}
                     </p>
                     <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-r border-b border-slate-100 rotate-45"></div>
                 </div>
@@ -132,7 +131,7 @@ const CustomerSupportChat: React.FC = () => {
 
             {isOpen && (
                 <div className="bg-white w-[340px] sm:w-[400px] h-[550px] rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.25)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up">
-                    {/* Header */}
+                    {/* Header Chat */}
                     <div className="bg-[#111827] text-white p-6 flex justify-between items-center relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none">
                             <svg width="100%" height="100%"><pattern id="pattern-dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="white" /></pattern><rect width="100%" height="100%" fill="url(#pattern-dots)" /></svg>
@@ -180,13 +179,13 @@ const CustomerSupportChat: React.FC = () => {
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input */}
+                    {/* Input Chat */}
                     <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-50 flex items-center gap-3">
                         <input 
                             type="text" 
                             value={inputValue} 
                             onChange={(e) => setInputValue(e.target.value)} 
-                            placeholder="Nhập nội dung tư vấn..." 
+                            placeholder="Nhập nội dung cần hỗ trợ..." 
                             className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl px-6 py-4 text-sm focus:border-[#B4975A] focus:bg-white transition-all outline-none font-bold placeholder:text-slate-300"
                         />
                         <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white p-4 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-20">

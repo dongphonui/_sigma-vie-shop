@@ -2,8 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { getHeaderSettings } from '../utils/headerSettingsStorage';
 import { getCurrentCustomer, logoutCustomer } from '../utils/customerStorage';
-import { MessageSquareIcon } from './Icons';
-import { fetchChatMessages } from '../utils/apiClient';
+import { MessageSquareIcon, ActivityIcon } from './Icons';
+import { fetchChatMessages, checkServerConnection } from '../utils/apiClient';
 import type { HeaderSettings, Customer } from '../types';
 
 interface HeaderProps {
@@ -25,10 +25,19 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
   const [settings, setSettings] = useState<HeaderSettings | null>(null);
   const [userMenuVisible, setUserMenuVisible] = useState(false);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
     setSettings(getHeaderSettings());
     
+    // Check Server Status
+    const checkStatus = async () => {
+        const status = await checkServerConnection();
+        setIsOnline(status);
+    };
+    checkStatus();
+    const statusInterval = setInterval(checkStatus, 30000);
+
     // Kiểm tra tin nhắn chưa đọc định kỳ
     if (currentUser) {
         const checkUnread = async () => {
@@ -42,9 +51,13 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
             }
         };
         checkUnread();
-        const interval = setInterval(checkUnread, 10000);
-        return () => clearInterval(interval);
+        const chatInterval = setInterval(checkUnread, 10000);
+        return () => {
+            clearInterval(statusInterval);
+            clearInterval(chatInterval);
+        };
     }
+    return () => clearInterval(statusInterval);
   }, [currentUser]);
 
   const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
@@ -60,8 +73,11 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
 
   const handleOpenChat = (e: React.MouseEvent) => {
       e.preventDefault();
+      // Phát sự kiện để component CustomerSupportChat mở ra
       window.dispatchEvent(new CustomEvent('sigma_vie_open_chat', { 
-          detail: { message: `Chào Sigma Vie, tôi là ${currentUser?.fullName}. Tôi cần hỗ trợ.` } 
+          detail: { 
+              message: `Chào Sigma Vie, tôi là ${currentUser?.fullName}. Tôi cần được tư vấn.` 
+          } 
       }));
       setUserMenuVisible(false);
       setHasUnreadChat(false);
@@ -71,29 +87,40 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
     <header className="backdrop-blur-md shadow-sm sticky top-0 z-40 bg-white/90 border-b border-[#064E3B]/5">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-24">
-          <a 
-            href="#/" 
-            onClick={(e) => handleNavigate(e, '/')} 
-            className="font-bold tracking-[0.2em] cursor-pointer transition-transform duration-300 ease-in-out hover:scale-105 flex items-center gap-4"
-          >
-            {settings?.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="h-14 w-auto object-contain" />
-            ) : (
-                <div className="flex flex-col">
-                    <span className="text-2xl font-serif font-black text-[#064E3B] leading-none uppercase">Sigma Vie</span>
-                    <span className="text-[8px] font-black text-[#92400E] uppercase tracking-[0.5em] mt-1">Fashion Boutique</span>
-                </div>
-            )}
-          </a>
+          <div className="flex items-center gap-4">
+              <a 
+                href="#/" 
+                onClick={(e) => handleNavigate(e, '/')} 
+                className="font-bold tracking-[0.2em] cursor-pointer transition-transform duration-300 ease-in-out hover:scale-105 flex items-center gap-4"
+              >
+                {settings?.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo" className="h-14 w-auto object-contain" />
+                ) : (
+                    <div className="flex flex-col">
+                        <span className="text-2xl font-serif font-black text-[#064E3B] leading-none uppercase">Sigma Vie</span>
+                        <span className="text-[8px] font-black text-[#92400E] uppercase tracking-[0.5em] mt-1">Fashion Boutique</span>
+                    </div>
+                )}
+              </a>
+
+              {/* ĐÈN BÁO SERVER KHÁCH HÀNG */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-full border border-slate-100/50 scale-75 md:scale-100">
+                  <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]'}`}></span>
+                  <span className={`text-[7px] font-black uppercase tracking-tighter ${isOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {isOnline ? 'Server Ready' : 'Connecting...'}
+                  </span>
+              </div>
+          </div>
           
           <div className="flex items-center gap-8">
             <nav className="hidden lg:flex items-center space-x-10">
                 <a href="#/" onClick={(e) => handleNavigate(e, '/')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Bộ sưu tập</a>
                 <a href="#/about" onClick={(e) => handleNavigate(e, '/about')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Về chúng tôi</a>
+                
                 {currentUser && (
                     <button 
                         onClick={handleOpenChat} 
-                        className="relative text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors flex items-center gap-2 group"
+                        className="relative text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors flex items-center gap-2 group animate-fade-in"
                     >
                         <MessageSquareIcon className="w-4 h-4 group-hover:animate-bounce" />
                         Live Chat Hỗ Trợ
@@ -101,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                             <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
                         )}
                         {hasUnreadChat && (
-                            <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full"></span>
+                            <span className="absolute -top-1 -right-2 w-2 h-2 bg-rose-500 rounded-full shadow-[0_0_5px_rgba(244,63,94,1)]"></span>
                         )}
                     </button>
                 )}

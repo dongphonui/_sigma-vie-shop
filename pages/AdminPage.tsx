@@ -5,7 +5,6 @@ import {
     BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, 
     UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, 
     CheckIcon, SettingsIcon, MonitorIcon, HomeIcon, MessageSquareIcon,
-    /* // Fix: Added ShieldCheckIcon to imports */
     ShieldCheckIcon
 } from '../components/Icons';
 import { checkServerConnection, fetchChatSessions } from '../utils/apiClient';
@@ -40,6 +39,8 @@ const AdminPage: React.FC = () => {
     } else if (sessionStorage.getItem('isAuthenticated') === 'true') {
         setCurrentAdminUser({ id: 'local_master', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER', permissions: ['ALL'] });
     }
+    
+    // Server status periodic check
     checkStatus();
     const interval = setInterval(checkStatus, 30000);
     
@@ -123,7 +124,7 @@ const AdminPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
                 <h1 className="text-xl font-black tracking-tighter uppercase leading-none text-white">Sigma Admin</h1>
-                {/* ĐÈN BÁO SIDEBAR */}
+                {/* ĐÈN BÁO SIDEBAR ADMIN */}
                 <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)] ${isServerOnline ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}`}></span>
             </div>
             <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Management Suite</p>
