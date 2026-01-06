@@ -15,6 +15,7 @@ const CustomerSupportChat: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // 1. Khởi tạo phiên và âm thanh
     useEffect(() => {
         audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
         
@@ -26,31 +27,32 @@ const CustomerSupportChat: React.FC = () => {
         setSessionId(sid);
 
         const timer = setTimeout(() => {
-            if (!isOpen && messages.length === 0) {
-                setShowTooltip(true);
-            }
-        }, 2500);
+            if (!isOpen) setShowTooltip(true);
+        }, 3000);
 
         return () => clearTimeout(timer);
     }, []);
 
+    // 2. Lắng nghe sự kiện mở chat từ Header (SỬA LỖI KHÔNG PHẢN HỒI)
     useEffect(() => {
         const handleOpenChat = (e: any) => {
-            console.log("Kích hoạt Live Chat Sigma Vie từ Hệ thống...");
+            console.log("Sigma Vie Event: Mở Live Chat trung tâm...");
             setIsOpen(true);
             setShowTooltip(false);
             if (e.detail?.message) {
                 setInputValue(e.detail.message);
             }
+            // Đợi UI render xong rồi mới scroll
             setTimeout(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 600);
+            }, 300);
         };
 
         window.addEventListener('sigma_vie_open_chat', handleOpenChat);
         return () => window.removeEventListener('sigma_vie_open_chat', handleOpenChat);
     }, []);
 
+    // 3. Tự động cập nhật tin nhắn
     useEffect(() => {
         const currentUser = getCurrentCustomer();
         setUser(currentUser);
@@ -89,7 +91,7 @@ const CustomerSupportChat: React.FC = () => {
                 setMessages(formatted);
             }
         } catch (e) {
-            console.error("Chat Error:", e);
+            console.error("Chat sync error:", e);
         }
     };
 
@@ -117,64 +119,49 @@ const CustomerSupportChat: React.FC = () => {
     };
 
     return (
-        /* VỊ TRÍ MỚI: CHÍNH GIỮA CUỐI MÀN HÌNH */
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[999999] flex flex-col items-center font-sans pointer-events-none w-full max-w-lg">
+        /* VỊ TRÍ CHIẾN LƯỢC: CHÍNH GIỮA CUỐI MÀN HÌNH */
+        <div className="fixed bottom-0 left-0 right-0 z-[9999999] flex flex-col items-center pointer-events-none pb-10">
             
-            {/* Tooltip Gợi ý (Nằm trên nút giữa) */}
-            {showTooltip && !isOpen && (
-                <div className="bg-[#B4975A] text-white px-8 py-4 rounded-full shadow-[0_20px_50px_rgba(180,151,90,0.5)] mb-6 animate-bounce-slow relative pointer-events-auto border-2 border-white/30 whitespace-nowrap">
-                    <button onClick={() => setShowTooltip(false)} className="absolute -top-2 -right-2 bg-[#111827] p-1 rounded-full text-white shadow-lg">
-                        <XIcon className="w-3 h-3" />
-                    </button>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em]">
-                        {user ? `Chào ${user.fullName.split(' ').pop()}, Sigma Vie đang đợi bạn!` : 'Quý khách cần tư vấn trực tiếp ngay bây giờ?'}
-                    </p>
-                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#B4975A] border-r border-b border-white/10 rotate-45"></div>
-                </div>
-            )}
-
-            {/* Cửa sổ chat (Căn giữa) */}
+            {/* Cửa sổ chat (Xuất hiện phía trên nút) */}
             {isOpen && (
-                <div className="bg-white w-[94vw] sm:w-[450px] h-[600px] max-h-[75vh] rounded-[3rem] shadow-[0_50px_120px_rgba(0,0,0,0.6)] flex flex-col mb-6 overflow-hidden border border-slate-100 animate-slide-up-center pointer-events-auto ring-1 ring-black/5">
-                    {/* Header Sang Trọng */}
-                    <div className="bg-[#111827] text-white p-8 flex justify-between items-center relative overflow-hidden shrink-0">
-                        <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
-                        <div className="flex items-center gap-6 relative z-10">
-                            <div className="w-16 h-16 bg-[#B4975A] rounded-2xl flex items-center justify-center font-black text-white shadow-2xl text-3xl border-b-4 border-black/20">Σ</div>
+                <div className="bg-white w-[95vw] sm:w-[450px] h-[550px] max-h-[70vh] rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.5)] flex flex-col mb-6 overflow-hidden border border-slate-200 animate-slide-up-center pointer-events-auto">
+                    {/* Header Chat */}
+                    <div className="bg-[#111827] text-white p-6 flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-[#B4975A] rounded-xl flex items-center justify-center font-black text-white shadow-lg text-xl">Σ</div>
                             <div>
-                                <h3 className="font-black text-sm tracking-[0.3em] uppercase">Sigma Vie Care</h3>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_15px_rgba(52,211,153,1)]"></span>
-                                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Đang trực tuyến</span>
+                                <h3 className="font-black text-xs tracking-widest uppercase">Sigma Vie Support</h3>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Đang Online</span>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="bg-white/5 hover:bg-rose-500/20 text-white p-4 rounded-full transition-all group">
-                            <XIcon className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+                        <button onClick={() => setIsOpen(false)} className="bg-white/10 hover:bg-rose-500/20 text-white p-2 rounded-full transition-all">
+                            <XIcon className="w-5 h-5" />
                         </button>
                     </div>
 
-                    {/* Vùng tin nhắn */}
-                    <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-[#FDFDFD] custom-scrollbar">
+                    {/* Tin nhắn */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-[#FAFAFA] custom-scrollbar">
                         {messages.length === 0 && (
-                            <div className="text-center py-16 opacity-30">
-                                <MessageSquareIcon className="w-16 h-16 mx-auto mb-6 text-slate-200" />
-                                <p className="text-xs font-black uppercase tracking-[0.4em] text-slate-400 leading-loose">Khởi đầu trải nghiệm<br/>mua sắm đẳng cấp</p>
+                            <div className="text-center py-10 opacity-20">
+                                <MessageSquareIcon className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Bắt đầu trò chuyện với chúng tôi</p>
                             </div>
                         )}
                         {messages.map((msg, idx) => (
-                            <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
-                                <div className={`max-w-[85%] px-7 py-5 rounded-[2rem] text-sm shadow-sm ${
+                            <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] px-5 py-3.5 rounded-2xl text-[13px] shadow-sm ${
                                     msg.senderRole === 'customer' 
                                         ? 'bg-[#B4975A] text-white rounded-tr-none' 
-                                        : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
+                                        : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
                                 }`}>
-                                    <p className="leading-relaxed font-bold">{msg.text}</p>
-                                    <div className={`flex items-center gap-2 mt-3 opacity-40 ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
-                                        <span className="text-[9px] uppercase font-black tracking-widest">
+                                    <p className="font-bold leading-relaxed">{msg.text}</p>
+                                    <div className={`flex items-center gap-1.5 mt-1.5 opacity-40 ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
+                                        <span className="text-[8px] font-black uppercase">
                                             {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
-                                        {msg.senderRole === 'customer' && <CheckIcon className="w-3 h-3" />}
                                     </div>
                                 </div>
                             </div>
@@ -182,78 +169,69 @@ const CustomerSupportChat: React.FC = () => {
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Ô nhập liệu */}
-                    <form onSubmit={handleSendMessage} className="p-8 bg-white border-t border-slate-50 flex items-center gap-5 shrink-0">
+                    {/* Input */}
+                    <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-slate-100 flex items-center gap-3 shrink-0">
                         <input 
                             type="text" 
                             value={inputValue} 
                             onChange={(e) => setInputValue(e.target.value)} 
-                            placeholder="Gửi yêu cầu hỗ trợ..." 
-                            className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl px-8 py-5 text-sm focus:border-[#B4975A] focus:bg-white transition-all outline-none font-bold shadow-inner"
+                            placeholder="Nhập tin nhắn..." 
+                            className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-xl px-5 py-3 text-sm focus:border-[#B4975A] focus:bg-white transition-all outline-none font-bold"
                         />
-                        <button 
-                            type="submit" 
-                            disabled={!inputValue.trim()} 
-                            className="bg-[#111827] text-white p-6 rounded-2xl hover:scale-110 active:scale-90 transition-all shadow-2xl disabled:opacity-20 group"
-                        >
-                            <svg className="w-6 h-6 transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white p-4 rounded-xl shadow-lg disabled:opacity-20 active:scale-90 transition-all">
+                            <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                         </button>
                     </form>
                 </div>
             )}
 
-            {/* NÚT KÍCH HOẠT CHÍNH - ĐẶT GIỮA MÀN HÌNH */}
-            <button 
-                onClick={() => { setIsOpen(!isOpen); setShowTooltip(false); }} 
-                className={`group flex items-center justify-center bg-[#111827] text-white w-20 h-20 rounded-full shadow-[0_25px_60px_rgba(0,0,0,0.6)] transition-all transform hover:scale-110 active:scale-95 border-[6px] border-white pointer-events-auto relative ${isOpen ? 'rotate-90' : 'animate-pulse-gold'}`}
-                title="Live Chat hỗ trợ"
-            >
-                <div className="relative">
-                    {isOpen ? <XIcon className="w-8 h-8" /> : <MessageSquareIcon className="w-8 h-8 text-[#B4975A]" />}
-                    
-                    {/* Badge thông báo màu đỏ */}
-                    {messages.some(m => m.senderRole === 'admin' && !m.isRead) && !isOpen && (
-                         <span className="absolute -top-3 -right-3 w-7 h-7 bg-rose-500 rounded-full border-4 border-[#111827] flex items-center justify-center text-[10px] font-black animate-bounce shadow-xl">!</span>
-                    )}
-                </div>
-                
-                {/* Text nhãn ẩn hiện khi hover */}
-                {!isOpen && (
-                    <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-[10px] font-black uppercase tracking-[0.3em] px-4 py-1.5 rounded-full whitespace-nowrap shadow-2xl">Live Chat</span>
+            {/* NÚT KÍCH HOẠT CHÍNH - LUÔN NẰM GIỮA ĐÁY */}
+            <div className="relative pointer-events-auto group">
+                {showTooltip && !isOpen && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-6 bg-[#B4975A] text-white px-6 py-3 rounded-full shadow-2xl animate-bounce border-2 border-white/50 whitespace-nowrap">
+                        <p className="text-[10px] font-black uppercase tracking-widest">Sigma Vie đang trực tuyến. Chat ngay?</p>
+                        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#B4975A] rotate-45"></div>
+                    </div>
                 )}
-            </button>
+                
+                <button 
+                    onClick={() => { setIsOpen(!isOpen); setShowTooltip(false); }} 
+                    className={`flex items-center justify-center w-20 h-20 rounded-full shadow-[0_15px_50px_rgba(0,0,0,0.4)] transition-all transform hover:scale-110 active:scale-95 border-4 border-white overflow-hidden relative
+                        ${isOpen ? 'bg-rose-500 rotate-90' : 'bg-[#111827] animate-pulse-glow'}`}
+                >
+                    {isOpen ? <XIcon className="w-8 h-8 text-white" /> : <MessageSquareIcon className="w-8 h-8 text-[#B4975A]" />}
+                    
+                    {/* Thông báo tin nhắn chưa đọc */}
+                    {messages.some(m => m.senderRole === 'admin' && !m.isRead) && !isOpen && (
+                         <span className="absolute top-4 right-4 w-4 h-4 bg-rose-500 rounded-full border-2 border-[#111827] animate-ping"></span>
+                    )}
+                </button>
+                
+                <span className="absolute top-full mt-2 left-1/2 -translate-x-1/2 text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] opacity-0 group-hover:opacity-100 transition-opacity">Hỗ trợ trực tiếp</span>
+            </div>
 
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 20px; }
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
                 
-                @keyframes bounce-slow {
-                    0%, 100% { transform: translateY(0); }
-                    50% { transform: translateY(-15px); }
+                @keyframes pulse-glow {
+                    0% { box-shadow: 0 0 0 0 rgba(180, 151, 90, 0.4), 0 15px 50px rgba(0,0,0,0.4); }
+                    70% { box-shadow: 0 0 0 25px rgba(180, 151, 90, 0), 0 15px 50px rgba(0,0,0,0.4); }
+                    100% { box-shadow: 0 0 0 0 rgba(180, 151, 90, 0), 0 15px 50px rgba(0,0,0,0.4); }
                 }
-                .animate-bounce-slow {
-                    animation: bounce-slow 3s infinite ease-in-out;
-                }
-
-                @keyframes pulse-gold {
-                    0% { box-shadow: 0 0 0 0 rgba(180, 151, 90, 0.6); transform: scale(1); }
-                    70% { box-shadow: 0 0 0 30px rgba(180, 151, 90, 0); transform: scale(1.05); }
-                    100% { box-shadow: 0 0 0 0 rgba(180, 151, 90, 0); transform: scale(1); }
-                }
-                .animate-pulse-gold {
-                    animation: pulse-gold 2.5s infinite;
+                .animate-pulse-glow {
+                    animation: pulse-glow 2.5s infinite;
                 }
 
                 .animate-slide-up-center {
-                    animation: slideUpCenter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                    animation: slideUpCenter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
                 @keyframes slideUpCenter {
-                    from { opacity: 0; transform: translateY(50px) scale(0.8); }
+                    from { opacity: 0; transform: translateY(40px) scale(0.9); }
                     to { opacity: 1; transform: translateY(0) scale(1); }
                 }
                 .animate-fade-in-up {
-                    animation: fadeInUpMsg 0.5s ease-out forwards;
+                    animation: fadeInUpMsg 0.4s ease-out forwards;
                 }
                 @keyframes fadeInUpMsg {
                     from { opacity: 0; transform: translateY(10px); }
