@@ -35,26 +35,25 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
         setIsOnline(status);
     };
     checkStatus();
-    const statusInterval = setInterval(checkStatus, 30000);
 
-    // Kiểm tra tin nhắn chưa đọc (Dùng SID từ localstorage cho cả khách vãng lai)
     const checkUnread = async () => {
         const sid = localStorage.getItem('sigma_vie_support_sid');
         if (sid) {
             const messages = await fetchChatMessages(sid);
             if (Array.isArray(messages)) {
-                const hasUnread = messages.some((m: any) => m.sender_role === 'admin' && !m.is_read);
-                setHasUnreadChat(hasUnread);
+                const unread = messages.some((m: any) => m.sender_role === 'admin' && !m.is_read);
+                setHasUnreadChat(unread);
             }
         }
     };
     checkUnread();
-    const chatInterval = setInterval(checkUnread, 10000);
     
-    return () => {
-        clearInterval(statusInterval);
-        clearInterval(chatInterval);
-    };
+    const interval = setInterval(() => {
+        checkStatus();
+        checkUnread();
+    }, 15000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleNavigate = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
@@ -70,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
 
   const handleOpenChat = (e: React.MouseEvent) => {
       e.preventDefault();
-      // Gửi sự kiện mở chat
+      console.log("Header: Dispatching open chat event...");
       window.dispatchEvent(new CustomEvent('sigma_vie_open_chat', { 
           detail: { 
               message: currentUser ? `Chào Sigma Vie, tôi là ${currentUser.fullName}.` : "Chào Sigma Vie, tôi cần tư vấn sản phẩm."
@@ -113,7 +112,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                 <a href="#/" onClick={(e) => handleNavigate(e, '/')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Bộ sưu tập</a>
                 <a href="#/about" onClick={(e) => handleNavigate(e, '/about')} className="text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors">Về chúng tôi</a>
                 
-                {/* BỎ ĐIỀU KIỆN ĐĂNG NHẬP: HIỆN CHO TẤT CẢ MỌI NGƯỜI */}
+                {/* NÚT CHAT TRÊN HEADER - LUÔN HIỂN THỊ */}
                 <button 
                     onClick={handleOpenChat} 
                     className="relative text-[#064E3B] font-black text-[10px] uppercase tracking-[0.4em] hover:text-[#92400E] transition-colors flex items-center gap-2 group"
