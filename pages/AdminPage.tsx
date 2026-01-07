@@ -180,7 +180,7 @@ const AdminPage: React.FC = () => {
                 <UsersIcon className="w-5 h-5" /> <span className="text-sm font-bold">Khách hàng</span>
               </button>
            )}
-           {hasPermission('customers') && (
+           {hasPermission('customer_care') && ( // Sử dụng quyền customer_care riêng biệt
                <button onClick={() => setActiveTab('customer_care')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'customer_care' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <GiftIcon className="w-5 h-5" /> <span className="text-sm font-bold">Chăm sóc KH</span>
               </button>

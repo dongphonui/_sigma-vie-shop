@@ -53,12 +53,71 @@ const initDb = async () => {
     ];
     for (let q of queries) await client.query(q);
     
+    // Đảm bảo có tài khoản Master mặc định
+    const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
+    if (checkAdmin.rows.length === 0) {
+        await client.query(
+            "INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            ['admin_master', 'admin', 'admin', 'Quản trị viên Sigma', 'MASTER', '["ALL"]', Date.now()]
+        );
+    }
+
     console.log("✅ Database Schema Ready");
   } catch (err) { console.error('❌ Schema Initialization Error:', err.stack); }
   finally { if (client) client.release(); }
 };
 
 initDb();
+
+// --- ADMIN USERS & AUTH ---
+app.post('/api/admin/login', async (req, res) => {
+    const { username, password, method } = req.body;
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    try {
+        if (method) {
+            // Đây là bước ghi log sau khi đã qua bước OTP
+            await pool.query(
+                "INSERT INTO admin_logs (username, method, status, ip_address, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                [username || 'Unknown', method, 'SUCCESS', ip, Date.now()]
+            );
+            return res.json({ success: true });
+        }
+
+        const result = await pool.query("SELECT * FROM admin_users WHERE username = $1 AND password = $2", [username, password]);
+        if (result.rows.length > 0) {
+            const user = result.rows[0];
+            res.json({ success: true, user: { id: user.id, username: user.username, fullname: user.fullname, role: user.role, permissions: user.permissions, is_totp_enabled: user.is_totp_enabled, totp_secret: user.totp_secret } });
+        } else {
+            await pool.query(
+                "INSERT INTO admin_logs (username, method, status, ip_address, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                [username, 'PASSWORD', 'FAILED', ip, Date.now()]
+            );
+            res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/logs', async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM admin_logs ORDER BY timestamp DESC LIMIT 100");
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/reset', async (req, res) => {
+    const { scope } = req.body;
+    try {
+        if (scope === 'FULL') {
+            await pool.query("TRUNCATE products, categories, customers, orders, inventory_transactions, chat_messages");
+        } else if (scope === 'ORDERS') {
+            await pool.query("TRUNCATE orders, inventory_transactions");
+        } else if (scope === 'PRODUCTS') {
+            await pool.query("TRUNCATE products, categories, inventory_transactions");
+        }
+        res.json({ success: true, message: `Hệ thống đã được dọn dẹp (Scope: ${scope})` });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // --- CUSTOMERS API ---
 app.get('/api/customers', async (req, res) => {
@@ -79,21 +138,6 @@ app.post('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/customers/login', async (req, res) => {
-    const { identifier, passwordHash } = req.body;
-    try {
-        const result = await pool.query(
-            "SELECT data FROM customers WHERE (phone = $1 OR email = $1) AND data->>'passwordHash' = $2",
-            [identifier, passwordHash]
-        );
-        if (result.rows.length > 0) {
-            res.json({ success: true, customer: result.rows[0].data });
-        } else {
-            res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
-        }
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // --- ORDERS API ---
 app.get('/api/orders', async (req, res) => {
     try {
@@ -105,7 +149,6 @@ app.get('/api/orders', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
     const o = req.body;
     try {
-        // Cập nhật: Đảm bảo total_price được lưu chính xác vào cột riêng biệt để báo cáo dễ dàng
         await pool.query(
             'INSERT INTO orders (id, customer_id, total_price, status, timestamp, data) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET status=$4, total_price=$3, data=$6',
             [o.id, o.customerId, o.totalPrice, o.status, o.timestamp, o]
