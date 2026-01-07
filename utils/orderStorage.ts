@@ -20,11 +20,7 @@ export const getOrders = (): Order[] => {
         hasLoadedFromDB = true;
         fetchOrdersFromDB().then(dbOrders => {
             if (dbOrders && Array.isArray(dbOrders)) {
-                if (dbOrders.length === 0 && localData.length > 0) {
-                    // Nếu server trống nhưng local có (có thể do reset server), không xóa local vội
-                    // trừ khi người dùng chủ động reset. Ở đây ta giữ nguyên để sync ngược lên.
-                    return;
-                }
+                // Hợp nhất dữ liệu nhưng ưu tiên dữ liệu từ Server
                 processAndMergeOrders(localData, dbOrders);
             }
         }).catch(err => {
@@ -58,20 +54,28 @@ const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
  * Buộc tải lại đơn hàng từ server (Dùng khi đăng nhập thiết bị mới)
  */
 export const forceReloadOrders = async (): Promise<Order[]> => {
+    hasLoadedFromDB = false; // Reset cờ để ép tải lại
     try {
         const dbOrders = await fetchOrdersFromDB();
         if (dbOrders && Array.isArray(dbOrders)) {
-            // Thay thế hoàn toàn dữ liệu local bằng dữ liệu server để đảm bảo tính nhất quán
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbOrders));
-            dispatchOrderUpdate();
             hasLoadedFromDB = true;
+            dispatchOrderUpdate();
             return dbOrders;
         }
-        return getOrders();
     } catch (e) {
         console.error("Lỗi force reload orders:", e);
-        return getOrders();
     }
+    return getOrders();
+};
+
+/**
+ * Xóa cache đơn hàng (Dùng khi logout)
+ */
+export const clearOrderCache = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    hasLoadedFromDB = false;
+    dispatchOrderUpdate();
 };
 
 export const syncAllOrdersToServer = async (): Promise<boolean> => {
@@ -87,7 +91,6 @@ export const syncAllOrdersToServer = async (): Promise<boolean> => {
 
 export const getOrdersByCustomerId = (customerId: string): Order[] => {
     const orders = getOrders();
-    // Chuyển đổi ID về string để so sánh chính xác
     return orders.filter(o => String(o.customerId) === String(customerId));
 };
 
@@ -182,14 +185,14 @@ export const createOrder = (
     return { success: true, message: 'Đặt hàng thành công!', order: newOrder };
 };
 
-export const updateOrderStatus = (orderId: string, newStatus: Order['status']): void => {
+export const updateOrderStatus = (orderId: string, iewStatus: Order['status']): void => {
     const orders = getOrders();
     const index = orders.findIndex(o => o.id === orderId);
     if (index !== -1) {
         const order = orders[index];
         const oldStatus = order.status;
 
-        if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+        if (iewStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
             const pid = Number(order.productId);
             const qty = Number(order.quantity);
             const success = updateProductStock(pid, qty, order.productSize, order.productColor);
@@ -206,7 +209,7 @@ export const updateOrderStatus = (orderId: string, newStatus: Order['status']): 
             }
         }
 
-        orders[index].status = newStatus;
+        orders[index].status = iewStatus;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
         dispatchOrderUpdate();
         syncOrderToDB(orders[index]);

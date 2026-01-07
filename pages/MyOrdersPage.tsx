@@ -37,11 +37,12 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
         setIsLoading(true);
         try {
             if (force) {
-                // Tải trực tiếp từ server để đảm bảo thiết bị mới cũng thấy đơn hàng
+                // Tải trực tiếp từ server để đồng bộ thiết bị
                 const allOrders = await forceReloadOrders();
                 setOrders(allOrders.filter(o => String(o.customerId) === String(currentUser.id)));
             } else {
-                setOrders(getOrdersByCustomerId(currentUser.id));
+                const localOrders = getOrdersByCustomerId(currentUser.id);
+                setOrders(localOrders);
             }
         } catch (e) {
             console.error("Lỗi khi tải đơn hàng:", e);
@@ -51,7 +52,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
     };
 
     useEffect(() => {
-        // Kích hoạt đồng bộ hóa ngay khi vào trang
+        // Luôn force sync khi vào trang lần đầu hoặc khi đổi user
         if (currentUser) {
             loadOrders(true);
         }
@@ -63,13 +64,13 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
         };
         window.addEventListener('sigma_vie_orders_update', handleOrderUpdate);
         return () => window.removeEventListener('sigma_vie_orders_update', handleOrderUpdate);
-    }, [currentUser?.id]); // Chỉ phụ thuộc vào ID của user
+    }, [currentUser?.id]);
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && currentUser) {
             if (file.size > 3 * 1024 * 1024) {
-                alert("Ảnh quá lớn! Vui lòng chọn ảnh dưới 3MB để đảm bảo đồng bộ nhanh.");
+                alert("Ảnh quá lớn! Vui lòng chọn ảnh dưới 3MB.");
                 return;
             }
 
@@ -85,7 +86,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                     await syncWithServer();
                     setIsUpdatingAvatar(false);
                 } else {
-                    alert("Có lỗi khi lưu ảnh vào hệ thống. Vui lòng kiểm tra kết nối mạng.");
+                    alert("Có lỗi khi lưu ảnh.");
                     setIsUpdatingAvatar(false);
                 }
             };
@@ -173,7 +174,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                         <div className="flex flex-row md:flex-col gap-4">
                             <div className="bg-slate-50 p-4 rounded-2xl text-center min-w-[120px] border border-slate-100 shadow-inner">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Đơn hàng</p>
-                                <p className="text-2xl font-black text-[#111827]">{orders.length}</p>
+                                <p className="text-2xl font-black text-[#111827]">{isLoading ? '...' : orders.length}</p>
                             </div>
                             <div className="bg-slate-50 p-4 rounded-2xl text-center min-w-[120px] border border-slate-100 shadow-inner">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tham gia</p>
@@ -196,20 +197,18 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                 </div>
                 
                 <div className="space-y-6">
-                    {orders.length === 0 ? (
+                    {isLoading ? (
+                        <div className="bg-white p-20 rounded-[2.5rem] shadow-sm text-center border border-slate-100">
+                             <div className="flex flex-col items-center gap-4">
+                                <div className="w-12 h-12 border-4 border-slate-100 border-t-[#D4AF37] rounded-full animate-spin"></div>
+                                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Đang tải đơn hàng từ đám mây...</p>
+                            </div>
+                        </div>
+                    ) : orders.length === 0 ? (
                         <div className="bg-white p-16 rounded-[2.5rem] shadow-sm text-center border border-slate-100 italic">
-                            {isLoading ? (
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="w-10 h-10 border-4 border-slate-100 border-t-[#D4AF37] rounded-full animate-spin"></div>
-                                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Đang kết nối trung tâm dữ liệu...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <PackageIcon className="w-12 h-12 mx-auto mb-4 text-slate-200" />
-                                    <p className="text-slate-400 mb-6">Quý khách chưa có đơn hàng nào tại Sigma Vie.</p>
-                                    <a href="#/" className="btn-luxury-main inline-block">Khám phá bộ sưu tập</a>
-                                </>
-                            )}
+                            <PackageIcon className="w-12 h-12 mx-auto mb-4 text-slate-200" />
+                            <p className="text-slate-400 mb-6">Quý khách chưa có đơn hàng nào tại Sigma Vie.</p>
+                            <a href="#/" className="btn-luxury-main inline-block">Khám phá bộ sưu tập</a>
                         </div>
                     ) : (
                         orders.map(order => (

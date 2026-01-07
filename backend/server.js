@@ -82,26 +82,6 @@ app.post('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/customers/:id', async (req, res) => {
-    const { id } = req.params;
-    const c = req.body;
-    try {
-        await pool.query(
-            `UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`,
-            [c.fullName, c.phoneNumber || null, c.email || null, c, id]
-        );
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/customers/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await pool.query('DELETE FROM customers WHERE id = $1', [id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.post('/api/customers/login', async (req, res) => {
     const { identifier, passwordHash } = req.body;
     try {
@@ -114,6 +94,44 @@ app.post('/api/customers/login', async (req, res) => {
         } else {
             res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
         }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ORDERS API (NEWLY ADDED) ---
+app.get('/api/orders', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
+        res.json(result.rows.map(row => row.data));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/orders', async (req, res) => {
+    const o = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO orders (id, customer_id, total_price, status, timestamp, data) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET status=$4, data=$6',
+            [o.id, o.customerId, o.totalPrice, o.status, o.timestamp, o]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- INVENTORY API (NEWLY ADDED) ---
+app.get('/api/inventory', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM inventory_transactions ORDER BY timestamp DESC');
+        res.json(result.rows.map(row => row.data));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/inventory', async (req, res) => {
+    const t = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO inventory_transactions (id, product_id, type, quantity, timestamp, data) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET data=$6',
+            [t.id, t.productId, t.type, t.quantity, t.timestamp, t]
+        );
+        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -133,23 +151,6 @@ app.post('/api/chat/messages', async (req, res) => {
             'INSERT INTO chat_messages (id, session_id, customer_id, customer_name, sender_role, text, image_url, timestamp, is_read, reactions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
             [m.id, m.sessionId, m.customerId || null, m.customerName, m.senderRole, m.text, m.imageUrl || null, m.timestamp, m.isRead, m.reactions || {}]
         );
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/chat/messages/:id/react', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { reactions } = req.body;
-        await pool.query('UPDATE chat_messages SET reactions = $1 WHERE id = $2', [reactions, id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/chat/messages/:sessionId', async (req, res) => {
-    try {
-        const { sessionId } = req.params;
-        await pool.query('DELETE FROM chat_messages WHERE session_id = $1', [sessionId]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -186,14 +187,6 @@ app.get('/api/chat/sessions', async (req, res) => {
         `;
         const result = await pool.query(query);
         res.json(result.rows);
-    } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/chat/read/:sessionId', async (req, res) => {
-    try {
-        const { sessionId } = req.params;
-        await pool.query('UPDATE chat_messages SET is_read = TRUE WHERE session_id = $1 AND sender_role = \'customer\'', [sessionId]);
-        res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

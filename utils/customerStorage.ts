@@ -4,7 +4,7 @@ import {
     fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, 
     deleteCustomerFromDB, verifyCustomerLoginOnServer
 } from './apiClient';
-import { forceReloadOrders } from './orderStorage';
+import { forceReloadOrders, clearOrderCache } from './orderStorage';
 
 const STORAGE_KEY = 'sigma_vie_customers';
 const SESSION_KEY = 'sigma_vie_current_customer';
@@ -168,7 +168,8 @@ export const loginCustomer = async (identifier: string, password: string): Promi
 
   if (localCustomer) {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(localCustomer));
-    await forceReloadOrders(); // Ép tải lại cho local user
+    // Tải lại đơn hàng cho local user
+    await forceReloadOrders();
     dispatchCustomerUpdate();
     return { success: true, message: 'Đăng nhập thành công!', customer: localCustomer };
   }
@@ -189,8 +190,8 @@ export const deleteCustomer = async (id: string): Promise<boolean> => {
 
 export const logoutCustomer = (): void => {
   sessionStorage.removeItem(SESSION_KEY);
-  // Xóa đơn hàng local khi đăng xuất để bảo mật và tránh nhiễu dữ liệu user sau
-  localStorage.removeItem('sigma_vie_orders');
+  // Xóa đơn hàng local khi đăng xuất để bảo mật và tránh nhiễu dữ liệu
+  clearOrderCache();
   dispatchCustomerUpdate();
 };
 
