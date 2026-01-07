@@ -2,9 +2,9 @@
 import type { Customer } from '../types';
 import { 
     fetchCustomersFromDB, syncCustomerToDB, updateCustomerInDB, 
-    deleteCustomerFromDB, verifyCustomerLoginOnServer,
-    requestCustomerForgotPassword, confirmCustomerResetPassword
+    deleteCustomerFromDB, verifyCustomerLoginOnServer
 } from './apiClient';
+import { forceReloadOrders } from './orderStorage';
 
 const STORAGE_KEY = 'sigma_vie_customers';
 const SESSION_KEY = 'sigma_vie_current_customer';
@@ -24,14 +24,10 @@ const dispatchCustomerUpdate = () => {
     window.dispatchEvent(new Event('sigma_vie_customers_update'));
 };
 
-/**
- * Lấy danh sách khách hàng và thực hiện đồng bộ ngầm với Server
- */
 export const getCustomers = (): Customer[] => {
   const stored = localStorage.getItem(STORAGE_KEY);
   const localData: Customer[] = stored ? JSON.parse(stored) : [];
 
-  // Thực hiện đồng bộ ngầm nếu chưa có tiến trình nào đang chạy
   if (!isSyncing) {
       syncWithServer();
   }
@@ -39,27 +35,20 @@ export const getCustomers = (): Customer[] => {
   return localData;
 };
 
-/**
- * Hàm đồng bộ dữ liệu từ Server về Local
- */
 export const syncWithServer = async (): Promise<void> => {
     if (isSyncing) return;
     isSyncing = true;
     try {
         const dbCustomers = await fetchCustomersFromDB();
         if (dbCustomers && Array.isArray(dbCustomers)) {
-            // Cập nhật LocalStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(dbCustomers));
             
-            // ĐỒNG BỘ SESSION HIỆN TẠI:
-            // Nếu có người dùng đang đăng nhập, hãy cập nhật thông tin mới nhất từ Server (như Avatar)
             const currentSessionStr = sessionStorage.getItem(SESSION_KEY);
             if (currentSessionStr) {
                 const currentUser = JSON.parse(currentSessionStr);
                 const freshUserData = dbCustomers.find(c => c.id === currentUser.id);
                 
                 if (freshUserData && JSON.stringify(freshUserData) !== currentSessionStr) {
-                    console.log("[Sigma Sync] Phát hiện thay đổi thông tin người dùng từ máy khác. Đang cập nhật...");
                     sessionStorage.setItem(SESSION_KEY, JSON.stringify(freshUserData));
                     dispatchCustomerUpdate();
                 }
@@ -126,11 +115,13 @@ export const registerCustomer = async (data: {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(newCustomer));
   dispatchCustomerUpdate();
   
+  // Ép tải lại đơn hàng (dù tài khoản mới thường rỗng, nhưng đảm bảo nhất quán)
+  await forceReloadOrders();
+
   return { success: true, message: 'Đăng ký thành công!', customer: newCustomer };
 };
 
 export const updateCustomer = async (updatedCustomer: Customer): Promise<boolean> => {
-    // 1. Cập nhật session và local trước để UI mượt mà (Optimistic Update)
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(updatedCustomer));
     
     const customers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -142,7 +133,6 @@ export const updateCustomer = async (updatedCustomer: Customer): Promise<boolean
 
     dispatchCustomerUpdate();
 
-    // 2. Đồng bộ lên Server (QUAN TRỌNG: Đây là nơi dữ liệu được lưu vĩnh viễn)
     try {
         const res = await updateCustomerInDB(updatedCustomer);
         return !!(res && res.success);
@@ -156,11 +146,14 @@ export const loginCustomer = async (identifier: string, password: string): Promi
   const hash = simpleHash(password);
   
   try {
-      // Ưu tiên xác thực Server
       const serverRes = await verifyCustomerLoginOnServer(identifier, hash);
       if (serverRes && serverRes.success && serverRes.customer) {
           const remoteCustomer = serverRes.customer;
           sessionStorage.setItem(SESSION_KEY, JSON.stringify(remoteCustomer));
+          
+          // QUAN TRỌNG: Ngay khi đăng nhập, ép tải lại đơn hàng cho user này
+          await forceReloadOrders();
+          
           await syncWithServer(); 
           dispatchCustomerUpdate();
           return { success: true, message: 'Đăng nhập thành công!', customer: remoteCustomer };
@@ -175,6 +168,7 @@ export const loginCustomer = async (identifier: string, password: string): Promi
 
   if (localCustomer) {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(localCustomer));
+    await forceReloadOrders(); // Ép tải lại cho local user
     dispatchCustomerUpdate();
     return { success: true, message: 'Đăng nhập thành công!', customer: localCustomer };
   }
@@ -195,6 +189,8 @@ export const deleteCustomer = async (id: string): Promise<boolean> => {
 
 export const logoutCustomer = (): void => {
   sessionStorage.removeItem(SESSION_KEY);
+  // Xóa đơn hàng local khi đăng xuất để bảo mật và tránh nhiễu dữ liệu user sau
+  localStorage.removeItem('sigma_vie_orders');
   dispatchCustomerUpdate();
 };
 

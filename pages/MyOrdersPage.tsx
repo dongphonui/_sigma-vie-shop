@@ -34,19 +34,28 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
     const loadOrders = async (force: boolean = false) => {
         if (!currentUser) return;
         
-        if (force) {
-            setIsLoading(true);
-            try {
-                await forceReloadOrders();
-            } finally {
-                setIsLoading(false);
+        setIsLoading(true);
+        try {
+            if (force) {
+                // Tải trực tiếp từ server để đảm bảo thiết bị mới cũng thấy đơn hàng
+                const allOrders = await forceReloadOrders();
+                setOrders(allOrders.filter(o => String(o.customerId) === String(currentUser.id)));
+            } else {
+                setOrders(getOrdersByCustomerId(currentUser.id));
             }
+        } catch (e) {
+            console.error("Lỗi khi tải đơn hàng:", e);
+        } finally {
+            setIsLoading(false);
         }
-        setOrders(getOrdersByCustomerId(currentUser.id));
     };
 
     useEffect(() => {
-        loadOrders(true);
+        // Kích hoạt đồng bộ hóa ngay khi vào trang
+        if (currentUser) {
+            loadOrders(true);
+        }
+
         const handleOrderUpdate = () => {
             if (currentUser) {
                 setOrders(getOrdersByCustomerId(currentUser.id));
@@ -54,7 +63,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
         };
         window.addEventListener('sigma_vie_orders_update', handleOrderUpdate);
         return () => window.removeEventListener('sigma_vie_orders_update', handleOrderUpdate);
-    }, [currentUser]);
+    }, [currentUser?.id]); // Chỉ phụ thuộc vào ID của user
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -70,14 +79,11 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                 const base64 = reader.result as string;
                 const updatedUser = { ...currentUser, avatarUrl: base64 };
                 
-                // Thực hiện cập nhật DB và Session
                 const success = await updateCustomer(updatedUser);
                 
                 if (success) {
-                    // Sau khi lưu thành công vào DB, trigger sync lần cuối để chắc chắn
                     await syncWithServer();
                     setIsUpdatingAvatar(false);
-                    // Không cần reload trang nữa vì App.tsx đã lắng nghe event update
                 } else {
                     alert("Có lỗi khi lưu ảnh vào hệ thống. Vui lòng kiểm tra kết nối mạng.");
                     setIsUpdatingAvatar(false);
@@ -91,8 +97,18 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
         return (
             <div className="min-h-screen bg-[#F7F5F2] flex flex-col">
                  <Header cartItemCount={cartItemCount} onOpenCart={onOpenCart} />
-                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                     <p className="text-xl text-gray-600 mb-4">Vui lòng đăng nhập để xem đơn hàng của bạn.</p>
+                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+                     <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 max-w-md">
+                        <UserIcon className="w-16 h-16 mx-auto mb-6 text-slate-200" />
+                        <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight mb-4">Khu vực dành cho Thành viên</h2>
+                        <p className="text-slate-500 text-sm mb-8 leading-relaxed">Vui lòng đăng nhập tài khoản Sigma Vie để quản lý lịch sử đơn hàng và thông tin cá nhân của quý khách.</p>
+                        <button 
+                            onClick={() => window.dispatchEvent(new CustomEvent('sigma_vie_open_auth'))}
+                            className="bg-[#111827] text-white px-10 py-4 rounded-full font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-xl active:scale-95"
+                        >
+                            Đăng nhập ngay
+                        </button>
+                     </div>
                  </div>
                  <Footer isAdminLinkVisible={isAdminLinkVisible} />
             </div>
@@ -104,7 +120,6 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
             <Header currentUser={currentUser} cartItemCount={cartItemCount} onOpenCart={onOpenCart} />
             
             <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl">
-                {/* PROFILE HEADER SECTION */}
                 <section className="bg-white rounded-[2.5rem] shadow-xl border border-[#064E3B]/5 p-8 md:p-12 mb-12 animate-fade-in-up">
                     <div className="flex flex-col md:flex-row items-center gap-10">
                         <div className="relative group">
@@ -156,11 +171,11 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                         </div>
 
                         <div className="flex flex-row md:flex-col gap-4">
-                            <div className="bg-slate-50 p-4 rounded-2xl text-center min-w-[120px] border border-slate-100">
+                            <div className="bg-slate-50 p-4 rounded-2xl text-center min-w-[120px] border border-slate-100 shadow-inner">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Đơn hàng</p>
                                 <p className="text-2xl font-black text-[#111827]">{orders.length}</p>
                             </div>
-                            <div className="bg-slate-50 p-4 rounded-2xl text-center min-w-[120px] border border-slate-100">
+                            <div className="bg-slate-50 p-4 rounded-2xl text-center min-w-[120px] border border-slate-100 shadow-inner">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tham gia</p>
                                 <p className="text-xs font-black text-[#111827]">{new Date(currentUser.createdAt).getFullYear()}</p>
                             </div>
@@ -176,7 +191,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                         disabled={isLoading}
                     >
                         <RefreshIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        {isLoading ? 'Đang đồng bộ...' : 'Cập nhật đơn hàng'}
+                        {isLoading ? 'Đang cập nhật...' : 'Đồng bộ đơn hàng'}
                     </button>
                 </div>
                 
@@ -184,12 +199,15 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                     {orders.length === 0 ? (
                         <div className="bg-white p-16 rounded-[2.5rem] shadow-sm text-center border border-slate-100 italic">
                             {isLoading ? (
-                                <p className="text-slate-400">Đang truy xuất dữ liệu từ máy chủ...</p>
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="w-10 h-10 border-4 border-slate-100 border-t-[#D4AF37] rounded-full animate-spin"></div>
+                                    <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Đang kết nối trung tâm dữ liệu...</p>
+                                </div>
                             ) : (
                                 <>
                                     <PackageIcon className="w-12 h-12 mx-auto mb-4 text-slate-200" />
                                     <p className="text-slate-400 mb-6">Quý khách chưa có đơn hàng nào tại Sigma Vie.</p>
-                                    <a href="#/" className="btn-luxury-main">Khám phá bộ sưu tập</a>
+                                    <a href="#/" className="btn-luxury-main inline-block">Khám phá bộ sưu tập</a>
                                 </>
                             )}
                         </div>
@@ -197,8 +215,8 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                         orders.map(order => (
                             <div key={order.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-50 animate-fade-in-up hover:shadow-lg transition-all duration-500">
                                 <div className="flex flex-col lg:flex-row justify-between items-start mb-8 gap-6 pb-6 border-b border-slate-50">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
+                                    <div className="flex-1 w-full">
+                                        <div className="flex items-center gap-3 mb-2 flex-wrap">
                                             <p className="font-black text-slate-900 uppercase text-sm tracking-tight">Đơn hàng #{order.id}</p>
                                             <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest 
                                                 ${order.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 
@@ -232,10 +250,10 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                                 </div>
 
                                 <div className="flex flex-col md:flex-row items-center gap-8">
-                                    <div className="w-32 h-40 bg-slate-50 rounded-2xl overflow-hidden shadow-inner flex-shrink-0 border border-slate-100">
-                                        <PackageIcon className="w-full h-full p-10 text-slate-100"/>
+                                    <div className="w-32 h-40 bg-slate-50 rounded-2xl overflow-hidden shadow-inner flex-shrink-0 border border-slate-100 flex items-center justify-center">
+                                        <PackageIcon className="w-12 h-12 text-slate-100"/>
                                     </div>
-                                    <div className="flex-1 text-center md:text-left">
+                                    <div className="flex-1 text-center md:text-left w-full">
                                         <h4 className="font-black text-slate-900 text-lg uppercase tracking-tight mb-3">{order.productName}</h4>
                                         <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
                                             {order.productSize && (
@@ -279,9 +297,21 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                 .animate-fade-in-up {
                     animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.5s ease-out forwards;
+                }
             `}</style>
         </div>
     );
 };
+
+// Re-import icon to avoid usage error
+const UserIcon: React.FC<{className?: string}> = ({className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+);
 
 export default MyOrdersPage;
