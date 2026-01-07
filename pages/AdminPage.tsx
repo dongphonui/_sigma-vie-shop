@@ -5,7 +5,7 @@ import {
     BarChart2, PackageIcon, ClipboardListIcon, UsersIcon, LayersIcon, 
     UserIcon, FileTextIcon, ActivityIcon, RefreshIcon, AlertCircleIcon, 
     CheckIcon, SettingsIcon, MonitorIcon, HomeIcon, MessageSquareIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon, GiftIcon
 } from '../components/Icons';
 import { checkServerConnection, fetchChatSessions } from '../utils/apiClient';
 
@@ -18,6 +18,7 @@ import CustomerTab from '../components/admin/CustomerTab';
 import SettingsTab from '../components/admin/SettingsTab';
 import ReportsTab from '../components/admin/ReportsTab';
 import LiveChatTab from '../components/admin/LiveChatTab';
+import CustomerCareTab from '../components/admin/CustomerCareTab';
 
 // Import Setting Components
 import HomePageSettingsTab from '../components/admin/settings/HomePageSettingsTab';
@@ -27,7 +28,7 @@ import ProductPageSettingsTab from '../components/admin/settings/ProductPageSett
 import LiveChatSettingsTab from '../components/admin/settings/LiveChatSettingsTab';
 
 const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reports' | 'chat' | 'settings' | 'home' | 'header' | 'about' | 'products_ui' | 'live_chat_ui'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'customer_care' | 'reports' | 'chat' | 'settings' | 'home' | 'header' | 'about' | 'products_ui' | 'live_chat_ui'>('dashboard');
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [isServerOnline, setIsServerOnline] = useState(true);
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
@@ -99,6 +100,7 @@ const AdminPage: React.FC = () => {
       case 'orders': return <OrderTab />;
       case 'inventory': return <InventoryTab />;
       case 'customers': return <CustomerTab />;
+      case 'customer_care': return <CustomerCareTab />;
       case 'reports': return <ReportsTab />; 
       case 'chat': return <LiveChatTab />; 
       case 'home': return <HomePageSettingsTab />;     
@@ -178,6 +180,11 @@ const AdminPage: React.FC = () => {
                 <UsersIcon className="w-5 h-5" /> <span className="text-sm font-bold">Khách hàng</span>
               </button>
            )}
+           {hasPermission('customers') && (
+               <button onClick={() => setActiveTab('customer_care')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'customer_care' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+                <GiftIcon className="w-5 h-5" /> <span className="text-sm font-bold">Chăm sóc KH</span>
+              </button>
+           )}
            {hasPermission('reports') && (
                <button onClick={() => setActiveTab('reports')} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-white/10 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                 <FileTextIcon className="w-5 h-5" /> <span className="text-sm font-bold">Báo cáo</span>
@@ -223,6 +230,7 @@ const AdminPage: React.FC = () => {
                      activeTab === 'chat' ? 'Trung tâm Tư vấn' : 
                      activeTab === 'inventory' ? 'Sổ kho' : 
                      activeTab === 'customers' ? 'Dữ liệu Khách hàng' : 
+                     activeTab === 'customer_care' ? 'Chăm sóc khách hàng' : 
                      activeTab === 'reports' ? 'Báo cáo Kinh doanh' : 
                      activeTab === 'home' ? 'Thiết lập Trang chủ' :
                      activeTab === 'products_ui' ? 'Thiết lập Giao diện SP' :
