@@ -53,9 +53,6 @@ const initDb = async () => {
     ];
     for (let q of queries) await client.query(q);
     
-    // Add reactions column if not exists (for existing databases)
-    await client.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}';`);
-    
     console.log("✅ Database Schema Ready");
   } catch (err) { console.error('❌ Schema Initialization Error:', err.stack); }
   finally { if (client) client.release(); }
@@ -97,7 +94,7 @@ app.post('/api/customers/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ORDERS API (NEWLY ADDED) ---
+// --- ORDERS API ---
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
@@ -108,15 +105,16 @@ app.get('/api/orders', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
     const o = req.body;
     try {
+        // Cập nhật: Đảm bảo total_price được lưu chính xác vào cột riêng biệt để báo cáo dễ dàng
         await pool.query(
-            'INSERT INTO orders (id, customer_id, total_price, status, timestamp, data) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET status=$4, data=$6',
+            'INSERT INTO orders (id, customer_id, total_price, status, timestamp, data) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET status=$4, total_price=$3, data=$6',
             [o.id, o.customerId, o.totalPrice, o.status, o.timestamp, o]
         );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- INVENTORY API (NEWLY ADDED) ---
+// --- INVENTORY API ---
 app.get('/api/inventory', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM inventory_transactions ORDER BY timestamp DESC');
@@ -190,7 +188,7 @@ app.get('/api/chat/sessions', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- SETTINGS & OTHER APIS ---
+// --- SETTINGS APIS ---
 app.get('/api/settings/:key', async (req, res) => {
     try {
         const { key } = req.params;

@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import type { CartItem, Customer } from '../types';
 import { updateCartQuantity, removeFromCart, clearCart } from '../utils/cartStorage';
 import { createOrder } from '../utils/orderStorage';
-import { calculateShippingFee, getShippingSettings } from '../utils/shippingSettingsStorage';
+import { calculateShippingFee, refreshShippingSettings } from '../utils/shippingSettingsStorage';
 import PaymentModal from './PaymentModal';
 
 interface CartDrawerProps {
@@ -41,6 +41,8 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
           setShipName(currentUser.fullName);
           setShipPhone(currentUser.phoneNumber || '');
           setShipAddress(currentUser.address || '');
+          // Cập nhật cấu hình vận chuyển mới nhất từ server khi mở giỏ hàng
+          refreshShippingSettings();
       }
   }, [isOpen, currentUser]);
 
@@ -60,11 +62,17 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
       if (!shipName || !shipPhone || !shipAddress) { alert('Quý khách vui lòng cung cấp đủ thông tin nhận hàng.'); return; }
 
       setIsProcessing(true);
+      
+      // Đồng bộ lại phí vận chuyển một lần cuối trước khi tạo đơn
+      await refreshShippingSettings();
+      const currentShippingFee = calculateShippingFee(subtotal);
+
       const createdOrders = [];
       let isFirstItem = true;
 
       for (const item of items) {
-          const fee = isFirstItem ? shippingFee : 0;
+          // Phí vận chuyển được tính cho món hàng đầu tiên trong lô
+          const fee = isFirstItem ? currentShippingFee : 0;
           const result = createOrder(currentUser, item, item.quantity, paymentMethod, fee, item.selectedSize, item.selectedColor, {
               name: shipName, phone: shipPhone, address: shipAddress
           });
@@ -81,7 +89,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, current
           } else {
               clearCart(); 
               onClose();
-              alert(`Đặt hàng thành công! Tổng giá trị: ${formatPrice(totalPrice)}`);
+              alert(`Đặt hàng thành công! Đơn hàng đang được xử lý.`);
           }
       } else {
           alert('Không thể hoàn tất đơn hàng. Một số mặt hàng có thể đã hết hàng.');

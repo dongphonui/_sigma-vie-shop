@@ -11,6 +11,10 @@ const dispatchOrderUpdate = () => {
     window.dispatchEvent(new Event('sigma_vie_orders_update'));
 };
 
+const parsePrice = (priceStr: string): number => {
+    return parseInt(priceStr.replace(/[^0-9]/g, ''), 10) || 0;
+};
+
 export const getOrders = (): Order[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -20,7 +24,6 @@ export const getOrders = (): Order[] => {
         hasLoadedFromDB = true;
         fetchOrdersFromDB().then(dbOrders => {
             if (dbOrders && Array.isArray(dbOrders)) {
-                // Hợp nhất dữ liệu nhưng ưu tiên dữ liệu từ Server
                 processAndMergeOrders(localData, dbOrders);
             }
         }).catch(err => {
@@ -38,7 +41,6 @@ const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
     const serverIdSet = new Set(dbOrders.map((o: any) => String(o.id)));
     const unsavedLocalOrders = localData.filter(o => !serverIdSet.has(String(o.id)));
     
-    // Nếu có đơn hàng local chưa có trên server, đẩy lên
     if (unsavedLocalOrders.length > 0 && dbOrders.length > 0) {
         unsavedLocalOrders.forEach(o => syncOrderToDB(o));
     }
@@ -50,11 +52,8 @@ const processAndMergeOrders = (localData: Order[], dbOrders: any[]) => {
     return mergedOrders;
 };
 
-/**
- * Buộc tải lại đơn hàng từ server (Dùng khi đăng nhập thiết bị mới)
- */
 export const forceReloadOrders = async (): Promise<Order[]> => {
-    hasLoadedFromDB = false; // Reset cờ để ép tải lại
+    hasLoadedFromDB = false;
     try {
         const dbOrders = await fetchOrdersFromDB();
         if (dbOrders && Array.isArray(dbOrders)) {
@@ -69,33 +68,15 @@ export const forceReloadOrders = async (): Promise<Order[]> => {
     return getOrders();
 };
 
-/**
- * Xóa cache đơn hàng (Dùng khi logout)
- */
 export const clearOrderCache = () => {
     localStorage.removeItem(STORAGE_KEY);
     hasLoadedFromDB = false;
     dispatchOrderUpdate();
 };
 
-export const syncAllOrdersToServer = async (): Promise<boolean> => {
-    try {
-        const orders = getOrders();
-        const promises = orders.map(o => syncOrderToDB(o));
-        await Promise.all(promises);
-        return true;
-    } catch (e) {
-        return false;
-    }
-};
-
 export const getOrdersByCustomerId = (customerId: string): Order[] => {
     const orders = getOrders();
     return orders.filter(o => String(o.customerId) === String(customerId));
-};
-
-const parsePrice = (priceStr: string): number => {
-    return parseInt(priceStr.replace(/[^0-9]/g, ''), 10) || 0;
 };
 
 export const createOrder = (
@@ -121,20 +102,14 @@ export const createOrder = (
         return { success: false, message: 'Sản phẩm không còn tồn tại trên hệ thống.' };
     }
 
-    let stockAvailable = latestProd.stock;
-    if (latestProd.variants && (size || color)) {
-        const v = latestProd.variants.find(v => 
-            (v.size === size || (!v.size && !size)) && 
-            (v.color === color || (!v.color && !color))
-        );
-        stockAvailable = v ? v.stock : 0;
-    }
+    // Logic kiểm tra Flash Sale để lấy đơn giá chính xác nhất
+    const now = Date.now();
+    const isFlashSaleActive = latestProd.isFlashSale && 
+                             latestProd.salePrice && 
+                             (!latestProd.flashSaleStartTime || now >= latestProd.flashSaleStartTime) &&
+                             (!latestProd.flashSaleEndTime || now <= latestProd.flashSaleEndTime);
 
-    if (stockAvailable < quantity) {
-        return { success: false, message: `Số lượng tồn kho không đủ (Chỉ còn ${stockAvailable}).` };
-    }
-
-    const pricePerUnit = parsePrice(product.price);
+    const pricePerUnit = isFlashSaleActive ? parsePrice(latestProd.salePrice!) : parsePrice(latestProd.price);
     const subtotal = pricePerUnit * quantity;
     const finalTotal = subtotal + shippingFee; 
 
@@ -148,8 +123,8 @@ export const createOrder = (
         shippingAddress: shippingInfo?.address || customer.address || 'Chưa cung cấp',
         note: shippingInfo?.note || '',
         customerAddress: customer.address || 'Chưa cung cấp',
-        productId: product.id,
-        productName: product.name,
+        productId: latestProd.id,
+        productName: latestProd.name,
         productSize: size, 
         productColor: color,
         quantity: quantity,
@@ -160,7 +135,7 @@ export const createOrder = (
         paymentMethod: paymentMethod
     };
 
-    const stockUpdated = updateProductStock(product.id, -quantity, size, color);
+    const stockUpdated = updateProductStock(latestProd.id, -quantity, size, color);
     if (!stockUpdated) {
         return { success: false, message: 'Lỗi cập nhật tồn kho biến thể.' };
     }
@@ -173,8 +148,8 @@ export const createOrder = (
     syncOrderToDB(newOrder);
 
     addTransaction({
-        productId: product.id,
-        productName: product.name,
+        productId: latestProd.id,
+        productName: latestProd.name,
         type: 'EXPORT',
         quantity: quantity,
         note: `Đơn hàng ${newOrder.id}`,
@@ -185,14 +160,14 @@ export const createOrder = (
     return { success: true, message: 'Đặt hàng thành công!', order: newOrder };
 };
 
-export const updateOrderStatus = (orderId: string, iewStatus: Order['status']): void => {
+export const updateOrderStatus = (orderId: string, newStatus: Order['status']): void => {
     const orders = getOrders();
     const index = orders.findIndex(o => o.id === orderId);
     if (index !== -1) {
         const order = orders[index];
         const oldStatus = order.status;
 
-        if (iewStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+        if (newStatus === 'CANCELLED' && oldStatus !== 'CANCELLED') {
             const pid = Number(order.productId);
             const qty = Number(order.quantity);
             const success = updateProductStock(pid, qty, order.productSize, order.productColor);
@@ -209,7 +184,7 @@ export const updateOrderStatus = (orderId: string, iewStatus: Order['status']): 
             }
         }
 
-        orders[index].status = iewStatus;
+        orders[index].status = newStatus;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
         dispatchOrderUpdate();
         syncOrderToDB(orders[index]);
