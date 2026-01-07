@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, ChatSession } from '../../types';
 import { fetchChatSessions, fetchChatMessages, sendChatMessage, markChatAsRead } from '../../utils/apiClient';
-import { UserIcon, RefreshIcon, CheckIcon } from '../Icons';
+import { UserIcon, RefreshIcon, CheckIcon, ImagePlus, XIcon } from '../Icons';
 
 const LiveChatTab: React.FC = () => {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -9,8 +10,12 @@ const LiveChatTab: React.FC = () => {
     const [messages, setMessages] = useState<SupportMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [isSending, setIsSending] = useState(false);
+    
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Khởi tạo audio để báo tin nhắn mới
     useEffect(() => {
@@ -41,7 +46,6 @@ const LiveChatTab: React.FC = () => {
         setIsLoadingSessions(true);
         const data = await fetchChatSessions();
         if (data) {
-            // Kiểm tra xem có tin nhắn mới nào không để phát âm thanh
             const hasNewMessages = data.some((s: any) => {
                 const oldSession = sessions.find(os => os.sessionId === s.sessionId);
                 return s.unreadCount > (oldSession?.unreadCount || 0);
@@ -66,6 +70,7 @@ const LiveChatTab: React.FC = () => {
                 customerName: m.customer_name,
                 senderRole: m.sender_role,
                 text: m.text,
+                imageUrl: m.image_url,
                 timestamp: Number(m.timestamp),
                 isRead: m.is_read
             }));
@@ -73,16 +78,33 @@ const LiveChatTab: React.FC = () => {
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) {
+                alert("Ảnh quá lớn! Vui lòng gửi ảnh dưới 2MB.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inputValue.trim() || !activeSession) return;
+        if ((!inputValue.trim() && !previewImage) || !activeSession || isSending) return;
 
+        setIsSending(true);
         const newMessage: SupportMessage = {
             id: `MSG-${Date.now()}`,
             sessionId: activeSession.sessionId,
             customerName: activeSession.customerName,
             senderRole: 'admin',
             text: inputValue,
+            imageUrl: previewImage || undefined,
             timestamp: Date.now(),
             isRead: true
         };
@@ -91,7 +113,9 @@ const LiveChatTab: React.FC = () => {
         if (res && res.success) {
             setMessages(prev => [...prev, newMessage]);
             setInputValue('');
+            setPreviewImage(null);
         }
+        setIsSending(false);
     };
 
     return (
@@ -161,14 +185,14 @@ const LiveChatTab: React.FC = () => {
                                     <span className="bg-emerald-50 text-emerald-600 text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-widest border border-emerald-100">Thành viên</span>
                                 )}
                                 <button onClick={() => setActiveSession(null)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    <XIcon className="w-5 h-5"/>
                                 </button>
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-[#FCFCFB] custom-scrollbar">
                             {messages.map((m, idx) => {
-                                const showTime = idx === 0 || m.timestamp - messages[idx-1].timestamp > 300000; // 5 mins
+                                const showTime = idx === 0 || m.timestamp - messages[idx-1].timestamp > 300000;
                                 return (
                                     <div key={m.id}>
                                         {showTime && (
@@ -177,9 +201,16 @@ const LiveChatTab: React.FC = () => {
                                             </div>
                                         )}
                                         <div className={`flex ${m.senderRole === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[70%] p-5 rounded-[2rem] shadow-sm relative group ${m.senderRole === 'admin' ? 'bg-[#111827] text-white rounded-tr-none' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'}`}>
-                                                <p className="text-sm leading-relaxed font-medium">{m.text}</p>
-                                                <div className="flex items-center justify-between mt-2 opacity-30 group-hover:opacity-60 transition-opacity">
+                                            <div className={`max-w-[70%] overflow-hidden rounded-[2rem] shadow-sm relative group ${m.senderRole === 'admin' ? 'bg-[#111827] text-white rounded-tr-none' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'}`}>
+                                                {m.imageUrl && (
+                                                    <a href={m.imageUrl} target="_blank" rel="noopener noreferrer">
+                                                        <img src={m.imageUrl} alt="Attachment" className="w-full h-auto max-h-80 object-cover cursor-zoom-in hover:opacity-90 transition-opacity" />
+                                                    </a>
+                                                )}
+                                                {m.text && (
+                                                    <p className="p-5 text-sm leading-relaxed font-medium">{m.text}</p>
+                                                )}
+                                                <div className="flex items-center justify-between px-5 pb-3 opacity-30 group-hover:opacity-60 transition-opacity">
                                                     <span className="text-[8px] font-black uppercase tracking-widest">{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                     {m.senderRole === 'admin' && <CheckIcon className="w-3 h-3 text-[#D4AF37]"/>}
                                                 </div>
@@ -191,7 +222,29 @@ const LiveChatTab: React.FC = () => {
                             <div ref={messagesEndRef} />
                         </div>
 
+                        {/* Admin Preview Image */}
+                        {previewImage && (
+                            <div className="px-8 py-3 bg-slate-50 border-t border-slate-100 flex items-center gap-4">
+                                <div className="relative">
+                                    <img src={previewImage} className="w-16 h-16 object-cover rounded-xl border-2 border-white shadow-lg" />
+                                    <button onClick={() => setPreviewImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white p-1 rounded-full shadow-lg">
+                                        <XIcon className="w-3 h-3" />
+                                    </button>
+                                </div>
+                                <p className="text-[11px] font-black text-slate-400 uppercase">Đang đính kèm hình ảnh...</p>
+                            </div>
+                        )}
+
                         <form onSubmit={handleSendMessage} className="p-8 bg-white border-t border-slate-100 flex items-center gap-4">
+                            <button 
+                                type="button" 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-4 text-slate-400 hover:text-[#D4AF37] transition-colors bg-slate-50 rounded-2xl border-2 border-slate-50"
+                            >
+                                <ImagePlus className="w-6 h-6" />
+                            </button>
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                            
                             <input 
                                 type="text" 
                                 value={inputValue} 
@@ -199,7 +252,9 @@ const LiveChatTab: React.FC = () => {
                                 placeholder="Gửi phản hồi cho quý khách..." 
                                 className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl px-8 py-5 text-sm font-bold focus:border-[#D4AF37] focus:bg-white transition-all outline-none"
                             />
-                            <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-2xl active:scale-95 disabled:opacity-20">Gửi</button>
+                            <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-2xl active:scale-95 disabled:opacity-20">
+                                {isSending ? '...' : 'Gửi'}
+                            </button>
                         </form>
                     </>
                 ) : (

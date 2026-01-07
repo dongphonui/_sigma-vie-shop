@@ -26,6 +26,28 @@ export interface Product {
   variants?: ProductVariant[];
 }
 
+// Tin nhắn Chat trực tiếp
+export interface SupportMessage {
+  id: string;
+  sessionId: string; 
+  customerId?: string; 
+  customerName: string;
+  senderRole: 'customer' | 'admin';
+  text: string;
+  imageUrl?: string; // Trường mới cho hình ảnh (Base64)
+  timestamp: number;
+  isRead: boolean;
+}
+
+export interface ChatSession {
+  sessionId: string;
+  customerName: string;
+  lastMessage: string;
+  lastTimestamp: number;
+  unreadCount: number;
+  customerId?: string;
+}
+
 // Cấu hình giao diện sản phẩm chi tiết
 export interface ProductPageSettings {
   titleFont: string;
@@ -37,7 +59,7 @@ export interface ProductPageSettings {
   descFont: string;
   descColor: string;
   descSize: string;
-  badgeLabel: string; // Nhãn thay thế cho Collection/Mã hiệu
+  badgeLabel: string; 
   badgeBgColor: string;
   badgeTextColor: string;
   buyBtnText: string;
@@ -119,7 +141,6 @@ export interface AdminUser {
     is_totp_enabled?: boolean;
 }
 
-// Fixed: Added missing AdminLoginLog interface
 export interface AdminLoginLog {
     id: number;
     username: string;

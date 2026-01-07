@@ -1,3 +1,4 @@
+
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
@@ -48,9 +49,15 @@ const initDb = async () => {
         `CREATE TABLE IF NOT EXISTS admin_users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, fullname TEXT, role TEXT, permissions JSONB, created_at BIGINT, totp_secret TEXT, is_totp_enabled BOOLEAN DEFAULT FALSE);`,
         `CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value JSONB);`,
         `CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, username TEXT, method TEXT, status TEXT, ip_address TEXT, timestamp BIGINT);`,
-        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE);`
+        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, image_url TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE);`
     ];
     for (let q of queries) await client.query(q);
+    
+    // Đảm bảo cột image_url tồn tại trong bảng cũ
+    try {
+        await client.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_url TEXT;`);
+    } catch (e) {}
+
     console.log("✅ Database Schema Ready");
   } catch (err) { console.error('❌ Schema Initialization Error:', err.stack); }
   finally { if (client) client.release(); }
@@ -71,8 +78,8 @@ app.post('/api/chat/messages', async (req, res) => {
     try {
         const m = req.body;
         await pool.query(
-            'INSERT INTO chat_messages (id, session_id, customer_id, customer_name, sender_role, text, timestamp, is_read) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-            [m.id, m.sessionId, m.customerId || null, m.customerName, m.senderRole, m.text, m.timestamp, m.isRead]
+            'INSERT INTO chat_messages (id, session_id, customer_id, customer_name, sender_role, text, image_url, timestamp, is_read) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+            [m.id, m.sessionId, m.customerId || null, m.customerName, m.senderRole, m.text, m.imageUrl || null, m.timestamp, m.isRead]
         );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -80,10 +87,9 @@ app.post('/api/chat/messages', async (req, res) => {
 
 app.get('/api/chat/sessions', async (req, res) => {
     try {
-        // Lấy tin nhắn cuối cùng và đếm số tin chưa đọc (unreadCount) của mỗi session
         const query = `
             WITH LastMessages AS (
-                SELECT session_id, customer_name, text, timestamp, customer_id,
+                SELECT session_id, customer_name, text, image_url, timestamp, customer_id,
                 ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC) as rn
                 FROM chat_messages
             ),
@@ -96,7 +102,11 @@ app.get('/api/chat/sessions', async (req, res) => {
             SELECT 
                 lm.session_id as "sessionId", 
                 lm.customer_name as "customerName", 
-                lm.text as "lastMessage", 
+                CASE 
+                    WHEN lm.image_url IS NOT NULL AND (lm.text IS NULL OR lm.text = '') THEN '[Hình ảnh]'
+                    WHEN lm.image_url IS NOT NULL THEN '[Hình ảnh] ' || lm.text
+                    ELSE lm.text 
+                END as "lastMessage", 
                 lm.timestamp as "lastTimestamp",
                 lm.customer_id as "customerId",
                 COALESCE(uc.unread_count, 0) as "unreadCount"
@@ -118,7 +128,7 @@ app.post('/api/chat/read/:sessionId', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- SETTINGS & OTHER APIS (Giữ nguyên phần còn lại của file) ---
+// --- SETTINGS & OTHER APIS ---
 app.get('/api/settings/:key', async (req, res) => {
     try {
         const { key } = req.params;

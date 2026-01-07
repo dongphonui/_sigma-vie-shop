@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, Customer } from '../types';
 import { sendChatMessage, fetchChatMessages, markChatAsRead } from '../utils/apiClient';
 import { getCurrentCustomer } from '../utils/customerStorage';
-import { MessageSquareIcon, XIcon } from './Icons';
+import { MessageSquareIcon, XIcon, ImagePlus } from './Icons';
 
 const CustomerSupportChat: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -13,14 +13,15 @@ const CustomerSupportChat: React.FC = () => {
     const [user, setUser] = useState<Customer | null>(null);
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
     const [shouldShake, setShouldShake] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [isSending, setIsSending] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        // Log để kiểm tra trong Console (F12)
         console.log("%c[Sigma Support] Component đã được nạp!", "color: gold; font-weight: bold; font-size: 16px;");
-        
         audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
         
         let sid = localStorage.getItem('sigma_vie_support_sid');
@@ -30,7 +31,6 @@ const CustomerSupportChat: React.FC = () => {
         }
         setSessionId(sid);
 
-        // Hiệu ứng lắc sau 3 giây để khách chú ý
         const timer = setTimeout(() => setShouldShake(true), 3000);
         return () => clearTimeout(timer);
     }, []);
@@ -71,6 +71,7 @@ const CustomerSupportChat: React.FC = () => {
                     customerName: m.customer_name,
                     senderRole: m.sender_role,
                     text: m.text,
+                    imageUrl: m.image_url,
                     timestamp: Number(m.timestamp),
                     isRead: m.is_read
                 }));
@@ -84,10 +85,26 @@ const CustomerSupportChat: React.FC = () => {
         } catch (e) {}
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) {
+                alert("Ảnh quá lớn! Vui lòng gửi ảnh dưới 2MB.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewImage(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inputValue.trim() || !sessionId) return;
+        if ((!inputValue.trim() && !previewImage) || !sessionId || isSending) return;
 
+        setIsSending(true);
         const newMessage: SupportMessage = {
             id: `MSG-${Date.now()}`,
             sessionId: sessionId,
@@ -95,6 +112,7 @@ const CustomerSupportChat: React.FC = () => {
             customerName: user?.fullName || 'Khách vãng lai',
             senderRole: 'customer',
             text: inputValue,
+            imageUrl: previewImage || undefined,
             timestamp: Date.now(),
             isRead: false
         };
@@ -103,16 +121,18 @@ const CustomerSupportChat: React.FC = () => {
         if (res && res.success) {
             setMessages(prev => [...prev, newMessage]);
             setInputValue('');
+            setPreviewImage(null);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
+        setIsSending(false);
     };
 
     return (
         <div 
-            id="sigma-concierge-chat-v3"
+            id="sigma-concierge-chat-v4"
             style={{
                 position: 'fixed',
-                bottom: '160px', // Cao hơn Chat AI cũ
+                bottom: '160px',
                 right: '24px',
                 zIndex: 2147483647,
                 display: 'flex',
@@ -127,8 +147,8 @@ const CustomerSupportChat: React.FC = () => {
                     className="bg-white rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] flex flex-col mb-4 overflow-hidden border border-slate-100 animate-float-up"
                     style={{ 
                         width: '380px', 
-                        height: '500px', 
-                        maxHeight: '70vh', 
+                        height: '550px', 
+                        maxHeight: '80vh', 
                         maxWidth: '90vw',
                         pointerEvents: 'auto' 
                     }}
@@ -155,28 +175,59 @@ const CustomerSupportChat: React.FC = () => {
                         )}
                         {messages.map((msg, idx) => (
                             <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-[13px] shadow-sm ${
+                                <div className={`max-w-[85%] rounded-2xl overflow-hidden shadow-sm flex flex-col ${
                                     msg.senderRole === 'customer' 
-                                        ? 'bg-[#D4AF37] text-white rounded-tr-none' 
+                                        ? 'bg-[#111827] text-white rounded-br-none' 
                                         : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                                 }`}>
-                                    <p className="font-bold leading-relaxed">{msg.text}</p>
+                                    {msg.imageUrl && (
+                                        <img src={msg.imageUrl} alt="Chat attachment" className="w-full h-auto max-h-60 object-cover" />
+                                    )}
+                                    {msg.text && (
+                                        <p className="px-4 py-2.5 text-[13px] font-bold leading-relaxed">{msg.text}</p>
+                                    )}
                                 </div>
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
                     </div>
 
+                    {/* Preview Image */}
+                    {previewImage && (
+                        <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
+                            <div className="relative">
+                                <img src={previewImage} className="w-12 h-12 object-cover rounded-lg border-2 border-white shadow-md" />
+                                <button onClick={() => setPreviewImage(null)} className="absolute -top-2 -right-2 bg-rose-500 text-white p-0.5 rounded-full shadow-lg">
+                                    <XIcon className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase">Hình ảnh đang chờ gửi...</p>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-50 flex items-center gap-2 pointer-events-auto">
+                        <button 
+                            type="button" 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-3 text-slate-400 hover:text-[#D4AF37] transition-colors"
+                        >
+                            <ImagePlus className="w-5 h-5" />
+                        </button>
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                        
                         <input 
                             type="text" 
                             value={inputValue} 
                             onChange={(e) => setInputValue(e.target.value)} 
                             placeholder="Nhập lời nhắn..." 
-                            className="flex-1 bg-slate-50 border-none rounded-xl px-5 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all"
+                            className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all"
                         />
-                        <button type="submit" disabled={!inputValue.trim()} className="bg-[#111827] text-white p-3.5 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
-                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white p-3.5 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
+                            {isSending ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                            )}
                         </button>
                     </form>
                 </div>
