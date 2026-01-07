@@ -143,17 +143,28 @@ const Header: React.FC<HeaderProps> = ({ onOpenAuth, currentUser, cartItemCount 
                                     <p className="text-[9px] font-black text-[#92400E] uppercase tracking-widest">Thành viên</p>
                                     <p className="text-xs font-bold text-[#064E3B]">{currentUser.fullName.split(' ').pop()}</p>
                                 </div>
-                                <div className="bg-[#064E3B] p-2.5 rounded-2xl group-hover:bg-[#92400E] transition-colors shadow-lg">
-                                    <UserIcon className="w-5 h-5 text-white"/>
+                                <div className="w-10 h-10 rounded-2xl overflow-hidden group-hover:ring-2 group-hover:ring-[#92400E] transition-all shadow-lg border border-[#064E3B]/10">
+                                    {currentUser.avatarUrl ? (
+                                        <img src={currentUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-[#064E3B] flex items-center justify-center">
+                                            <UserIcon className="w-5 h-5 text-white"/>
+                                        </div>
+                                    )}
                                 </div>
                             </button>
                             {userMenuVisible && (
                                 <div className="absolute right-0 mt-4 w-64 bg-white rounded-2xl shadow-2xl py-3 border border-[#064E3B]/5 animate-fade-in-up overflow-hidden">
-                                    <div className="px-5 py-3 border-b border-slate-50 mb-2">
-                                        <p className="text-[10px] font-black text-[#92400E] uppercase tracking-widest">Tài khoản</p>
-                                        <p className="text-sm font-bold text-[#064E3B] truncate">{currentUser.fullName}</p>
+                                    <div className="px-5 py-4 border-b border-slate-50 mb-2 flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full overflow-hidden border">
+                                            {currentUser.avatarUrl ? <img src={currentUser.avatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">Σ</div>}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-black text-[#92400E] uppercase tracking-widest">Tài khoản</p>
+                                            <p className="text-sm font-bold text-[#064E3B] truncate">{currentUser.fullName}</p>
+                                        </div>
                                     </div>
-                                    <a href="#/my-orders" onClick={(e) => handleNavigate(e, '/my-orders')} className="block px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50">Lịch sử đơn hàng</a>
+                                    <a href="#/my-orders" onClick={(e) => handleNavigate(e, '/my-orders')} className="block px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#064E3B] hover:bg-slate-50">Trung tâm cá nhân</a>
                                     <div className="border-t border-slate-50 mt-2">
                                         <button onClick={handleLogout} className="block w-full text-left px-5 py-3 text-xs font-bold text-rose-500 hover:bg-rose-50">Đăng xuất</button>
                                     </div>

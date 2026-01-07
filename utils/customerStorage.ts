@@ -80,6 +80,7 @@ export const registerCustomer = async (data: {
     gender: string;
     dob: string;
     issueDate: string;
+    avatarUrl?: string;
 }): Promise<{ success: boolean; message: string; customer?: Customer }> => {
   
   if (!data.fullName || !data.password || !data.email || !data.phoneNumber) {
@@ -107,6 +108,7 @@ export const registerCustomer = async (data: {
     issueDate: data.issueDate, 
     passwordHash: simpleHash(data.password),
     address: data.address,
+    avatarUrl: data.avatarUrl,
     createdAt: Date.now()
   };
 

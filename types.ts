@@ -105,6 +105,7 @@ export interface Customer {
   issueDate?: string;   
   passwordHash: string;
   address?: string;
+  avatarUrl?: string; // Thêm trường ảnh đại diện
   createdAt: number;
 }
 
