@@ -53,11 +53,12 @@ export const checkServerConnection = async (): Promise<boolean> => {
 // --- LIVE CHAT API ---
 export const fetchChatMessages = (sessionId: string) => fetchData(`chat/messages/${sessionId}`);
 export const sendChatMessage = (message: any) => syncData('chat/messages', message);
+export const updateMessageReaction = (id: string, reactions: any) => syncData(`chat/messages/${id}/react`, { reactions });
 export const fetchChatSessions = () => fetchData('chat/sessions');
 export const markChatAsRead = (sessionId: string) => syncData(`chat/read/${sessionId}`, {});
 export const deleteChatMessages = (sessionId: string) => syncData(`chat/messages/${sessionId}`, {}, 'DELETE');
 
-// --- OTHER APIS (Giữ nguyên) ---
+// --- OTHER APIS ---
 export const fetchSettingFromDB = (key: string) => fetchData(`settings/${key}`);
 export const syncSettingToDB = (key: string, value: any) => syncData(`settings/${key}`, value);
 export const fetchProductsFromDB = () => fetchData('products');

@@ -34,9 +34,10 @@ export interface SupportMessage {
   customerName: string;
   senderRole: 'customer' | 'admin';
   text: string;
-  imageUrl?: string; // Trường mới cho hình ảnh (Base64)
+  imageUrl?: string;
   timestamp: number;
   isRead: boolean;
+  reactions?: Record<string, number>; // Lưu trữ cảm xúc: { "❤️": 1, "👍": 2 }
 }
 
 export interface ChatSession {
@@ -105,7 +106,7 @@ export interface Customer {
   issueDate?: string;   
   passwordHash: string;
   address?: string;
-  avatarUrl?: string; // Thêm trường ảnh đại diện
+  avatarUrl?: string; 
   createdAt: number;
 }
 

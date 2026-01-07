@@ -49,9 +49,13 @@ const initDb = async () => {
         `CREATE TABLE IF NOT EXISTS admin_users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, fullname TEXT, role TEXT, permissions JSONB, created_at BIGINT, totp_secret TEXT, is_totp_enabled BOOLEAN DEFAULT FALSE);`,
         `CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value JSONB);`,
         `CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, username TEXT, method TEXT, status TEXT, ip_address TEXT, timestamp BIGINT);`,
-        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, image_url TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE);`
+        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, image_url TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE, reactions JSONB DEFAULT '{}');`
     ];
     for (let q of queries) await client.query(q);
+    
+    // Add reactions column if not exists (for existing databases)
+    await client.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{}';`);
+    
     console.log("✅ Database Schema Ready");
   } catch (err) { console.error('❌ Schema Initialization Error:', err.stack); }
   finally { if (client) client.release(); }
@@ -126,9 +130,18 @@ app.post('/api/chat/messages', async (req, res) => {
     try {
         const m = req.body;
         await pool.query(
-            'INSERT INTO chat_messages (id, session_id, customer_id, customer_name, sender_role, text, image_url, timestamp, is_read) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-            [m.id, m.sessionId, m.customerId || null, m.customerName, m.senderRole, m.text, m.imageUrl || null, m.timestamp, m.isRead]
+            'INSERT INTO chat_messages (id, session_id, customer_id, customer_name, sender_role, text, image_url, timestamp, is_read, reactions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+            [m.id, m.sessionId, m.customerId || null, m.customerName, m.senderRole, m.text, m.imageUrl || null, m.timestamp, m.isRead, m.reactions || {}]
         );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/chat/messages/:id/react', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reactions } = req.body;
+        await pool.query('UPDATE chat_messages SET reactions = $1 WHERE id = $2', [reactions, id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
