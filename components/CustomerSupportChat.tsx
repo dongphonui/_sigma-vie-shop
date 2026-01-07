@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, Customer } from '../types';
 import { sendChatMessage, fetchChatMessages, markChatAsRead, deleteChatMessages, updateMessageReaction } from '../utils/apiClient';
 import { getCurrentCustomer } from '../utils/customerStorage';
-import { MessageSquareIcon, XIcon, ImagePlus, RefreshIcon } from './Icons';
+import { MessageSquareIcon, XIcon, ImagePlus, RefreshIcon, SmileIcon } from './Icons';
 
 const REACTION_LIST = ['❤️', '👍', '🔥', '😍', '👏'];
+const QUICK_EMOJIS = ['👋', '😊', '🙏', '✨', '💖', '👗', '👠', '🛍️', '🔥', '👍'];
 
 const CustomerSupportChat: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -19,6 +20,7 @@ const CustomerSupportChat: React.FC = () => {
     const [isSending, setIsSending] = useState(false);
     const [isClearing, setIsClearing] = useState(false);
     const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+    const [showEmojiBar, setShowEmojiBar] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -123,9 +125,11 @@ const CustomerSupportChat: React.FC = () => {
         }
     };
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if ((!inputValue.trim() && !previewImage) || !sessionId || isSending) return;
+    const handleSendMessage = async (e?: React.FormEvent, customText?: string) => {
+        if (e) e.preventDefault();
+        
+        const finalContent = customText || inputValue;
+        if ((!finalContent.trim() && !previewImage) || !sessionId || isSending) return;
 
         setIsSending(true);
         const newMessage: SupportMessage = {
@@ -134,7 +138,7 @@ const CustomerSupportChat: React.FC = () => {
             customerId: user?.id,
             customerName: user?.fullName || 'Khách vãng lai',
             senderRole: 'customer',
-            text: inputValue,
+            text: finalContent,
             imageUrl: previewImage || undefined,
             timestamp: Date.now(),
             isRead: false,
@@ -144,11 +148,16 @@ const CustomerSupportChat: React.FC = () => {
         const res = await sendChatMessage(newMessage);
         if (res && res.success) {
             setMessages(prev => [...prev, newMessage]);
-            setInputValue('');
+            if (!customText) setInputValue('');
             setPreviewImage(null);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
         setIsSending(false);
+    };
+
+    const handleQuickEmojiSend = (emoji: string) => {
+        handleSendMessage(undefined, emoji);
+        setShowEmojiBar(false);
     };
 
     const handleReact = async (msgId: string, emoji: string) => {
@@ -159,7 +168,6 @@ const CustomerSupportChat: React.FC = () => {
         const msg = updatedMessages[msgIndex];
         const newReactions = { ...(msg.reactions || {}) };
         
-        // Toggle reaction
         if (newReactions[emoji]) {
             delete newReactions[emoji];
         } else {
@@ -169,8 +177,6 @@ const CustomerSupportChat: React.FC = () => {
         msg.reactions = newReactions;
         setMessages(updatedMessages);
         setHoveredMsgId(null);
-
-        // Sync to server
         await updateMessageReaction(msgId, newReactions);
     };
 
@@ -235,17 +241,10 @@ const CustomerSupportChat: React.FC = () => {
                                         onMouseLeave={() => setHoveredMsgId(null)}
                                     >
                                         <div className="relative">
-                                            {/* Emoji Picker Popup - Visible on hover */}
                                             {hoveredMsgId === msg.id && (
                                                 <div className={`absolute -top-10 flex gap-2 bg-white p-2 rounded-full shadow-2xl border border-slate-100 z-[100] animate-float-up ${msg.senderRole === 'customer' ? 'right-0' : 'left-0'}`}>
                                                     {REACTION_LIST.map(emoji => (
-                                                        <button 
-                                                            key={emoji} 
-                                                            onClick={() => handleReact(msg.id, emoji)}
-                                                            className="hover:scale-150 transition-transform px-0.5 text-base"
-                                                        >
-                                                            {emoji}
-                                                        </button>
+                                                        <button key={emoji} onClick={() => handleReact(msg.id, emoji)} className="hover:scale-150 transition-transform px-0.5 text-base">{emoji}</button>
                                                     ))}
                                                 </div>
                                             )}
@@ -255,21 +254,14 @@ const CustomerSupportChat: React.FC = () => {
                                                     ? 'bg-[#111827] text-white rounded-br-none' 
                                                     : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
                                             }`}>
-                                                {msg.imageUrl && (
-                                                    <img src={msg.imageUrl} alt="Chat attachment" className="w-full h-auto max-h-60 object-cover" />
-                                                )}
-                                                {msg.text && (
-                                                    <p className="px-4 py-2.5 text-[13px] font-bold leading-relaxed">{msg.text}</p>
-                                                )}
+                                                {msg.imageUrl && <img src={msg.imageUrl} alt="Chat attachment" className="w-full h-auto max-h-60 object-cover" />}
+                                                {msg.text && <p className="px-4 py-2.5 text-[13px] font-bold leading-relaxed">{msg.text}</p>}
                                             </div>
 
-                                            {/* Display Active Reactions Pills */}
                                             {msg.reactions && Object.keys(msg.reactions).length > 0 && (
                                                 <div className={`flex gap-1 mt-1 ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
                                                     {Object.keys(msg.reactions).map(emoji => (
-                                                        <div key={emoji} className="bg-white border border-slate-100 shadow-sm rounded-full px-1.5 py-0.5 text-[10px] animate-bounce-slow flex items-center justify-center cursor-pointer hover:bg-slate-50" onClick={() => handleReact(msg.id, emoji)}>
-                                                            {emoji}
-                                                        </div>
+                                                        <div key={emoji} className="bg-white border border-slate-100 shadow-sm rounded-full px-1.5 py-0.5 text-[10px] animate-bounce-slow flex items-center justify-center cursor-pointer hover:bg-slate-50" onClick={() => handleReact(msg.id, emoji)}>{emoji}</div>
                                                     ))}
                                                 </div>
                                             )}
@@ -291,11 +283,23 @@ const CustomerSupportChat: React.FC = () => {
                         </div>
                     )}
 
-                    <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-50 flex items-center gap-2 pointer-events-auto">
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-[#D4AF37] transition-colors"><ImagePlus className="w-5 h-5" /></button>
+                    {/* Emoji Quick Bar */}
+                    {showEmojiBar && (
+                        <div className="px-4 py-2.5 bg-white border-t border-slate-50 flex items-center gap-3 overflow-x-auto custom-scrollbar animate-float-up shrink-0">
+                            {QUICK_EMOJIS.map(emoji => (
+                                <button key={emoji} onClick={() => handleQuickEmojiSend(emoji)} className="text-xl hover:scale-125 transition-transform shrink-0 p-1">{emoji}</button>
+                            ))}
+                        </div>
+                    )}
+
+                    <form onSubmit={(e) => handleSendMessage(e)} className="p-4 bg-white border-t border-slate-50 flex items-center gap-2 pointer-events-auto shrink-0">
+                        <div className="flex items-center gap-1">
+                            <button type="button" onClick={() => setShowEmojiBar(!showEmojiBar)} className={`p-2 rounded-lg transition-colors ${showEmojiBar ? 'text-[#D4AF37] bg-amber-50' : 'text-slate-400 hover:text-[#D4AF37]'}`}><SmileIcon className="w-5 h-5" /></button>
+                            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-[#D4AF37] transition-colors"><ImagePlus className="w-5 h-5" /></button>
+                        </div>
                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                        <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Nhập lời nhắn..." className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all" />
-                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white p-3.5 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
+                        <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Nhập lời nhắn..." className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all" />
+                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white p-3 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
                             {isSending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
                         </button>
                     </form>

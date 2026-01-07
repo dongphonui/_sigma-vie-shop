@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, ChatSession } from '../../types';
 import { fetchChatSessions, fetchChatMessages, sendChatMessage, markChatAsRead, deleteChatMessages, updateMessageReaction } from '../../utils/apiClient';
-import { UserIcon, RefreshIcon, CheckIcon, ImagePlus, XIcon, Trash2Icon } from '../Icons';
+import { UserIcon, RefreshIcon, CheckIcon, ImagePlus, XIcon, Trash2Icon, SmileIcon } from '../Icons';
 
 const REACTION_LIST = ['❤️', '👍', '🔥', '😍', '👏'];
+const QUICK_EMOJIS = ['👋', '😊', '🙏', '✨', '💖', '👗', '👠', '🛍️', '🔥', '👍'];
 
 const LiveChatTab: React.FC = () => {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -15,6 +15,7 @@ const LiveChatTab: React.FC = () => {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
     const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
+    const [showEmojiBar, setShowEmojiBar] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -109,9 +110,10 @@ const LiveChatTab: React.FC = () => {
         }
     };
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if ((!inputValue.trim() && !previewImage) || !activeSession || isSending) return;
+    const handleSendMessage = async (e?: React.FormEvent, customText?: string) => {
+        if (e) e.preventDefault();
+        const finalContent = customText || inputValue;
+        if ((!finalContent.trim() && !previewImage) || !activeSession || isSending) return;
 
         setIsSending(true);
         const newMessage: SupportMessage = {
@@ -119,7 +121,7 @@ const LiveChatTab: React.FC = () => {
             sessionId: activeSession.sessionId,
             customerName: activeSession.customerName,
             senderRole: 'admin',
-            text: inputValue,
+            text: finalContent,
             imageUrl: previewImage || undefined,
             timestamp: Date.now(),
             isRead: true,
@@ -129,10 +131,14 @@ const LiveChatTab: React.FC = () => {
         const res = await sendChatMessage(newMessage);
         if (res && res.success) {
             setMessages(prev => [...prev, newMessage]);
-            setInputValue('');
+            if (!customText) setInputValue('');
             setPreviewImage(null);
         }
         setIsSending(false);
+    };
+
+    const handleQuickEmojiSend = (emoji: string) => {
+        handleSendMessage(undefined, emoji);
     };
 
     const handleReact = async (msgId: string, emoji: string) => {
@@ -260,14 +266,29 @@ const LiveChatTab: React.FC = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleSendMessage} className="p-8 bg-white border-t border-slate-100 flex items-center gap-4">
-                            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 text-slate-400 hover:text-[#D4AF37] transition-colors bg-slate-50 rounded-2xl border-2 border-slate-50"><ImagePlus className="w-6 h-6" /></button>
-                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                            <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Gửi phản hồi..." className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl px-8 py-5 text-sm font-bold focus:border-[#D4AF37] focus:bg-white transition-all outline-none" />
-                            <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-2xl">
-                                {isSending ? '...' : 'Gửi'}
-                            </button>
-                        </form>
+                        <div className="bg-white border-t border-slate-100">
+                             {/* Quick Emoji Bar for Admin */}
+                            {showEmojiBar && (
+                                <div className="px-8 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-4 overflow-x-auto custom-scrollbar animate-fade-in shrink-0">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Phản hồi nhanh:</span>
+                                    {QUICK_EMOJIS.map(emoji => (
+                                        <button key={emoji} onClick={() => handleQuickEmojiSend(emoji)} className="text-xl hover:scale-125 transition-transform shrink-0 p-1">{emoji}</button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <form onSubmit={(e) => handleSendMessage(e)} className="p-8 flex items-center gap-4 shrink-0">
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setShowEmojiBar(!showEmojiBar)} className={`p-4 rounded-2xl border-2 transition-all ${showEmojiBar ? 'bg-amber-50 border-amber-200 text-[#D4AF37]' : 'bg-slate-50 border-slate-50 text-slate-400 hover:text-[#D4AF37]'}`}><SmileIcon className="w-6 h-6" /></button>
+                                    <button type="button" onClick={() => fileInputRef.current?.click()} className="p-4 text-slate-400 hover:text-[#D4AF37] transition-colors bg-slate-50 rounded-2xl border-2 border-slate-50"><ImagePlus className="w-6 h-6" /></button>
+                                </div>
+                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                                <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Gửi phản hồi..." className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-2xl px-8 py-5 text-sm font-bold focus:border-[#D4AF37] focus:bg-white transition-all outline-none" />
+                                <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-2xl disabled:opacity-30">
+                                    {isSending ? '...' : 'Gửi'}
+                                </button>
+                            </form>
+                        </div>
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-200 p-20 text-center animate-fade-in">
