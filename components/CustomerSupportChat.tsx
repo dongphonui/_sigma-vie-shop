@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { SupportMessage, Customer } from '../types';
+import { SupportMessage, Customer, LiveChatSettings } from '../types';
 import { sendChatMessage, fetchChatMessages, markChatAsRead, deleteChatMessages, updateMessageReaction } from '../utils/apiClient';
 import { getCurrentCustomer } from '../utils/customerStorage';
+import { getLiveChatSettings, LIVECHAT_SETTINGS_EVENT } from '../utils/liveChatSettingsStorage';
 import { MessageSquareIcon, XIcon, ImagePlus, RefreshIcon, SmileIcon } from './Icons';
 
 const REACTION_LIST = ['❤️', '👍', '🔥', '😍', '👏'];
@@ -10,6 +11,7 @@ const QUICK_EMOJIS = ['👋', '😊', '🙏', '✨', '💖', '👗', '👠', '�
 
 const CustomerSupportChat: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [ui, setUi] = useState<LiveChatSettings>(getLiveChatSettings());
     const [messages, setMessages] = useState<SupportMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [sessionId, setSessionId] = useState('');
@@ -37,7 +39,14 @@ const CustomerSupportChat: React.FC = () => {
         setSessionId(sid);
 
         const timer = setTimeout(() => setShouldShake(true), 3000);
-        return () => clearTimeout(timer);
+        
+        const handleUiUpdate = () => setUi(getLiveChatSettings());
+        window.addEventListener(LIVECHAT_SETTINGS_EVENT, handleUiUpdate);
+
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener(LIVECHAT_SETTINGS_EVENT, handleUiUpdate);
+        };
     }, []);
 
     useEffect(() => {
@@ -191,7 +200,8 @@ const CustomerSupportChat: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'flex-end',
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                fontFamily: ui.fontFamily
             }}
         >
             {isOpen && (
@@ -205,11 +215,14 @@ const CustomerSupportChat: React.FC = () => {
                         pointerEvents: 'auto' 
                     }}
                 >
-                    <div className="bg-[#111827] text-white p-6 flex justify-between items-center shrink-0">
+                    <div 
+                        className="p-6 flex justify-between items-center shrink-0 transition-colors"
+                        style={{ backgroundColor: ui.headerBgColor, color: ui.headerTextColor }}
+                    >
                         <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-[#D4AF37] rounded-xl flex items-center justify-center font-black">Σ</div>
+                            <div className="w-10 h-10 bg-[#D4AF37] rounded-xl flex items-center justify-center font-black text-white">Σ</div>
                             <div>
-                                <h3 className="font-black text-[11px] tracking-widest uppercase">Hỗ trợ Sigma Vie</h3>
+                                <h3 className="font-black text-[11px] tracking-widest uppercase">{ui.chatTitle}</h3>
                                 <p className="text-[8px] text-emerald-400 font-bold uppercase animate-pulse">Nhân viên đang online</p>
                             </div>
                         </div>
@@ -230,7 +243,7 @@ const CustomerSupportChat: React.FC = () => {
                                 {messages.length === 0 && (
                                     <div className="text-center py-20 opacity-30">
                                         <MessageSquareIcon className="w-10 h-10 mx-auto mb-3" />
-                                        <p className="text-[10px] font-black uppercase tracking-widest">Quý khách cần tư vấn?</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest">{ui.welcomeMsg}</p>
                                     </div>
                                 )}
                                 {messages.map((msg) => (
@@ -249,13 +262,16 @@ const CustomerSupportChat: React.FC = () => {
                                                 </div>
                                             )}
 
-                                            <div className={`max-w-[280px] rounded-2xl overflow-hidden shadow-sm flex flex-col ${
-                                                msg.senderRole === 'customer' 
-                                                    ? 'bg-[#111827] text-white rounded-br-none' 
-                                                    : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
-                                            }`}>
+                                            <div 
+                                                className={`max-w-[280px] rounded-2xl overflow-hidden shadow-sm flex flex-col ${msg.senderRole === 'customer' ? 'rounded-br-none' : 'rounded-tl-none border border-slate-100'}`}
+                                                style={{ 
+                                                    backgroundColor: msg.senderRole === 'customer' ? ui.bubbleBgCustomer : ui.bubbleBgAdmin,
+                                                    color: msg.senderRole === 'customer' ? ui.bubbleTextCustomer : ui.bubbleTextAdmin,
+                                                    fontSize: ui.fontSize
+                                                }}
+                                            >
                                                 {msg.imageUrl && <img src={msg.imageUrl} alt="Chat attachment" className="w-full h-auto max-h-60 object-cover" />}
-                                                {msg.text && <p className="px-4 py-2.5 text-[13px] font-bold leading-relaxed">{msg.text}</p>}
+                                                {msg.text && <p className="px-4 py-2.5 font-bold leading-relaxed">{msg.text}</p>}
                                             </div>
 
                                             {msg.reactions && Object.keys(msg.reactions).length > 0 && (
@@ -283,7 +299,6 @@ const CustomerSupportChat: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Emoji Quick Bar */}
                     {showEmojiBar && (
                         <div className="px-4 py-2.5 bg-white border-t border-slate-50 flex items-center gap-3 overflow-x-auto custom-scrollbar animate-float-up shrink-0">
                             {QUICK_EMOJIS.map(emoji => (
@@ -298,8 +313,8 @@ const CustomerSupportChat: React.FC = () => {
                             <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-[#D4AF37] transition-colors"><ImagePlus className="w-5 h-5" /></button>
                         </div>
                         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                        <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Nhập lời nhắn..." className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all" />
-                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white p-3 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
+                        <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={ui.placeholderText} className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all" />
+                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="text-white p-3 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20" style={{ backgroundColor: ui.floatingBtnColor }}>
                             {isSending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>}
                         </button>
                     </form>
@@ -308,13 +323,17 @@ const CustomerSupportChat: React.FC = () => {
 
             <div className={`flex flex-col items-end gap-3 pointer-events-auto ${shouldShake && !isOpen ? 'animate-shake' : ''}`}>
                 {!isOpen && (
-                    <div className="bg-[#111827] text-white px-4 py-2 rounded-2xl shadow-2xl border border-[#D4AF37] animate-bounce-slow">
+                    <div 
+                        className="text-white px-4 py-2 rounded-2xl shadow-2xl border border-[#D4AF37] animate-bounce-slow"
+                        style={{ backgroundColor: ui.floatingBtnColor }}
+                    >
                         <p className="text-[10px] font-black uppercase tracking-widest">Chat với chúng tôi ✨</p>
                     </div>
                 )}
                 <button 
                     onClick={() => { setIsOpen(!isOpen); setHasUnreadChat(false); }} 
-                    className={`group flex items-center justify-center w-20 h-20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all transform hover:scale-110 active:scale-95 border-4 border-white relative ${isOpen ? 'bg-rose-500 rotate-90' : 'bg-[#111827] hover:bg-black'}`}
+                    className={`group flex items-center justify-center w-20 h-20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all transform hover:scale-110 active:scale-95 border-4 border-white relative ${isOpen ? 'bg-rose-500 rotate-90' : 'hover:bg-black'}`}
+                    style={{ backgroundColor: isOpen ? undefined : ui.floatingBtnColor }}
                 >
                     {isOpen ? <XIcon className="w-10 h-10 text-white" /> : <MessageSquareIcon className="w-10 h-10 text-[#D4AF37]" />}
                     {!isOpen && hasUnreadChat && <span className="absolute -top-1 -right-1 w-6 h-6 bg-rose-500 rounded-full border-4 border-white shadow-lg animate-ping"></span>}

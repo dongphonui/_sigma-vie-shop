@@ -69,6 +69,22 @@ export interface ProductPageSettings {
   qrIconVisible: boolean;
 }
 
+// Cấu hình Live Chat
+export interface LiveChatSettings {
+  chatTitle: string;
+  headerBgColor: string;
+  headerTextColor: string;
+  bubbleBgCustomer: string;
+  bubbleTextCustomer: string;
+  bubbleBgAdmin: string;
+  bubbleTextAdmin: string;
+  floatingBtnColor: string;
+  placeholderText: string;
+  welcomeMsg: string;
+  fontFamily: string;
+  fontSize: string;
+}
+
 export interface CartItem extends Product {
   quantity: number;
   selectedPrice: number;

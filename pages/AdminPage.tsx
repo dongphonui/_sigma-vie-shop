@@ -24,9 +24,10 @@ import HomePageSettingsTab from '../components/admin/settings/HomePageSettingsTa
 import HeaderSettingsTab from '../components/admin/settings/HeaderSettingsTab';
 import AboutPageSettingsTab from '../components/admin/settings/AboutPageSettingsTab';
 import ProductPageSettingsTab from '../components/admin/settings/ProductPageSettingsTab';
+import LiveChatSettingsTab from '../components/admin/settings/LiveChatSettingsTab';
 
 const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reports' | 'chat' | 'settings' | 'home' | 'header' | 'about' | 'products_ui'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reports' | 'chat' | 'settings' | 'home' | 'header' | 'about' | 'products_ui' | 'live_chat_ui'>('dashboard');
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [isServerOnline, setIsServerOnline] = useState(true);
   const [isCheckingConnection, setIsCheckingConnection] = useState(false);
@@ -89,6 +90,9 @@ const AdminPage: React.FC = () => {
   };
 
   const renderContent = () => {
+    const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
+    if (!isAuthenticated) return null;
+
     switch(activeTab) {
       case 'dashboard': return <DashboardTab />;
       case 'products': return <ProductTab />;
@@ -101,6 +105,7 @@ const AdminPage: React.FC = () => {
       case 'header': return <HeaderSettingsTab />;     
       case 'about': return <AboutPageSettingsTab />;   
       case 'products_ui': return <ProductPageSettingsTab />;   
+      case 'live_chat_ui': return <LiveChatSettingsTab />;
       case 'settings': return <SettingsTab currentUser={currentAdminUser} />;
       default: return <DashboardTab />;
     }
@@ -124,7 +129,6 @@ const AdminPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
                 <h1 className="text-xl font-black tracking-tighter uppercase leading-none text-white">Sigma Admin</h1>
-                {/* ĐÈN BÁO SIDEBAR ADMIN */}
                 <span className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)] ${isServerOnline ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'}`}></span>
             </div>
             <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mt-1">Hệ thống Quản trị Luxury</p>
@@ -187,6 +191,7 @@ const AdminPage: React.FC = () => {
                     </p>
                     <button onClick={() => setActiveTab('home')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'home' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Trang chủ</button>
                     <button onClick={() => setActiveTab('products_ui')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'products_ui' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Sản phẩm</button>
+                    <button onClick={() => setActiveTab('live_chat_ui')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'live_chat_ui' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Cài đặt Live chat</button>
                     <button onClick={() => setActiveTab('header')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'header' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Header & Logo</button>
                     <button onClick={() => setActiveTab('about')} className={`w-full text-left px-5 py-2.5 rounded-xl text-xs transition-all ${activeTab === 'about' ? 'text-[#B4975A] font-black bg-white/5' : 'text-gray-500 hover:text-white'}`}>Thiết lập Giới thiệu</button>
                </div>
@@ -221,6 +226,7 @@ const AdminPage: React.FC = () => {
                      activeTab === 'reports' ? 'Báo cáo Kinh doanh' : 
                      activeTab === 'home' ? 'Thiết lập Trang chủ' :
                      activeTab === 'products_ui' ? 'Thiết lập Giao diện SP' :
+                     activeTab === 'live_chat_ui' ? 'Cấu hình Live Chat' :
                      activeTab === 'header' ? 'Header & Logo' :
                      activeTab === 'about' ? 'Trang Giới thiệu' : 'Cài đặt hệ thống'}
                 </h2>
@@ -233,7 +239,6 @@ const AdminPage: React.FC = () => {
                 <div className="text-left">
                     <div className="flex items-center gap-3">
                         <p className="text-sm font-black text-[#111827] uppercase leading-none">{currentAdminUser?.fullname}</p>
-                        {/* ĐÈN BÁO TRỰC TIẾP TRÊN THẺ ADMIN */}
                         <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-full border border-slate-100">
                             <span className={`w-2 h-2 rounded-full ${isServerOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)] animate-pulse'}`}></span>
                             <span className={`text-[8px] font-black uppercase tracking-tighter ${isServerOnline ? 'text-emerald-600' : 'text-rose-600'}`}>
