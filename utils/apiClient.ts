@@ -55,13 +55,13 @@ export const fetchChatMessages = (sessionId: string) => fetchData(`chat/messages
 export const sendChatMessage = (message: any) => syncData('chat/messages', message);
 export const fetchChatSessions = () => fetchData('chat/sessions');
 export const markChatAsRead = (sessionId: string) => syncData(`chat/read/${sessionId}`, {});
+export const deleteChatMessages = (sessionId: string) => syncData(`chat/messages/${sessionId}`, {}, 'DELETE');
 
 // --- OTHER APIS (Giữ nguyên) ---
 export const fetchSettingFromDB = (key: string) => fetchData(`settings/${key}`);
 export const syncSettingToDB = (key: string, value: any) => syncData(`settings/${key}`, value);
 export const fetchProductsFromDB = () => fetchData('products');
 export const syncProductToDB = (product: any) => syncData('products', product);
-/* // Fix: Add updateProductStockInDB export to resolve import error in productStorage.ts */
 export const updateProductStockInDB = (id: number, quantityChange: number, size?: string, color?: string) => syncData(`products/${id}/stock`, { quantityChange, size, color }, 'PUT');
 export const deleteProductFromDB = (id: number) => syncData(`products/${id}`, {}, 'DELETE');
 export const fetchCategoriesFromDB = () => fetchData('categories');

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, ChatSession } from '../../types';
-import { fetchChatSessions, fetchChatMessages, sendChatMessage, markChatAsRead } from '../../utils/apiClient';
-import { UserIcon, RefreshIcon, CheckIcon, ImagePlus, XIcon } from '../Icons';
+import { fetchChatSessions, fetchChatMessages, sendChatMessage, markChatAsRead, deleteChatMessages } from '../../utils/apiClient';
+import { UserIcon, RefreshIcon, CheckIcon, ImagePlus, XIcon, Trash2Icon } from '../Icons';
 
 const LiveChatTab: React.FC = () => {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -75,6 +75,20 @@ const LiveChatTab: React.FC = () => {
                 isRead: m.is_read
             }));
             setMessages(formatted);
+        }
+    };
+
+    const handleDeleteConversation = async () => {
+        if (!activeSession) return;
+        if (!confirm(`Bạn có chắc muốn xóa vĩnh viễn cuộc hội thoại với "${activeSession.customerName}"?`)) return;
+
+        try {
+            await deleteChatMessages(activeSession.sessionId);
+            setActiveSession(null);
+            setMessages([]);
+            loadSessions();
+        } catch (e) {
+            alert("Lỗi khi xóa hội thoại.");
         }
     };
 
@@ -181,6 +195,13 @@ const LiveChatTab: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex gap-2">
+                                <button 
+                                    onClick={handleDeleteConversation} 
+                                    title="Xóa hội thoại"
+                                    className="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                >
+                                    <Trash2Icon className="w-5 h-5" />
+                                </button>
                                 {activeSession.customerId && (
                                     <span className="bg-emerald-50 text-emerald-600 text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-widest border border-emerald-100">Thành viên</span>
                                 )}
@@ -243,7 +264,7 @@ const LiveChatTab: React.FC = () => {
                             >
                                 <ImagePlus className="w-6 h-6" />
                             </button>
-                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                            <input type="file" min="0" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                             
                             <input 
                                 type="text" 

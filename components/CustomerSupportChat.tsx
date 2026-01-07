@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SupportMessage, Customer } from '../types';
-import { sendChatMessage, fetchChatMessages, markChatAsRead } from '../utils/apiClient';
+import { sendChatMessage, fetchChatMessages, markChatAsRead, deleteChatMessages } from '../utils/apiClient';
 import { getCurrentCustomer } from '../utils/customerStorage';
-import { MessageSquareIcon, XIcon, ImagePlus } from './Icons';
+import { MessageSquareIcon, XIcon, ImagePlus, RefreshIcon } from './Icons';
 
 const CustomerSupportChat: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -15,6 +15,7 @@ const CustomerSupportChat: React.FC = () => {
     const [shouldShake, setShouldShake] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
+    const [isClearing, setIsClearing] = useState(false);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -48,19 +49,19 @@ const CustomerSupportChat: React.FC = () => {
     useEffect(() => {
         setUser(getCurrentCustomer());
         let interval: any;
-        if (isOpen) {
+        if (isOpen && !isClearing) {
             loadMessages(sessionId);
             markChatAsRead(sessionId);
             setHasUnreadChat(false);
             interval = setInterval(() => loadMessages(sessionId), 4000);
-        } else {
+        } else if (!isClearing) {
             interval = setInterval(() => loadMessages(sessionId), 10000);
         }
         return () => clearInterval(interval);
-    }, [isOpen, sessionId]);
+    }, [isOpen, sessionId, isClearing]);
 
     const loadMessages = async (sid: string) => {
-        if (!sid) return;
+        if (!sid || isClearing) return;
         try {
             const data = await fetchChatMessages(sid);
             if (data && Array.isArray(data)) {
@@ -83,6 +84,26 @@ const CustomerSupportChat: React.FC = () => {
                 setMessages(formatted);
             }
         } catch (e) {}
+    };
+
+    const handleClearChat = async () => {
+        if (!confirm("Bạn có muốn làm mới hội thoại và xóa hết lịch sử chat không?")) return;
+        
+        setIsClearing(true);
+        try {
+            await deleteChatMessages(sessionId);
+            // Cấp Session ID mới
+            const newSid = `CHAT-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            localStorage.setItem('sigma_vie_support_sid', newSid);
+            setSessionId(newSid);
+            setMessages([]);
+            setInputValue('');
+            setPreviewImage(null);
+        } catch (e) {
+            alert("Lỗi khi xóa hội thoại.");
+        } finally {
+            setIsClearing(false);
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,35 +182,53 @@ const CustomerSupportChat: React.FC = () => {
                                 <p className="text-[8px] text-emerald-400 font-bold uppercase animate-pulse">Nhân viên đang online</p>
                             </div>
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="bg-white/10 hover:bg-rose-500/20 p-2 rounded-full transition-all">
-                            <XIcon className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={handleClearChat} 
+                                title="Làm mới hội thoại"
+                                className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
+                            >
+                                <RefreshIcon className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setIsOpen(false)} className="bg-white/10 hover:bg-rose-500/20 p-2 rounded-full transition-all">
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#FAFAFA] custom-scrollbar">
-                        {messages.length === 0 && (
-                            <div className="text-center py-20 opacity-30">
-                                <MessageSquareIcon className="w-10 h-10 mx-auto mb-3" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Quý khách cần tư vấn<br/>về sản phẩm hoặc đơn hàng?</p>
+                        {isClearing ? (
+                            <div className="flex flex-col items-center justify-center h-full gap-3 opacity-40">
+                                <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+                                <p className="text-[10px] font-black uppercase tracking-widest">Đang dọn dẹp hội thoại...</p>
                             </div>
+                        ) : (
+                            <>
+                                {messages.length === 0 && (
+                                    <div className="text-center py-20 opacity-30">
+                                        <MessageSquareIcon className="w-10 h-10 mx-auto mb-3" />
+                                        <p className="text-[10px] font-black uppercase tracking-widest">Quý khách cần tư vấn<br/>về sản phẩm hoặc đơn hàng?</p>
+                                    </div>
+                                )}
+                                {messages.map((msg, idx) => (
+                                    <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] rounded-2xl overflow-hidden shadow-sm flex flex-col ${
+                                            msg.senderRole === 'customer' 
+                                                ? 'bg-[#111827] text-white rounded-br-none' 
+                                                : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
+                                        }`}>
+                                            {msg.imageUrl && (
+                                                <img src={msg.imageUrl} alt="Chat attachment" className="w-full h-auto max-h-60 object-cover" />
+                                            )}
+                                            {msg.text && (
+                                                <p className="px-4 py-2.5 text-[13px] font-bold leading-relaxed">{msg.text}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                <div ref={messagesEndRef} />
+                            </>
                         )}
-                        {messages.map((msg, idx) => (
-                            <div key={msg.id || idx} className={`flex ${msg.senderRole === 'customer' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] rounded-2xl overflow-hidden shadow-sm flex flex-col ${
-                                    msg.senderRole === 'customer' 
-                                        ? 'bg-[#111827] text-white rounded-br-none' 
-                                        : 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
-                                }`}>
-                                    {msg.imageUrl && (
-                                        <img src={msg.imageUrl} alt="Chat attachment" className="w-full h-auto max-h-60 object-cover" />
-                                    )}
-                                    {msg.text && (
-                                        <p className="px-4 py-2.5 text-[13px] font-bold leading-relaxed">{msg.text}</p>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        <div ref={messagesEndRef} />
                     </div>
 
                     {/* Preview Image */}
@@ -213,7 +252,7 @@ const CustomerSupportChat: React.FC = () => {
                         >
                             <ImagePlus className="w-5 h-5" />
                         </button>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                        <input type="file" min="0" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                         
                         <input 
                             type="text" 
@@ -222,7 +261,7 @@ const CustomerSupportChat: React.FC = () => {
                             placeholder="Nhập lời nhắn..." 
                             className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#D4AF37] transition-all"
                         />
-                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending} className="bg-[#111827] text-white p-3.5 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
+                        <button type="submit" disabled={(!inputValue.trim() && !previewImage) || isSending || isClearing} className="bg-[#111827] text-white p-3.5 rounded-xl active:scale-90 transition-all shadow-lg disabled:opacity-20">
                             {isSending ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (

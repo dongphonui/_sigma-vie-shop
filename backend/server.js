@@ -85,6 +85,14 @@ app.post('/api/chat/messages', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/chat/messages/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        await pool.query('DELETE FROM chat_messages WHERE session_id = $1', [sessionId]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/chat/sessions', async (req, res) => {
     try {
         const query = `
