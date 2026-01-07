@@ -10,7 +10,7 @@ import ChatWidget from './components/ChatWidget';
 import CustomerSupportChat from './components/CustomerSupportChat';
 import AuthModal from './components/AuthModal';
 import CartDrawer from './components/CartDrawer';
-import { getCurrentCustomer } from './utils/customerStorage';
+import { getCurrentCustomer, getCustomers, syncWithServer } from './utils/customerStorage';
 import { getCart } from './utils/cartStorage';
 import { forceReloadOrders } from './utils/orderStorage';
 import type { Customer, CartItem } from './types';
@@ -32,8 +32,22 @@ const App: React.FC = () => {
   const [initialProductId, setInitialProductId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Khởi tạo người dùng ban đầu
+    const user = getCurrentCustomer();
+    setCurrentUser(user);
+    
+    // Tải danh sách khách hàng (trigger sync ngầm)
+    getCustomers();
+
+    // THIẾT LẬP ĐỒNG BỘ ĐỊNH KỲ (Background Polling)
+    // Cứ 30 giây kiểm tra xem máy khác có thay đổi Avatar/Thông tin không
+    const syncInterval = setInterval(() => {
+        if (getCurrentCustomer()) {
+            syncWithServer();
+        }
+    }, 30000);
+
     const handleHashChange = () => {
-      const fullUrl = window.location.href;
       const hash = window.location.hash;
       const search = window.location.search;
       const urlParams = new URLSearchParams(search);
@@ -51,13 +65,20 @@ const App: React.FC = () => {
     };
     
     handleHashChange(); 
-    
-    const user = getCurrentCustomer();
-    setCurrentUser(user);
-    if (user) forceReloadOrders().catch(e => console.error(e));
-    
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    // Lắng nghe sự kiện cập nhật khách hàng (từ Profile máy này hoặc Sync từ máy khác)
+    const handleCustomerUpdate = () => {
+        const updatedUser = getCurrentCustomer();
+        setCurrentUser(updatedUser);
+    };
+    window.addEventListener('sigma_vie_customers_update', handleCustomerUpdate);
+
+    return () => {
+        clearInterval(syncInterval);
+        window.removeEventListener('hashchange', handleHashChange);
+        window.removeEventListener('sigma_vie_customers_update', handleCustomerUpdate);
+    };
   }, []);
 
   useEffect(() => {
@@ -131,10 +152,7 @@ const App: React.FC = () => {
           onOpenCart: handleOpenCart
       })}
       
-      {/* Bot AI Sigma Vie */}
       <ChatWidget />
-      
-      {/* NÚT CHAT HỖ TRỢ ADMIN - LUÔN LUÔN Ở CUỐI CÙNG ĐỂ CHÈN LÊN TRÊN */}
       <CustomerSupportChat />
       
       <AuthModal 

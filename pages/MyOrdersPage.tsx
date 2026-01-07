@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { getOrdersByCustomerId, forceReloadOrders } from '../utils/orderStorage';
-import { updateCustomer } from '../utils/customerStorage';
+import { updateCustomer, syncWithServer } from '../utils/customerStorage';
 import type { Customer, Order } from '../types';
 
 interface MyOrdersPageProps {
@@ -59,8 +59,8 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && currentUser) {
-            if (file.size > 2 * 1024 * 1024) {
-                alert("Ảnh quá lớn! Vui lòng chọn ảnh dưới 2MB.");
+            if (file.size > 3 * 1024 * 1024) {
+                alert("Ảnh quá lớn! Vui lòng chọn ảnh dưới 3MB để đảm bảo đồng bộ nhanh.");
                 return;
             }
 
@@ -69,14 +69,19 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
             reader.onloadend = async () => {
                 const base64 = reader.result as string;
                 const updatedUser = { ...currentUser, avatarUrl: base64 };
+                
+                // Thực hiện cập nhật DB và Session
                 const success = await updateCustomer(updatedUser);
+                
                 if (success) {
-                    // Re-render header and page by reloading current user from storage or state
-                    window.location.reload(); 
+                    // Sau khi lưu thành công vào DB, trigger sync lần cuối để chắc chắn
+                    await syncWithServer();
+                    setIsUpdatingAvatar(false);
+                    // Không cần reload trang nữa vì App.tsx đã lắng nghe event update
                 } else {
-                    alert("Lỗi khi cập nhật ảnh đại diện.");
+                    alert("Có lỗi khi lưu ảnh vào hệ thống. Vui lòng kiểm tra kết nối mạng.");
+                    setIsUpdatingAvatar(false);
                 }
-                setIsUpdatingAvatar(false);
             };
             reader.readAsDataURL(file);
         }
@@ -112,7 +117,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                                     </div>
                                 )}
                                 {isUpdatingAvatar && (
-                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
                                         <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                                     </div>
                                 )}
@@ -121,6 +126,7 @@ const MyOrdersPage: React.FC<MyOrdersPageProps> = ({ currentUser, isAdminLinkVis
                                 onClick={() => fileInputRef.current?.click()}
                                 className="absolute bottom-1 right-1 bg-white p-3 rounded-full shadow-lg border border-slate-100 hover:bg-[#D4AF37] hover:text-white transition-all transform active:scale-90"
                                 title="Thay đổi ảnh đại diện"
+                                disabled={isUpdatingAvatar}
                             >
                                 <CameraIcon className="w-5 h-5" />
                             </button>

@@ -52,18 +52,66 @@ const initDb = async () => {
         `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, image_url TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE);`
     ];
     for (let q of queries) await client.query(q);
-    
-    // Đảm bảo cột image_url tồn tại trong bảng cũ
-    try {
-        await client.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS image_url TEXT;`);
-    } catch (e) {}
-
     console.log("✅ Database Schema Ready");
   } catch (err) { console.error('❌ Schema Initialization Error:', err.stack); }
   finally { if (client) client.release(); }
 };
 
 initDb();
+
+// --- CUSTOMERS API ---
+app.get('/api/customers', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM customers ORDER BY created_at DESC');
+        res.json(result.rows.map(row => row.data));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/customers', async (req, res) => {
+    const c = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO customers (id, name, phone, email, data, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET name=$2, phone=$3, email=$4, data=$5`,
+            [c.id, c.fullName, c.phoneNumber || null, c.email || null, c, c.createdAt]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/customers/:id', async (req, res) => {
+    const { id } = req.params;
+    const c = req.body;
+    try {
+        await pool.query(
+            `UPDATE customers SET name=$1, phone=$2, email=$3, data=$4 WHERE id=$5`,
+            [c.fullName, c.phoneNumber || null, c.email || null, c, id]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/customers/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM customers WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/customers/login', async (req, res) => {
+    const { identifier, passwordHash } = req.body;
+    try {
+        const result = await pool.query(
+            "SELECT data FROM customers WHERE (phone = $1 OR email = $1) AND data->>'passwordHash' = $2",
+            [identifier, passwordHash]
+        );
+        if (result.rows.length > 0) {
+            res.json({ success: true, customer: result.rows[0].data });
+        } else {
+            res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
+        }
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // --- CHAT API ---
 app.get('/api/chat/messages/:sessionId', async (req, res) => {
