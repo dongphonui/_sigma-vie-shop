@@ -12,14 +12,9 @@ const ProductTab: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [isManagingCategories, setIsManagingCategories] = useState(false);
-  const [selectedQrProduct, setSelectedQrProduct] = useState<Product | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
-
-  // Form State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
@@ -28,210 +23,63 @@ const ProductTab: React.FC = () => {
   const [newProductStatus, setNewProductStatus] = useState<'active' | 'draft' | 'archived'>('active');
   const [newProductDescription, setNewProductDescription] = useState('');
   const [newProductImage, setNewProductImage] = useState<string | null>(null);
-  const [productFeedback, setProductFeedback] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
-  const [newProductSizes, setNewProductSizes] = useState('');
-  const [newProductColors, setNewProductColors] = useState('');
-
-  // Flash Sale State
-  const [newProductIsFlashSale, setNewProductIsFlashSale] = useState(false);
-  const [newProductSalePrice, setNewProductSalePrice] = useState('');
-  const [newProductFlashSaleStartTime, setNewProductFlashSaleStartTime] = useState('');
-  const [newProductFlashSaleEndTime, setNewProductFlashSaleEndTime] = useState('');
-
-  const [newCatName, setNewCatName] = useState('');
+  const [feedback, setFeedback] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
   useEffect(() => {
     refreshData();
-    const handleUpdate = () => refreshData();
-    window.addEventListener('sigma_vie_products_update', handleUpdate);
-    window.addEventListener('sigma_vie_categories_update', handleUpdate);
-    return () => {
-        window.removeEventListener('sigma_vie_products_update', handleUpdate);
-        window.removeEventListener('sigma_vie_categories_update', handleUpdate);
-    };
   }, []);
 
-  useEffect(() => {
-    if (categories.length > 0 && !newProductCategory) {
-        setNewProductCategory(categories[0].name);
-    }
-  }, [categories]);
-
-  const showFeedback = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
-      setProductFeedback({ msg, type });
-      setTimeout(() => setProductFeedback(null), 5000);
-  };
-
   const refreshData = () => {
-      const p = getProducts();
-      const c = getCategories();
-      setProducts(p);
-      setCategories(c);
+      setProducts(getProducts());
+      setCategories(getCategories());
   };
 
-  const handlePrintLabel = () => {
-    if (!selectedQrProduct) return;
-    const svgElement = document.querySelector('.qr-container svg') as SVGGraphicsElement;
-    if (!svgElement) return;
-
-    const svgData = new XMLSerializer().serializeToString(svgElement);
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    img.onload = () => {
-        canvas.width = 300;
-        canvas.height = 300;
-        ctx?.clearRect(0, 0, 300, 300);
-        ctx?.drawImage(img, 0, 0, 300, 300);
-        const qrImageDataUrl = canvas.toDataURL('image/png');
-
-        const printWindow = window.open('', '_blank', 'width=450,height=300');
-        if (printWindow) {
-            const finalPrice = selectedQrProduct.isFlashSale && selectedQrProduct.salePrice 
-                ? selectedQrProduct.salePrice 
-                : selectedQrProduct.price;
-
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>In Tem - ${selectedQrProduct.sku}</title>
-                    <style>
-                        @page { margin: 0 !important; size: 50mm 30mm; }
-                        * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
-                        html, body { margin: 0 !important; padding: 0 !important; width: 50mm; height: 30mm; overflow: hidden; background: white; font-family: Arial, sans-serif; }
-                        .label-container { width: 50mm; height: 30mm; display: flex; flex-direction: row; align-items: center; padding: 2mm; overflow: hidden; }
-                        .qr-side { width: 18mm; height: 100%; display: flex; align-items: center; justify-content: center; }
-                        .qr-side img { width: 17mm; height: 17mm; display: block; }
-                        .info-side { flex: 1; padding-left: 2mm; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-                        .brand { font-size: 6pt; font-weight: bold; color: #444; margin-bottom: 0.5mm; letter-spacing: 0.3mm; }
-                        .name { font-size: 7.5pt; font-weight: 900; line-height: 1.1; margin-bottom: 1mm; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-transform: uppercase; color: black; }
-                        .price { font-size: 10pt; font-weight: 900; color: black; }
-                        .sku { font-size: 5pt; color: #666; font-family: monospace; margin-top: 0.5mm; }
-                    </style>
-                </head>
-                <body onload="setTimeout(function(){ window.print(); window.close(); }, 300);">
-                    <div class="label-container">
-                        <div class="qr-side"><img src="${qrImageDataUrl}" /></div>
-                        <div class="info-side">
-                            <div class="brand">SIGMA VIE</div>
-                            <div class="name">${selectedQrProduct.name}</div>
-                            <div class="price">${finalPrice}</div>
-                            <div class="sku">#${selectedQrProduct.sku}</div>
-                        </div>
-                    </div>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-            URL.revokeObjectURL(url);
-        }
-    };
-    img.src = url;
-  };
-
-  const toLocalISOString = (date: Date) => {
-      const tzOffset = date.getTimezoneOffset() * 60000;
-      return (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
-  };
-
-  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-          showFeedback('⚠️ Ảnh quá lớn (Tối đa 5MB).', 'error');
-          return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProductImage(reader.result as string);
-        showFeedback('✅ Đã nhận diện hình ảnh', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const resetProductForm = () => {
-      setEditingProduct(null);
-      setNewProductName('');
-      setNewProductPrice('');
-      setNewProductSku('');
-      setNewProductDescription('');
-      setNewProductImage(null);
-      setNewProductSizes('');
-      setNewProductColors('');
-      setNewProductStatus('active');
-      setNewProductIsFlashSale(false);
-      setNewProductSalePrice('');
-      setNewProductFlashSaleStartTime('');
-      setNewProductFlashSaleEndTime('');
-      if (categories.length > 0) setNewProductCategory(categories[0].name);
-  };
-
-  const handleEditProduct = (product: Product) => {
-      setEditingProduct(product);
-      setNewProductName(product.name);
-      setNewProductPrice(product.price.replace(/[^\d]/g, ''));
-      setNewProductSku(product.sku);
-      setNewProductCategory(product.category);
-      setNewProductStatus(product.status);
-      setNewProductDescription(product.description);
-      setNewProductImage(product.imageUrl);
-      setNewProductSizes(product.sizes?.join(', ') || '');
-      setNewProductColors(product.colors?.join(', ') || '');
-      
-      setNewProductIsFlashSale(product.isFlashSale || false);
-      setNewProductSalePrice(product.salePrice ? product.salePrice.replace(/[^\d]/g, '') : '');
-      setNewProductFlashSaleStartTime(product.flashSaleStartTime ? toLocalISOString(new Date(product.flashSaleStartTime)) : '');
-      setNewProductFlashSaleEndTime(product.flashSaleEndTime ? toLocalISOString(new Date(product.flashSaleEndTime)) : '');
-      
+  // Fixed: Added handleEditProduct method
+  const handleEditProduct = (p: Product) => {
+      setEditingProduct(p);
+      setNewProductName(p.name);
+      setNewProductPrice(p.price.replace(/[^0-9]/g, ''));
+      setNewProductSku(p.sku);
+      setNewProductCategory(p.category);
+      setNewProductStatus(p.status);
+      setNewProductDescription(p.description);
+      setNewProductImage(p.imageUrl);
       setIsAddingProduct(true);
   };
 
-  const handleDeleteProduct = async (productId: number, productName: string) => {
-    if (window.confirm(`Bạn muốn xóa "${productName}"?`)) {
-      const res = await deleteProduct(productId);
-      if (res.success) {
-        showFeedback(`Đã xóa sản phẩm ${productName}`, 'success');
+  // Fixed: Added handleDeleteProduct method
+  const handleDeleteProduct = async (id: number, name: string) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${name}" không?`)) {
+        await deleteProduct(id);
         refreshData();
-      } else {
-        showFeedback(`❌ Lỗi: ${res.message}`, 'error');
-      }
+        setFeedback({ msg: `Đã xóa sản phẩm "${name}".`, type: 'success' });
+        setTimeout(() => setFeedback(null), 3000);
     }
   };
 
   const handleGenerateDescriptionAI = async () => {
       if (!newProductName) {
-          showFeedback('⚠️ Hãy nhập Tên sản phẩm trước.', 'info');
+          alert('Vui lòng nhập tên sản phẩm để AI lấy cảm hứng.');
           return;
       }
 
       setIsGeneratingAI(true);
       try {
-          /* // Fix: Initialization according to @google/genai guidelines - use process.env.API_KEY directly and assume its availability. */
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const response = await ai.models.generateContent({
               model: 'gemini-3-flash-preview',
               contents: [{
                   parts: [{
-                      text: `Bạn là chuyên gia viết quảng cáo thời trang Luxury cho Sigma Vie. Hãy viết 1 đoạn mô tả cực kỳ sang trọng cho sản phẩm: "${newProductName}". 
-                      Yêu cầu:
-                      - Văn phong thanh lịch, đẳng cấp, gợi cảm hứng sống.
-                      - Độ dài: 3-4 câu xúc tích.
-                      - Tránh dùng từ quá bình dân. Ví dụ: "giúp tôn vinh trọn vẹn nét thanh lịch và phong thái tự tin".
-                      - Không dùng icon, không gạch đầu dòng.`
+                      text: `Bạn là chuyên gia thời trang cao cấp. Hãy viết mô tả sản phẩm sang trọng cho: "${newProductName}". Văn phong thanh lịch, giới hạn 3 câu.`
                   }]
               }]
           });
-          /* // Fix: Extract text output using property access as per guidelines. */
+          
           if (response.text) {
               setNewProductDescription(response.text.trim());
-              showFeedback('✨ AI đã viết xong!', 'success');
           }
-      } catch (error: any) {
-          showFeedback(`❌ Lỗi AI.`, 'error');
+      } catch (error) {
+          console.error("AI Error:", error);
       } finally {
           setIsGeneratingAI(false);
       }
@@ -239,219 +87,96 @@ const ProductTab: React.FC = () => {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName || !newProductPrice || !newProductImage) {
-      showFeedback('⚠️ Vui lòng điền đủ Tên, Giá và Ảnh.', 'error');
-      return;
-    }
+    if (!newProductName || !newProductPrice || !newProductImage) return;
+    
     setIsSaving(true);
-    const formattedPrice = newProductPrice.includes('₫') 
-        ? newProductPrice 
-        : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductPrice))}₫`;
-    const formattedSalePrice = newProductSalePrice 
-        ? (newProductSalePrice.includes('₫') ? newProductSalePrice : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductSalePrice))}₫`)
-        : undefined;
-
     const productData = {
       name: newProductName,
-      price: formattedPrice,
+      price: newProductPrice.includes('₫') ? newProductPrice : `${new Intl.NumberFormat('vi-VN').format(parseInt(newProductPrice))}₫`,
       importPrice: '0₫',
-      description: newProductDescription || 'Thời trang cao cấp Sigma Vie.',
+      description: newProductDescription,
       imageUrl: newProductImage,
       sku: newProductSku || `SIG-${Date.now().toString().slice(-6)}`,
       brand: 'Sigma Vie',
-      category: newProductCategory || (categories.length > 0 ? categories[0].name : 'Chung'),
+      category: newProductCategory || 'Bộ sưu tập',
       status: newProductStatus,
-      sizes: newProductSizes.split(',').map(s => s.trim()).filter(s => s),
-      colors: newProductColors.split(',').map(s => s.trim()).filter(s => s),
-      isFlashSale: newProductIsFlashSale,
-      salePrice: formattedSalePrice,
-      flashSaleStartTime: newProductFlashSaleStartTime ? new Date(newProductFlashSaleStartTime).getTime() : undefined,
-      flashSaleEndTime: newProductFlashSaleEndTime ? new Date(newProductFlashSaleEndTime).getTime() : undefined,
+      stock: editingProduct ? editingProduct.stock : 0
     };
 
-    try {
-        if (editingProduct) {
-            updateProduct({ ...editingProduct, ...productData, stock: editingProduct.stock });
-            showFeedback('✅ Cập nhật thành công', 'success');
-        } else {
-            addProduct({ ...productData, stock: 0 });
-            showFeedback('✅ Đã lưu sản phẩm mới', 'success');
-        }
-        setTimeout(() => {
-            setIsAddingProduct(false);
-            resetProductForm();
-            refreshData();
-            setIsSaving(false);
-        }, 800);
-    } catch (err) {
-        showFeedback('❌ Lỗi hệ thống.', 'error');
-        setIsSaving(false);
+    if (editingProduct) {
+        await updateProduct({ ...editingProduct, ...productData });
+    } else {
+        await addProduct(productData);
     }
+    
+    setIsSaving(false);
+    setIsAddingProduct(false);
+    setEditingProduct(null);
+    refreshData();
+    setFeedback({ msg: '✅ Đã cập nhật kho hàng.', type: 'success' });
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up relative min-h-screen">
-        <div className="fixed top-20 right-5 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-sm items-end">
-            {productFeedback && (
-                <div className={`pointer-events-auto px-5 py-4 rounded-xl shadow-2xl border-l-8 flex items-center gap-3 transition-all transform animate-slide-in-right
-                    ${productFeedback.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 
-                    productFeedback.type === 'error' ? 'bg-rose-50 border-rose-500 text-rose-800' : 'bg-blue-50 border-blue-500 text-blue-800'}`}>
-                    <div className="flex-1 font-bold text-xs tracking-tight">{productFeedback.msg}</div>
-                    <button onClick={() => setProductFeedback(null)} className="p-1 hover:bg-black/5 rounded-full"><XIcon className="w-3 h-3 opacity-50" /></button>
-                </div>
-            )}
+    <div className="space-y-6">
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
+            <h2 className="text-xl font-black text-slate-800 uppercase">Quản lý kho Sigma</h2>
+            <button onClick={() => { setEditingProduct(null); setIsAddingProduct(true); }} className="bg-[#D4AF37] text-white px-6 py-2 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#b89b31]">
+                + Thêm sản phẩm
+            </button>
         </div>
 
-        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-            <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">Quản lý kho Sigma</h2>
-            <div className="flex gap-2">
-                <button onClick={() => setIsManagingCategories(!isManagingCategories)} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors">
-                    {isManagingCategories ? 'Quay lại' : 'Loại hàng'}
-                </button>
-                <button onClick={() => { resetProductForm(); setIsAddingProduct(true); }} className="px-5 py-2 bg-[#D4AF37] text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-[#b89b31] shadow-lg transition-all">
-                    + Thêm mới
-                </button>
+        {feedback && (
+            <div className={`p-4 rounded-lg text-center font-bold ${feedback.type === 'success' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                {feedback.msg}
             </div>
-        </div>
+        )}
 
-        {isManagingCategories ? (
-            <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100 animate-fade-in-up">
-                <h3 className="font-bold mb-4 text-slate-700 uppercase text-xs tracking-widest">Danh mục</h3>
-                <form onSubmit={(e) => { e.preventDefault(); if (newCatName) { addCategory({ name: newCatName }); setNewCatName(''); showFeedback('Đã thêm danh mục', 'success'); refreshData(); } }} className="flex gap-2 mb-6">
-                    <input type="text" placeholder="Tên danh mục..." value={newCatName} onChange={e => setNewCatName(e.target.value)} className="border-2 border-slate-100 rounded-xl px-4 py-2 flex-1 outline-none focus:border-[#D4AF37]" required />
-                    <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded-xl font-bold">Thêm</button>
-                </form>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {categories.map(cat => (
-                        <div key={cat.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
-                            <span className="font-medium text-slate-700">{cat.name}</span>
-                            <button onClick={() => deleteCategory(cat.id)} className="text-slate-300 hover:text-red-500 transition-all"><Trash2Icon className="w-4 h-4"/></button>
+        {isAddingProduct ? (
+            <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in-up border border-slate-100">
+                <form onSubmit={handleProductSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tên sản phẩm *</label>
+                            <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-2 font-bold outline-none transition-all" required />
                         </div>
-                    ))}
-                </div>
-            </div>
-        ) : isAddingProduct ? (
-            <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 animate-fade-in-up max-w-5xl mx-auto">
-                <form onSubmit={handleProductSubmit} className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tên sản phẩm *</label>
-                                <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 text-lg font-bold outline-none transition-all" placeholder="Ví dụ: Áo Sơ Mi Lụa Satin" required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Giá bán (VNĐ) *</label>
-                                    <input type="number" value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none font-black text-teal-700" placeholder="1250000" required />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Danh mục</label>
-                                    <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none cursor-pointer font-bold text-slate-700">
-                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Kích thước</label>
-                                    <input type="text" value={newProductSizes} onChange={e => setNewProductSizes(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none" placeholder="S, M, L, XL" />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Màu sắc</label>
-                                    <input type="text" value={newProductColors} onChange={e => setNewProductColors(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-3 outline-none" placeholder="Đen, Trắng, Be" />
-                                </div>
-                            </div>
-
-                            <div className="p-5 bg-rose-50 rounded-2xl border-2 border-rose-100 space-y-4">
-                                <label className="flex items-center gap-2 cursor-pointer group">
-                                    <div className={`w-10 h-6 rounded-full transition-all relative ${newProductIsFlashSale ? 'bg-red-500' : 'bg-slate-300'}`}>
-                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${newProductIsFlashSale ? 'left-5' : 'left-1'}`}></div>
-                                    </div>
-                                    <input type="checkbox" className="hidden" checked={newProductIsFlashSale} onChange={e => setNewProductIsFlashSale(e.target.checked)} />
-                                    <span className="text-[10px] font-black text-red-700 uppercase tracking-widest flex items-center gap-1">⚡ Kích hoạt Flash Sale</span>
-                                </label>
-
-                                {newProductIsFlashSale && (
-                                    <div className="grid grid-cols-1 gap-4 animate-fade-in-up">
-                                        <input type="number" value={newProductSalePrice} onChange={e => setNewProductSalePrice(e.target.value)} className="w-full bg-white border border-rose-200 rounded-lg px-3 py-2 text-sm font-bold text-red-600 outline-none" placeholder="Giá khuyến mãi..." />
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <input type="datetime-local" value={newProductFlashSaleStartTime} onChange={e => setNewProductFlashSaleStartTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px]" />
-                                            <input type="datetime-local" value={newProductFlashSaleEndTime} onChange={e => setNewProductFlashSaleEndTime(e.target.value)} className="w-full bg-white border border-rose-100 rounded-lg px-2 py-2 text-[11px]" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Hình ảnh sản phẩm *</label>
-                                <div className="flex items-center gap-6 p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                                    <label className="w-24 h-24 bg-white border-2 border-slate-100 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#D4AF37] transition-all">
-                                        <ImagePlus className="w-8 h-8 text-slate-300" />
-                                        <span className="text-[10px] mt-1 font-bold">Tải ảnh</span>
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleProductImageUpload} />
-                                    </label>
-                                    {newProductImage && (
-                                        <div className="relative">
-                                            <img src={newProductImage} className="w-24 h-24 object-cover rounded-xl shadow-md border-2 border-white" />
-                                            <button type="button" onClick={() => setNewProductImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg"><XIcon className="w-3 h-3"/></button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col h-full">
-                            <div className="flex justify-between items-center mb-3">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả thiết kế cao cấp</label>
-                                <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className={`text-[10px] px-4 py-2 rounded-full font-black flex items-center gap-2 transition-all shadow-md ${isGeneratingAI ? 'bg-slate-200 text-slate-400' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
-                                    {isGeneratingAI ? <RefreshIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
-                                    AI VIẾT MÔ TẢ
-                                </button>
-                            </div>
-                            <textarea rows={15} value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} className="w-full flex-1 bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl p-5 text-sm leading-relaxed outline-none transition-all resize-none shadow-inner" placeholder="Mô tả sẽ hiển thị ở đầu trang chi tiết sản phẩm..." required />
+                        <div>
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Giá bán (VNĐ) *</label>
+                            <input type="number" value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-xl px-4 py-2 font-bold outline-none" required />
                         </div>
                     </div>
-                    <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
-                        <button type="button" onClick={() => { setIsAddingProduct(false); resetProductForm(); }} className="px-8 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-slate-800 transition-colors">Bỏ qua</button>
-                        <button type="submit" disabled={isSaving} className="px-12 py-3 bg-[#00695C] text-white rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-teal-900/20 hover:bg-[#004d40] transition-all">
-                            {isSaving ? 'ĐANG LƯU...' : 'XÁC NHẬN LƯU'}
+                    
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả sản phẩm</label>
+                            <button type="button" onClick={handleGenerateDescriptionAI} disabled={isGeneratingAI} className="text-[10px] bg-purple-600 text-white px-3 py-1 rounded-full font-bold flex items-center gap-1">
+                                {isGeneratingAI ? 'Đang viết...' : <><SparklesIcon className="w-3 h-3"/> AI VIẾT MÔ TẢ</>}
+                            </button>
+                        </div>
+                        <textarea value={newProductDescription} onChange={e => setNewProductDescription(e.target.value)} rows={4} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] rounded-xl p-4 text-sm font-medium outline-none" />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t">
+                        <button type="button" onClick={() => setIsAddingProduct(false)} className="px-6 py-2 text-slate-400 font-bold uppercase text-xs">Hủy</button>
+                        <button type="submit" disabled={isSaving} className="bg-[#00695C] text-white px-10 py-3 rounded-full font-black text-xs uppercase tracking-widest shadow-lg">
+                            {isSaving ? 'ĐANG LƯU...' : 'LƯU SẢN PHẨM'}
                         </button>
                     </div>
                 </form>
             </div>
         ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.length === 0 && <div className="col-span-full py-20 text-center text-slate-400 bg-white rounded-xl border border-dashed font-bold">Trống.</div>}
-                {products.map(product => (
-                    <div key={product.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 group relative hover:shadow-xl transition-all">
-                        <div className="relative h-60 rounded-xl overflow-hidden mb-4 bg-slate-50">
-                            <img src={product.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3">
-                                <button onClick={() => setSelectedQrProduct(product)} className="p-2.5 bg-white rounded-full text-slate-800 hover:scale-110 shadow-lg"><QrCodeIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleEditProduct(product)} className="p-2.5 bg-white rounded-full text-blue-600 hover:scale-110 shadow-lg"><EditIcon className="w-5 h-5" /></button>
-                                <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2.5 bg-white rounded-full text-red-600 hover:scale-110 shadow-lg"><Trash2Icon className="w-4 h-4" /></button>
-                            </div>
-                        </div>
-                        <h3 className="font-bold text-slate-800 truncate leading-tight mb-2">{product.name}</h3>
-                        <div className="flex justify-between items-center">
-                            <span className="text-[#00695C] font-black text-lg">{product.isFlashSale ? product.salePrice : product.price}</span>
-                            <span className="text-[9px] text-slate-400 font-black uppercase">{product.category}</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {products.map(p => (
+                    <div key={p.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-50 group hover:shadow-lg transition-all">
+                        <img src={p.imageUrl} className="w-full h-48 object-cover rounded-xl mb-4" />
+                        <h3 className="font-bold text-slate-800 truncate">{p.name}</h3>
+                        <p className="text-[#00695C] font-black">{p.price}</p>
+                        <div className="mt-4 flex gap-2">
+                            <button onClick={() => handleEditProduct(p)} className="flex-1 bg-slate-50 py-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"><EditIcon className="w-4 h-4 mx-auto"/></button>
+                            <button onClick={() => handleDeleteProduct(p.id, p.name)} className="flex-1 bg-slate-50 py-2 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"><Trash2Icon className="w-4 h-4 mx-auto"/></button>
                         </div>
                     </div>
                 ))}
-            </div>
-        )}
-
-        {selectedQrProduct && (
-            <div className="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedQrProduct(null)}>
-                <div className="bg-white rounded-3xl p-10 max-w-sm w-full text-center relative animate-fade-in-up shadow-2xl" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setSelectedQrProduct(null)} className="absolute top-6 right-6 text-slate-300 hover:text-slate-800"><XIcon className="w-6 h-6"/></button>
-                    <div className="qr-container p-4 bg-white border-4 border-slate-50 rounded-3xl inline-block shadow-inner mb-6">
-                        <QRCodeSVG value={`${window.location.origin}/?product=${selectedQrProduct.id}`} size={220} />
-                    </div>
-                    <p className="text-[10px] text-slate-400 mb-6 font-mono font-bold tracking-widest uppercase">SKU: {selectedQrProduct.sku}</p>
-                    <button onClick={handlePrintLabel} className="w-full bg-[#00695C] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-[#004d40] transition-all flex items-center justify-center gap-2">IN TEM DÁN</button>
-                </div>
             </div>
         )}
     </div>

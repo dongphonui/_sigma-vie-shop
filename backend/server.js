@@ -7,19 +7,19 @@ const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const https = require('https');
 
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Hàm làm sạch Database URL từ Render
 const cleanDbUrl = (url) => {
     if (!url) return null;
-    let cleaned = url.trim();
+    let cleaned = url.trim().replace(/^["']|["']$/g, '');
     if (cleaned.startsWith('base=')) cleaned = cleaned.replace('base=', '');
     if (cleaned.startsWith('DATABASE_URL=')) cleaned = cleaned.replace('DATABASE_URL=', '');
-    cleaned = cleaned.replace(/^"|"$/g, '');
-    cleaned = cleaned.replace(/^'|'$/g, '');
     return cleaned.trim();
 };
 
 const dbUrl = cleanDbUrl(process.env.DATABASE_URL);
-const app = express();
-const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -30,41 +30,32 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
 });
 
+// Cấu hình Email (Gmail App Password)
 const getTransporter = () => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
     return nodemailer.createTransport({
         service: 'gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-        connectionTimeout: 5000
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
     });
 };
 
-// Hàm gửi SMS qua SpeedSMS (Dành cho tài khoản cá nhân hoặc Brandname)
-const sendSMS = (phone, content, senderId) => {
+// Gửi SMS qua SpeedSMS (sender "" cho tài khoản chưa có Brandname)
+const sendSMS = (phone, content) => {
     return new Promise((resolve, reject) => {
         const apiKey = process.env.SPEED_SMS_API_KEY;
-        if (!apiKey) {
-            console.log("⚠️ [CONFIG ERROR] Thiếu SPEED_SMS_API_KEY trên Render");
-            return resolve({ status: 'error', message: "Thiếu API Key" });
-        }
+        if (!apiKey) return resolve({ status: 'error', message: "Missing API Key" });
 
-        // CHUẨN HÓA SỐ ĐIỆN THOẠI: Chuyển 0... thành 84...
         let cleanPhone = phone.replace(/\s/g, '').replace(/[^\d]/g, '');
-        if (cleanPhone.startsWith('0')) {
-            cleanPhone = '84' + cleanPhone.substring(1);
-        }
+        if (cleanPhone.startsWith('0')) cleanPhone = '84' + cleanPhone.substring(1);
 
         const data = JSON.stringify({
             to: [cleanPhone],
             content: content,
-            sms_type: 2, // 2 là tin nhắn CSKH/OTP có tỉ lệ thành công cao nhất
-            sender: senderId || "" // Nếu không có Brandname đã đăng ký, bắt buộc để TRỐNG ""
+            sms_type: 2, 
+            sender: "" // Bắt buộc để trống nếu chưa đăng ký Brandname chính thức
         });
-
-        console.log(`📤 Đang gửi OTP đến ${cleanPhone} | Sender: "${senderId || 'Hệ thống ngẫu nhiên'}"`);
 
         const options = {
             hostname: 'api.speedsms.vn',
@@ -81,115 +72,90 @@ const sendSMS = (phone, content, senderId) => {
             let body = '';
             res.on('data', (d) => body += d);
             res.on('end', () => {
-                try {
-                    const result = JSON.parse(body);
-                    console.log("📩 Kết quả từ SpeedSMS:", result);
-                    resolve(result);
-                } catch (e) {
-                    console.error("❌ Lỗi Parse dữ liệu SpeedSMS:", body);
-                    resolve({ status: 'error', message: "Server phản hồi sai định dạng" });
-                }
+                try { resolve(JSON.parse(body)); } catch (e) { resolve({ status: 'error' }); }
             });
         });
-
-        req.on('error', (e) => {
-            console.error("❌ Lỗi kết nối API SpeedSMS:", e.message);
-            reject(e);
-        });
-        
+        req.on('error', (e) => reject(e));
         req.write(data);
         req.end();
     });
 };
 
+// Tự động khởi tạo cấu trúc bảng dữ liệu
 const initDb = async () => {
   if (!dbUrl) return;
   let client;
   try {
     client = await pool.connect();
     const queries = [
-        `CREATE TABLE IF NOT EXISTS products (id BIGINT PRIMARY KEY, name TEXT, stock INTEGER DEFAULT 0, data JSONB, updated_at BIGINT);`,
-        `CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT, data JSONB);`,
-        `CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT, data JSONB, created_at BIGINT);`,
-        `CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, customer_id TEXT, total_price NUMERIC, status TEXT, timestamp BIGINT, data JSONB);`,
-        `CREATE TABLE IF NOT EXISTS inventory_transactions (id TEXT PRIMARY KEY, product_id BIGINT, type TEXT, quantity INTEGER, timestamp BIGINT, data JSONB);`,
-        `CREATE TABLE IF NOT EXISTS admin_users (id TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, fullname TEXT, role TEXT, permissions JSONB, created_at BIGINT, totp_secret TEXT, is_totp_enabled BOOLEAN DEFAULT FALSE);`,
-        `CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value JSONB);`,
+        `CREATE TABLE IF NOT EXISTS products (id BIGINT PRIMARY KEY, data JSONB, updated_at BIGINT);`,
+        `CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, data JSONB);`,
+        `CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, data JSONB, created_at BIGINT);`,
+        `CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, data JSONB, timestamp BIGINT);`,
+        `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value JSONB);`,
         `CREATE TABLE IF NOT EXISTS admin_logs (id SERIAL PRIMARY KEY, username TEXT, method TEXT, status TEXT, ip_address TEXT, timestamp BIGINT);`,
-        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, customer_id TEXT, customer_name TEXT, sender_role TEXT, text TEXT, image_url TEXT, timestamp BIGINT, is_read BOOLEAN DEFAULT FALSE, reactions JSONB DEFAULT '{}');`
+        `CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, session_id TEXT, data JSONB, timestamp BIGINT);`
     ];
     for (let q of queries) await client.query(q);
-    const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
-    if (checkAdmin.rows.length === 0) {
-        await client.query("INSERT INTO admin_users (id, username, password, fullname, role, permissions, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)", ['admin_master', 'admin', 'admin', 'Quản trị viên Sigma', 'MASTER', '["ALL"]', Date.now()]);
-    }
-  } catch (err) { console.error(err); }
+  } catch (err) { console.error("Database Init Error:", err); }
   finally { if (client) client.release(); }
 };
 initDb();
 
+// API ENDPOINTS
+app.get('/api/health', (req, res) => res.json({ status: 'ok', database: !!dbUrl }));
+
+app.get('/api/products', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
+        res.json(result.rows.map(r => r.data));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/products', async (req, res) => {
+    const p = req.body;
+    try {
+        await pool.query('INSERT INTO products (id, data, updated_at) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = $3', [p.id, p, Date.now()]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/admin/send-otp', async (req, res) => {
-    const { email, phone, otp, senderId } = req.body;
+    const { email, phone, otp } = req.body;
     const results = { email: false, sms: false };
     
-    // Gửi qua SMS
     if (phone && phone.length > 8) {
-        try {
-            const smsRes = await sendSMS(phone, `Ma OTP dang nhap Sigma Vie cua ban la: ${otp}. Hieu luc 5 phut.`, senderId);
-            results.sms = (smsRes.status === 'success');
-        } catch (e) { console.error("SMS Logic Error:", e.message); }
+        const smsRes = await sendSMS(phone, `Ma OTP Sigma Vie cua ban la: ${otp}. Hieu luc 5 phut.`);
+        results.sms = (smsRes.status === 'success');
     }
 
-    // Gửi qua Email (Luôn gửi cả 2 để đảm bảo)
     const transporter = getTransporter();
     if (transporter && email) {
         try {
             await transporter.sendMail({
                 from: `"Sigma Vie" <${process.env.EMAIL_USER}>`,
                 to: email,
-                subject: 'Mã xác thực đăng nhập Sigma Vie',
-                html: `<div style="padding:20px; font-family:sans-serif; background:#f9f9f9;">
-                        <h2 style="color:#D4AF37;">Sigma Vie Admin</h2>
-                        <p>Mã OTP của bạn là: <b style="font-size:24px; color:#111827;">${otp}</b></p>
-                        <p style="font-size:12px; color:#999;">Mã này có hiệu lực trong 5 phút. Vui lòng không chia sẻ cho bất kỳ ai.</p>
-                       </div>`
+                subject: 'Mã xác thực Sigma Vie',
+                html: `<h3>Mã OTP của bạn là: <b style="color:#D4AF37; font-size:24px;">${otp}</b></h3>`
             });
             results.email = true;
-        } catch (e) { console.error("Email Error:", e.message); }
+        } catch (e) { console.error("Email Error:", e); }
     }
-
-    res.json({ 
-        success: true, 
-        delivered: results,
-        message: (results.sms || results.email) ? "Mã đã được gửi." : "Gửi thất bại qua cả 2 kênh."
-    });
+    res.json({ success: true, delivered: results });
 });
 
-app.post('/api/admin/login', async (req, res) => {
-    const { username, password, method } = req.body;
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+app.post('/api/orders', async (req, res) => {
     try {
-        if (method) {
-            await pool.query("INSERT INTO admin_logs (username, method, status, ip_address, timestamp) VALUES ($1, $2, $3, $4, $5)", [username || 'Unknown', method, 'SUCCESS', ip, Date.now()]);
-            return res.json({ success: true });
-        }
-        const result = await pool.query("SELECT * FROM admin_users WHERE username = $1 AND password = $2", [username, password]);
-        if (result.rows.length > 0) {
-            res.json({ success: true, user: result.rows[0] });
-        } else {
-            res.json({ success: false, message: 'Tài khoản hoặc mật khẩu không đúng' });
-        }
-    } catch (err) { res.status(500).json({ error: err.message }); }
+        await pool.query('INSERT INTO orders (id, data, timestamp) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET data = $2', [req.body.id, req.body, req.body.timestamp]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/products', async (req, res) => {
-    const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
-    res.json(result.rows.map(row => row.data));
+app.get('/api/orders', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
+        res.json(result.rows.map(r => r.data));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.post('/api/products', async (req, res) => {
-    const p = req.body;
-    await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, p.stock, p, Date.now()]);
-    res.json({ success: true });
-});
-app.listen(port, () => console.log(`🚀 Sigma Vie Server running on port ${port}`));
+
+app.listen(port, () => console.log(`🚀 Sigma Vie Backend running on port ${port}`));
