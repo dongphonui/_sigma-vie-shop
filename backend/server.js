@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const cors = require('cors');
 require('dotenv').config();
 const bodyParser = require('body-parser');
+const nodemailer = require('nodemailer');
 
 const cleanDbUrl = (url) => {
     if (!url) return null;
@@ -31,6 +32,15 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
+// Cấu hình Mail Transporter (Ưu tiên Gmail)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER, // VD: sigmavie@gmail.com
+        pass: process.env.EMAIL_PASS  // Mã mật khẩu ứng dụng (App Password)
+    }
+});
+
 const initDb = async () => {
   if (!dbUrl) {
       console.error("❌ DATABASE_URL is missing!");
@@ -53,7 +63,6 @@ const initDb = async () => {
     ];
     for (let q of queries) await client.query(q);
     
-    // Đảm bảo có tài khoản Master mặc định
     const checkAdmin = await client.query("SELECT * FROM admin_users WHERE username = 'admin'");
     if (checkAdmin.rows.length === 0) {
         await client.query(
@@ -76,7 +85,6 @@ app.post('/api/admin/login', async (req, res) => {
 
     try {
         if (method) {
-            // Đây là bước ghi log sau khi đã qua bước OTP
             await pool.query(
                 "INSERT INTO admin_logs (username, method, status, ip_address, timestamp) VALUES ($1, $2, $3, $4, $5)",
                 [username || 'Unknown', method, 'SUCCESS', ip, Date.now()]
@@ -96,6 +104,36 @@ app.post('/api/admin/login', async (req, res) => {
             res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// API Gửi Email (Bổ sung mới)
+app.post('/api/admin/email', async (req, res) => {
+    const { to, subject, html } = req.body;
+    
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Server chưa cấu hình EMAIL_USER hoặc EMAIL_PASS trong Environment Variables.' 
+        });
+    }
+
+    try {
+        const mailOptions = {
+            from: `"Sigma Vie Boutique" <${process.env.EMAIL_USER}>`,
+            to,
+            subject,
+            html
+        };
+
+        await transporter.sendMail(mailOptions);
+        res.json({ success: true, message: 'Email đã được gửi đi thành công.' });
+    } catch (err) {
+        console.error("Mail Error:", err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Lỗi từ dịch vụ gửi mail: ' + err.message 
+        });
+    }
 });
 
 app.get('/api/admin/logs', async (req, res) => {

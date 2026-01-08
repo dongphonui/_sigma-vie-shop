@@ -52,6 +52,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
   const [showSubAdminForm, setShowSubAdminForm] = useState(false);
   const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
   const [isBackupLoading, setIsBackupLoading] = useState(false);
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,7 +63,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       { id: 'chat', label: 'Trực Chat Hỗ trợ', group: 'Module Chính' },
       { id: 'inventory', label: 'Quản lý Kho', group: 'Module Chính' },
       { id: 'customers', label: 'Quản lý Khách hàng', group: 'Module Chính' },
-      { id: 'customer_care', label: 'Chăm sóc Khách hàng', group: 'Module Chính' }, // Bổ sung mới
+      { id: 'customer_care', label: 'Chăm sóc Khách hàng', group: 'Module Chính' },
       { id: 'reports', label: 'Xem Báo cáo', group: 'Module Chính' },
       { id: 'settings_ui', label: 'Sửa Giao diện Web', group: 'Cài đặt' },
       { id: 'settings_info', label: 'Sửa Thông tin Shop', group: 'Cài đặt' },
@@ -249,21 +250,40 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
       }
   };
 
-  // Add missing handleTestEmail function to resolve reference error
   const handleTestEmail = async () => {
-      const email = getPrimaryAdminEmail();
-      const result = await sendEmail(
-          email, 
-          'Kiểm tra cấu hình Email Sigma Vie', 
-          '<h1>Xin chào!</h1><p>Nếu bạn nhận được email này, hệ thống gửi mail đang hoạt động tốt.</p>'
-      );
+      if (isTestingEmail) return;
+      setIsTestingEmail(true);
+      setSettingsFeedback('⏳ Đang gửi email kiểm tra...');
       
-      if(result && result.success) {
-          setSettingsFeedback('Thành công: Email kiểm tra đã được gửi.');
-      } else {
-          setSettingsFeedback('Lỗi: Không thể gửi email. Vui lòng kiểm tra Log trên Render.');
+      const email = getPrimaryAdminEmail();
+      try {
+          const result = await sendEmail(
+              email, 
+              'Kiểm tra cấu hình Email Sigma Vie', 
+              `
+              <div style="font-family: sans-serif; border: 1px solid #e5e7eb; padding: 30px; border-radius: 20px; max-width: 500px;">
+                <h1 style="color: #00695C; font-size: 24px;">Xin chào Quản trị viên!</h1>
+                <p style="color: #374151; line-height: 1.6;">Đây là email tự động nhằm kiểm tra hệ thống thông báo của <strong>Sigma Vie Boutique</strong>.</p>
+                <div style="background-color: #f9fafb; padding: 20px; border-radius: 12px; margin-top: 20px;">
+                    <p style="margin: 0; font-size: 14px; color: #6b7280;">Trạng thái: <strong>Hoạt động tốt</strong></p>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6b7280;">Thời gian: <strong>${new Date().toLocaleString('vi-VN')}</strong></p>
+                </div>
+                <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; border-top: 1px solid #f3f4f6; pt: 20px;">Quý khách nhận được email này vì địa chỉ này đã được đăng ký làm quản trị viên chính.</p>
+              </div>
+              `
+          );
+          
+          if(result && result.success) {
+              setSettingsFeedback('✅ Thành công: Email kiểm tra đã được gửi.');
+          } else {
+              setSettingsFeedback(`❌ Lỗi: ${result?.message || 'Không thể kết nối API gửi mail.'}`);
+          }
+      } catch (e) {
+          setSettingsFeedback('❌ Lỗi: Hệ thống backend không phản hồi.');
+      } finally {
+          setIsTestingEmail(false);
+          setTimeout(() => setSettingsFeedback(''), 8000);
       }
-      setTimeout(() => setSettingsFeedback(''), 5000);
   };
 
   const handleAdminSubmit = async (e: React.FormEvent) => {
@@ -610,8 +630,13 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                               <input type="email" value={newAdminEmail} onChange={e => setNewAdminEmail(e.target.value)} placeholder="Email quản trị mới..." className="flex-1 bg-slate-50 border-2 border-slate-50 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:border-[#D4AF37]" required />
                               <button type="submit" className="bg-[#00695C] text-white px-6 py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest">Thêm</button>
                           </form>
-                          <button onClick={handleTestEmail} className="mt-4 text-[10px] font-black text-[#D4AF37] uppercase tracking-widest hover:underline flex items-center gap-2">
-                              📧 Gửi email kiểm tra hệ thống
+                          <button 
+                            type="button"
+                            onClick={handleTestEmail} 
+                            disabled={isTestingEmail}
+                            className={`mt-4 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${isTestingEmail ? 'text-slate-400 cursor-not-allowed' : 'text-[#D4AF37] hover:underline'}`}
+                          >
+                              {isTestingEmail ? <RefreshIcon className="w-3 h-3 animate-spin" /> : '📧'} Gửi email kiểm tra hệ thống
                           </button>
                       </div>
                   </div>
