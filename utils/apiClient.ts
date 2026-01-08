@@ -36,8 +36,23 @@ const syncData = async (endpoint: string, data: any, method: 'POST' | 'PUT' | 'D
             headers: { 'Content-Type': 'application/json' },
             body: method === 'DELETE' ? undefined : JSON.stringify(data)
         });
-        if (!res.ok) return { success: false, message: `Server error ${res.status}` };
-        return await res.json();
+        
+        // Cố gắng đọc JSON từ phản hồi lỗi
+        let result;
+        try {
+            result = await res.json();
+        } catch (e) {
+            result = null;
+        }
+
+        if (!res.ok) {
+            // Trả về message lỗi từ server nếu có, nếu không thì dùng mã status
+            return { 
+                success: false, 
+                message: result?.message || `Server error ${res.status}` 
+            };
+        }
+        return result;
     } catch (e: any) {
         return { success: false, message: e.message, isNetworkError: true };
     }

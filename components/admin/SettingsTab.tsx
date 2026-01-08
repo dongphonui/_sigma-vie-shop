@@ -276,11 +276,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
           if(result && result.success) {
               setSettingsFeedback('✅ Thành công: Email kiểm tra đã được gửi. Hãy check mục Hộp thư đến hoặc Thư rác.');
           } else {
-              // Phản hồi chi tiết nếu server trả về lỗi cấu hình
               const errorMsg = result?.message || 'Không thể kết nối API.';
               setSettingsFeedback(`❌ Lỗi: ${errorMsg}`);
-              if (errorMsg.includes('SMTP') || errorMsg.includes('EMAIL_USER')) {
-                  alert("⚠️ CẤU HÌNH THIẾU:\nBạn chưa thiết lập EMAIL_USER và EMAIL_PASS (Mật khẩu ứng dụng) trên máy chủ (Render/Vercel). Hãy tạo 'App Password' trong tài khoản Google để hệ thống có thể gửi mail.");
+              
+              // Nếu lỗi liên quan đến xác thực (Auth), hiển thị hướng dẫn chi tiết
+              if (errorMsg.includes('Invalid login') || errorMsg.includes('auth') || errorMsg.includes('SMTP')) {
+                  alert("⚠️ LỖI XÁC THỰC EMAIL:\n\nCó vẻ như EMAIL_PASS bạn nhập là mật khẩu Gmail thông thường. Google không cho phép dùng mật khẩu này nữa.\n\nBẠN CẦN:\n1. Bật 2FA (Xác minh 2 lớp) cho tài khoản Gmail.\n2. Vào mục 'Bảo mật' -> 'Mật khẩu ứng dụng' (App Password).\n3. Tạo 1 mã mới (chọn Loại: Thư, Thiết bị: Khác) và copy mã 16 ký tự đó dán vào EMAIL_PASS trên Render.");
               }
           }
       } catch (e) {

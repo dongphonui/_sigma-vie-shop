@@ -32,11 +32,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Hàm tạo transporter động để không làm sập app nếu thiếu config
+// Hàm tạo transporter động để đảm bảo lấy được biến môi trường mới nhất
 const getTransporter = () => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
     return nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // dùng SSL/TLS
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
@@ -114,7 +116,7 @@ app.post('/api/admin/email', async (req, res) => {
     if (!transporter) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Thiếu cấu hình SMTP. Hãy thiết lập EMAIL_USER và EMAIL_PASS (Mật khẩu ứng dụng) trên Render.' 
+            message: 'Thiếu biến môi trường EMAIL_USER hoặc EMAIL_PASS trên server.' 
         });
     }
 
@@ -123,12 +125,13 @@ app.post('/api/admin/email', async (req, res) => {
             from: `"Sigma Vie Boutique" <${process.env.EMAIL_USER}>`,
             to, subject, html
         });
-        res.json({ success: true, message: 'Email đã được gửi.' });
+        res.json({ success: true, message: 'Email đã được gửi thành công.' });
     } catch (err) {
         console.error("Mail Error:", err);
+        // Gửi lỗi chi tiết từ Nodemailer về cho Frontend
         res.status(500).json({ 
             success: false, 
-            message: 'Dịch vụ Email từ chối: ' + err.message 
+            message: 'Máy chủ Mail từ chối: ' + err.message 
         });
     }
 });
