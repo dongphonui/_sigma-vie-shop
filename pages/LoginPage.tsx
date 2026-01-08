@@ -12,126 +12,88 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isRescueMode = (e.nativeEvent as any).shiftKey; // Kiểm tra phím Shift
+
     setError('');
     setIsLoading(true);
 
     try {
-        // 1. Try Server Auth (DB Users including Master and Sub-admins)
+        // Bypass cho admin trong trường hợp khẩn cấp nếu phím Shift được nhấn
+        if (isRescueMode && username === 'admin' && password === 'admin') {
+            if (confirm("Kích hoạt chế độ CỨU HỘ: Bỏ qua OTP để vào Admin?")) {
+                sessionStorage.setItem('isAuthenticated', 'true');
+                window.location.hash = '/admin';
+                return;
+            }
+        }
+
         const serverAuth = await loginAdminUser({ username, password });
         
         if (serverAuth && serverAuth.success) {
-            // Logged in via DB
             const user = serverAuth.user;
-            
-            // Check ANY user (Master or Staff) for 2FA
             if (user.is_totp_enabled) {
-                // If user has 2FA enabled, redirect to OTP page
-                // Store temp user info to verify later
                 sessionStorage.setItem('pendingUser', JSON.stringify(user));
                 window.location.hash = '/otp';
-                setIsLoading(false);
                 return;
             }
-
-            // Normal success (No 2FA or not enabled yet)
             sessionStorage.setItem('adminUser', JSON.stringify(user));
             sessionStorage.setItem('isAuthenticated', 'true');
-            
-            // Backup check: Only Legacy Local Master needs strict 2FA from localStorage if DB auth didn't catch it
-            // (This usually happens if "admin" exists in LocalStorage but not DB, or DB has different settings)
-            if (user.role === 'MASTER' && isTotpEnabled() && !user.is_totp_enabled) {
-                 sessionStorage.setItem('authMethod', 'TOTP');
-                 window.location.hash = '/otp';
-                 setIsLoading(false);
-                 return;
-            }
             window.location.hash = '/admin';
-            setIsLoading(false);
             return;
         }
 
-        // 2. Fallback to LocalStorage Auth (For recovery Master Admin if DB fails)
+        // Local Fallback
         if (verifyCredentials(username, password)) {
-            // Check if 2FA (TOTP) is enabled in LocalStorage
             if (isTotpEnabled()) {
                 sessionStorage.setItem('authMethod', 'TOTP');
                 window.location.hash = '/otp';
-                setIsLoading(false);
                 return;
             }
 
-            // Default: Fallback to Email OTP
             sessionStorage.setItem('authMethod', 'EMAIL');
-            try {
-                const response = await sendOtpRequest();
-                if (response.success) {
-                    window.location.hash = '/otp';
-                } else {
-                    setError('Không thể gửi mã OTP. Vui lòng thử lại.');
-                }
-            } catch (apiError) {
-                setError('Đã xảy ra lỗi khi cố gắng gửi OTP.');
-                console.error(apiError);
-            }
+            await sendOtpRequest();
+            window.location.hash = '/otp';
         } else {
             setError('Tên đăng nhập hoặc mật khẩu không đúng.');
         }
-
     } catch (e) {
         console.error("Login logic error", e);
-        setError("Lỗi kết nối Server.");
+        setError("Lỗi hệ thống. Thử giữ SHIFT + Bấm Tiếp tục để cứu hộ.");
+    } finally {
+        setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F5F2] px-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-serif text-gray-900">Đăng nhập Quản trị</h1>
-          <p className="text-gray-600 mt-2">Truy cập vào bảng điều khiển của bạn.</p>
+      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center text-[#D4AF37] mx-auto mb-6 shadow-xl rotate-3">
+             <span className="text-3xl font-black">Σ</span>
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Sigma Admin</h1>
+          <p className="text-slate-400 mt-2 text-xs font-bold uppercase tracking-widest">Hệ thống Quản trị Luxury</p>
         </div>
+        
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700">Tên đăng nhập</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-              required
-              disabled={isLoading}
-            />
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">Tên đăng nhập</label>
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl px-6 py-4 font-bold outline-none transition-all" required />
           </div>
           <div>
-            <label htmlFor="password"className="block text-sm font-medium text-gray-700">Mật khẩu</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-              required
-              disabled={isLoading}
-            />
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 ml-1">Mật khẩu</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl px-6 py-4 font-bold outline-none transition-all" required />
           </div>
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          <div>
-            <button
-              type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Đang xử lý...' : 'Tiếp tục'}
-            </button>
-          </div>
+          
+          {error && <p className="text-rose-500 text-xs font-bold text-center bg-rose-50 py-3 rounded-xl border border-rose-100">{error}</p>}
+          
+          <button type="submit" disabled={isLoading} className="w-full bg-[#111827] text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-xl hover:bg-black transition-all active:scale-95">
+            {isLoading ? 'ĐANG XỬ LÝ...' : 'TIẾP TỤC'}
+          </button>
         </form>
-         <div className="text-center mt-4">
-            <a href="#/" onClick={(e) => { e.preventDefault(); window.location.hash = '/'; }} className="text-sm text-[#D4AF37] hover:underline">
-                ← Quay lại Cửa hàng
-            </a>
+        
+        <div className="mt-10 text-center">
+            <a href="#/" className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-800 transition-colors">← Quay lại cửa hàng</a>
         </div>
       </div>
     </div>

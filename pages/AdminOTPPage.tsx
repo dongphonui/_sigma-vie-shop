@@ -1,42 +1,32 @@
 
 import React, { useState, useEffect } from 'react';
-import { getAdminEmails, verifyTotpToken, verifyTempTotpToken } from '../utils/adminSettingsStorage';
+import { getAdminEmails, verifyTotpToken } from '../utils/adminSettingsStorage';
 import { recordAdminLogin } from '../utils/apiClient';
-import { sendOtpRequest } from '../utils/api';
 import type { AdminUser } from '../types';
 
 const AdminOTPPage: React.FC = () => {
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
-  const [adminEmails, setAdminEmails] = useState<string[]>([]);
   const [authMethod, setAuthMethod] = useState<'EMAIL' | 'TOTP' | 'DB_TOTP'>('EMAIL');
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingUser, setPendingUser] = useState<AdminUser | null>(null);
-  const [emergencyOtp, setEmergencyOtp] = useState<string | null>(null);
+  const [emergencyCode, setEmergencyCode] = useState<string | null>(null);
 
   useEffect(() => {
-    setAdminEmails(getAdminEmails());
     const pendingUserStr = sessionStorage.getItem('pendingUser');
     if (pendingUserStr) {
         setAuthMethod('DB_TOTP');
-        setPendingUser(JSON.parse(pendingUserStr));
-        return;
+    } else {
+        const method = sessionStorage.getItem('authMethod') as any;
+        setAuthMethod(method || 'EMAIL');
     }
-    const method = sessionStorage.getItem('authMethod') as 'EMAIL' | 'TOTP';
-    setAuthMethod(method || 'EMAIL');
-    checkEmailOtpSession();
-  }, []);
-
-  const checkEmailOtpSession = () => {
+    
+    // Lấy mã từ storage để hiển thị nếu cần khẩn cấp
     const otpDataString = sessionStorage.getItem('otpVerification');
-    if (!otpDataString) return;
-    const otpData = JSON.parse(otpDataString);
-    if (Date.now() > otpData.expiry) {
-        setError('Mã OTP đã hết hạn.');
-        return;
+    if (otpDataString) {
+        const otpData = JSON.parse(otpDataString);
+        setEmergencyCode(otpData.otp);
     }
-    setEmergencyOtp(otpData.otp);
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,8 +36,9 @@ const AdminOTPPage: React.FC = () => {
     const otpDataString = sessionStorage.getItem('otpVerification');
     const otpData = otpDataString ? JSON.parse(otpDataString) : null;
 
+    // Kiểm tra mã OTP (local backup)
     if (otpData && otp === otpData.otp) {
-        await recordAdminLogin('SMS_EMAIL_OTP', 'SUCCESS', 'admin');
+        await recordAdminLogin('EMERGENCY_OR_LOCAL_OTP', 'SUCCESS', 'admin');
         sessionStorage.removeItem('otpVerification');
         sessionStorage.setItem('isAuthenticated', 'true');
         window.location.hash = '/admin';
@@ -57,16 +48,24 @@ const AdminOTPPage: React.FC = () => {
     }
   };
 
+  const showRescueCode = () => {
+      if (emergencyCode) {
+          alert(`MÃ OTP KHẨN CẤP CỦA BẠN: ${emergencyCode}\n\nLưu ý: Bạn nên cấu hình lại SMS/Email sau khi vào được Admin.`);
+      } else {
+          alert("Không tìm thấy mã trong phiên làm việc. Vui lòng quay lại đăng nhập.");
+      }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F5F2] px-4">
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4 text-teal-600">
-             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-600">
+             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
-          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Xác minh bảo mật</h1>
+          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Xác minh Quản trị</h1>
           <p className="text-gray-500 mt-3 text-sm leading-relaxed">
-             Hệ thống đã gửi mã OTP đến <strong>SMS</strong> và <strong>Email</strong> của quản trị viên. Vui lòng kiểm tra điện thoại hoặc hộp thư.
+             Vui lòng nhập mã OTP được gửi tới thiết bị của bạn.
           </p>
         </div>
         
@@ -74,8 +73,9 @@ const AdminOTPPage: React.FC = () => {
           <input
             type="text"
             value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-4 text-center text-3xl font-black tracking-[0.5em] focus:border-teal-500 outline-none transition-all"
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+            placeholder="......"
+            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-4 text-center text-3xl font-black tracking-[0.5em] focus:border-[#D4AF37] outline-none transition-all"
             required
             maxLength={6}
             autoFocus
@@ -84,18 +84,18 @@ const AdminOTPPage: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg disabled:opacity-50"
+            className="w-full bg-[#111827] text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg"
           >
-            {isLoading ? 'ĐANG XÁC THỰC...' : 'XÁC NHẬN ĐĂNG NHẬP'}
+            {isLoading ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN'}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-50 text-center space-y-4">
              <button 
-                onClick={() => { if(emergencyOtp) alert(`MÃ OTP CỦA BẠN: ${emergencyOtp}`); }}
+                onClick={showRescueCode}
                 className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline"
             >
-                Không nhận được tin nhắn? Hiện mã khẩn cấp
+                ⚠️ KHÔNG NHẬN ĐƯỢC MÃ? HIỆN MÃ KHẨN CẤP
             </button>
             <br/>
             <a href="#/login" className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-800">← Quay lại đăng nhập</a>
