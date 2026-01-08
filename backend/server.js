@@ -33,7 +33,6 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Cấu hình Mail dự phòng
 const getTransporter = () => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
     return nodemailer.createTransport({
@@ -43,21 +42,29 @@ const getTransporter = () => {
     });
 };
 
-// Hàm gửi SMS qua SpeedSMS (Dùng cổng 443 - Không bao giờ bị chặn)
-const sendSMS = (phone, content) => {
+// Hàm gửi SMS qua SpeedSMS (Dành cho tài khoản cá nhân hoặc Brandname)
+const sendSMS = (phone, content, senderId) => {
     return new Promise((resolve, reject) => {
-        const apiKey = process.env.SPEED_SMS_API_KEY; // Bạn cần thêm biến này vào Render/Vercel
+        const apiKey = process.env.SPEED_SMS_API_KEY;
         if (!apiKey) {
-            console.log("🔔 [MÔ PHỎNG SMS] Gửi đến " + phone + ": " + content);
-            return resolve({ success: false, message: "Thiếu SMS API Key" });
+            console.log("⚠️ [CONFIG ERROR] Thiếu SPEED_SMS_API_KEY trên Render");
+            return resolve({ status: 'error', message: "Thiếu API Key" });
+        }
+
+        // CHUẨN HÓA SỐ ĐIỆN THOẠI: Chuyển 0... thành 84...
+        let cleanPhone = phone.replace(/\s/g, '').replace(/[^\d]/g, '');
+        if (cleanPhone.startsWith('0')) {
+            cleanPhone = '84' + cleanPhone.substring(1);
         }
 
         const data = JSON.stringify({
-            to: [phone],
+            to: [cleanPhone],
             content: content,
-            sms_type: 2, // 2 là tin nhắn CSKH/OTP
-            sender: "SigmaVie"
+            sms_type: 2, // 2 là tin nhắn CSKH/OTP có tỉ lệ thành công cao nhất
+            sender: senderId || "" // Nếu không có Brandname đã đăng ký, bắt buộc để TRỐNG ""
         });
+
+        console.log(`📤 Đang gửi OTP đến ${cleanPhone} | Sender: "${senderId || 'Hệ thống ngẫu nhiên'}"`);
 
         const options = {
             hostname: 'api.speedsms.vn',
@@ -73,10 +80,23 @@ const sendSMS = (phone, content) => {
         const req = https.request(options, (res) => {
             let body = '';
             res.on('data', (d) => body += d);
-            res.on('end', () => resolve(JSON.parse(body)));
+            res.on('end', () => {
+                try {
+                    const result = JSON.parse(body);
+                    console.log("📩 Kết quả từ SpeedSMS:", result);
+                    resolve(result);
+                } catch (e) {
+                    console.error("❌ Lỗi Parse dữ liệu SpeedSMS:", body);
+                    resolve({ status: 'error', message: "Server phản hồi sai định dạng" });
+                }
+            });
         });
 
-        req.on('error', (e) => reject(e));
+        req.on('error', (e) => {
+            console.error("❌ Lỗi kết nối API SpeedSMS:", e.message);
+            reject(e);
+        });
+        
         req.write(data);
         req.end();
     });
@@ -108,44 +128,43 @@ const initDb = async () => {
 };
 initDb();
 
-// API GỬI OTP ĐA KÊNH (KÈM SMS)
 app.post('/api/admin/send-otp', async (req, res) => {
-    const { email, phone, otp } = req.body;
+    const { email, phone, otp, senderId } = req.body;
     const results = { email: false, sms: false };
     
-    console.log(`🔑 Yêu cầu OTP cho: ${email} | ${phone} | Mã: ${otp}`);
-
-    // 1. Gửi qua SMS (Ưu tiên vì không bị chặn cổng)
-    if (phone) {
+    // Gửi qua SMS
+    if (phone && phone.length > 8) {
         try {
-            const smsRes = await sendSMS(phone, `Ma OTP dang nhap Sigma Vie cua ban la: ${otp}. Hieu luc 5 phut.`);
-            results.sms = smsRes.status === 'success';
-        } catch (e) { console.error("SMS Error:", e.message); }
+            const smsRes = await sendSMS(phone, `Ma OTP dang nhap Sigma Vie cua ban la: ${otp}. Hieu luc 5 phut.`, senderId);
+            results.sms = (smsRes.status === 'success');
+        } catch (e) { console.error("SMS Logic Error:", e.message); }
     }
 
-    // 2. Gửi qua Email (Có thể bị timeout trên Cloud)
+    // Gửi qua Email (Luôn gửi cả 2 để đảm bảo)
     const transporter = getTransporter();
     if (transporter && email) {
         try {
             await transporter.sendMail({
                 from: `"Sigma Vie" <${process.env.EMAIL_USER}>`,
                 to: email,
-                subject: 'Mã xác thực Sigma Vie',
-                html: `<h2 style="color:#D4AF37">Mã OTP: ${otp}</h2><p>Vui lòng không cung cấp mã này cho bất kỳ ai.</p>`
+                subject: 'Mã xác thực đăng nhập Sigma Vie',
+                html: `<div style="padding:20px; font-family:sans-serif; background:#f9f9f9;">
+                        <h2 style="color:#D4AF37;">Sigma Vie Admin</h2>
+                        <p>Mã OTP của bạn là: <b style="font-size:24px; color:#111827;">${otp}</b></p>
+                        <p style="font-size:12px; color:#999;">Mã này có hiệu lực trong 5 phút. Vui lòng không chia sẻ cho bất kỳ ai.</p>
+                       </div>`
             });
             results.email = true;
-        } catch (e) { console.error("Email Timeout/Error:", e.message); }
+        } catch (e) { console.error("Email Error:", e.message); }
     }
 
-    // Trả về thành công nếu ít nhất 1 kênh hoạt động, hoặc báo thành công giả để hiện OTP màn hình
     res.json({ 
         success: true, 
         delivered: results,
-        message: (results.sms || results.email) ? "Mã đã được gửi." : "Gửi thất bại, vui lòng dùng mã trên màn hình."
+        message: (results.sms || results.email) ? "Mã đã được gửi." : "Gửi thất bại qua cả 2 kênh."
     });
 });
 
-// Các API khác giữ nguyên...
 app.post('/api/admin/login', async (req, res) => {
     const { username, password, method } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -158,10 +177,11 @@ app.post('/api/admin/login', async (req, res) => {
         if (result.rows.length > 0) {
             res.json({ success: true, user: result.rows[0] });
         } else {
-            res.json({ success: false, message: 'Sai tài khoản hoặc mật khẩu' });
+            res.json({ success: false, message: 'Tài khoản hoặc mật khẩu không đúng' });
         }
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/products', async (req, res) => {
     const result = await pool.query('SELECT data FROM products ORDER BY updated_at DESC');
@@ -172,4 +192,4 @@ app.post('/api/products', async (req, res) => {
     await pool.query(`INSERT INTO products (id, name, stock, data, updated_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET name=$2, stock=$3, data=$4, updated_at=$5`, [p.id, p.name, p.stock, p, Date.now()]);
     res.json({ success: true });
 });
-app.listen(port, () => console.log(`🚀 Server on ${port}`));
+app.listen(port, () => console.log(`🚀 Sigma Vie Server running on port ${port}`));
