@@ -32,16 +32,17 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Hàm tạo transporter động để đảm bảo lấy được biến môi trường mới nhất
+// Cấu hình linh hoạt cho Cloud (Vercel/Render)
 const getTransporter = () => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
     return nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // dùng SSL/TLS
+        service: 'gmail', // Sử dụng service để nodemailer tự chọn cổng 587 hoặc 465 tùy môi trường
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
+        },
+        tls: {
+            rejectUnauthorized: false // Bỏ qua kiểm tra chứng chỉ nghiêm ngặt để tránh lỗi bắt tay SSL
         }
     });
 };
@@ -116,7 +117,7 @@ app.post('/api/admin/email', async (req, res) => {
     if (!transporter) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Thiếu biến môi trường EMAIL_USER hoặc EMAIL_PASS trên server.' 
+            message: 'Thiếu cấu hình EMAIL_USER hoặc EMAIL_PASS trên server.' 
         });
     }
 
@@ -127,8 +128,7 @@ app.post('/api/admin/email', async (req, res) => {
         });
         res.json({ success: true, message: 'Email đã được gửi thành công.' });
     } catch (err) {
-        console.error("Mail Error:", err);
-        // Gửi lỗi chi tiết từ Nodemailer về cho Frontend
+        console.error("Mail Error Detail:", err);
         res.status(500).json({ 
             success: false, 
             message: 'Máy chủ Mail từ chối: ' + err.message 
