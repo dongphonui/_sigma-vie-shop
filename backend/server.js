@@ -32,18 +32,25 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Cấu hình linh hoạt cho Cloud (Vercel/Render)
+// Cấu hình SMTP "Rugged" - Chống lỗi Timeout trên Cloud
 const getTransporter = () => {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
+    
     return nodemailer.createTransport({
-        service: 'gmail', // Sử dụng service để nodemailer tự chọn cổng 587 hoặc 465 tùy môi trường
+        host: 'smtp.gmail.com',
+        port: 587, // Sử dụng cổng 587 thay vì 465
+        secure: false, // false cho cổng 587 (sẽ tự động nâng cấp lên TLS)
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
         },
         tls: {
-            rejectUnauthorized: false // Bỏ qua kiểm tra chứng chỉ nghiêm ngặt để tránh lỗi bắt tay SSL
-        }
+            rejectUnauthorized: false, // Bỏ qua lỗi chứng chỉ nếu có
+            minVersion: 'TLSv1.2'
+        },
+        connectionTimeout: 15000, // Tăng thời gian chờ kết nối lên 15s
+        greetingTimeout: 15000,   // Tăng thời gian chờ phản hồi chào hỏi lên 15s
+        socketTimeout: 30000      // Thời gian duy trì socket
     });
 };
 
@@ -129,9 +136,14 @@ app.post('/api/admin/email', async (req, res) => {
         res.json({ success: true, message: 'Email đã được gửi thành công.' });
     } catch (err) {
         console.error("Mail Error Detail:", err);
+        // Kiểm tra lỗi cụ thể để báo người dùng
+        let msg = err.message;
+        if (msg.includes('ETIMEDOUT')) msg = "Kết nối đến Google bị quá hạn. Hãy thử lại.";
+        if (msg.includes('EACCES')) msg = "Server hosting đang chặn gửi email.";
+        
         res.status(500).json({ 
             success: false, 
-            message: 'Máy chủ Mail từ chối: ' + err.message 
+            message: 'Máy chủ Mail từ chối: ' + msg 
         });
     }
 });
