@@ -26,6 +26,29 @@ export interface Product {
   variants?: ProductVariant[];
 }
 
+// Fixed: Added Order interface to resolve type errors across multiple components
+export interface Order {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerContact: string;
+  shippingName: string;
+  shippingPhone: string;
+  shippingAddress: string;
+  note: string;
+  customerAddress: string;
+  productId: number;
+  productName: string;
+  productSize?: string;
+  productColor?: string;
+  quantity: number;
+  totalPrice: number;
+  shippingFee: number;
+  status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
+  timestamp: number;
+  paymentMethod: 'COD' | 'BANK_TRANSFER';
+}
+
 // Tin nhắn Chat trực tiếp
 export interface SupportMessage {
   id: string;
@@ -126,32 +149,11 @@ export interface Customer {
   createdAt: number;
 }
 
-export interface Order {
-  id: string;
-  customerId: string;
-  customerName: string;
-  customerContact: string;
-  shippingName: string;
-  shippingPhone: string;
-  shippingAddress: string;
-  note?: string;
-  customerAddress: string; 
-  productId: number;
-  productName: string;
-  productSize?: string;
-  productColor?: string;
-  quantity: number;
-  totalPrice: number; 
-  shippingFee?: number; 
-  status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
-  timestamp: number;
-  paymentMethod?: 'COD' | 'BANK_TRANSFER'; 
-}
-
 export interface AdminUser {
     id: string;
     username: string;
     fullname: string;
+    phoneNumber?: string; // Số điện thoại nhận OTP SMS
     role: 'MASTER' | 'STAFF';
     permissions: string[];
     created_at?: number;

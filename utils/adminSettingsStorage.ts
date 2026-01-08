@@ -3,31 +3,31 @@ import * as OTPAuth from 'otpauth';
 
 interface AdminSettings {
   username: string;
-  passwordHash: string; // Store a simple hash for demonstration
+  passwordHash: string; 
   emails: string[];
-  totpSecret?: string; // Secret key for Google Authenticator
+  phoneNumber?: string; // Lưu số điện thoại admin
+  totpSecret?: string; 
   isTotpEnabled?: boolean;
 }
 
 const STORAGE_KEY = 'sigma_vie_admin_settings';
 const MASTER_EMAIL = 'sigmavieshop@gmail.com';
 
-// Super simple "hashing" for demo purposes.
 const simpleHash = (s: string) => {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
     const char = s.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash; 
   }
   return hash.toString();
 };
-
 
 const getDefaultSettings = (): AdminSettings => ({
   username: 'admin',
   passwordHash: simpleHash('admin'),
   emails: [MASTER_EMAIL],
+  phoneNumber: '',
   isTotpEnabled: false
 });
 
@@ -35,41 +35,31 @@ const getSettings = (): AdminSettings => {
   try {
     const storedSettings = localStorage.getItem(STORAGE_KEY);
     if (storedSettings) {
-      const parsed = JSON.parse(storedSettings);
-      
-      // Migration logic if needed
-      if (parsed.email && !parsed.emails) {
-        const migratedSettings: AdminSettings = {
-          username: parsed.username,
-          passwordHash: parsed.passwordHash,
-          emails: [parsed.email],
-          isTotpEnabled: false
-        };
-        if (!migratedSettings.emails.includes(MASTER_EMAIL)) {
-            migratedSettings.emails.unshift(MASTER_EMAIL);
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedSettings));
-        return migratedSettings;
-      }
-      
-      const settings = parsed as AdminSettings;
-      
-      // Self-healing: Ensure master email exists
-      if (!settings.emails.includes(MASTER_EMAIL)) {
-          settings.emails.unshift(MASTER_EMAIL);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-      }
-      
-      return settings;
+      return { ...getDefaultSettings(), ...JSON.parse(storedSettings) };
     } else {
       const defaultSettings = getDefaultSettings();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSettings));
       return defaultSettings;
     }
   } catch (error) {
-    console.error("Failed to parse admin settings from localStorage", error);
     return getDefaultSettings();
   }
+};
+
+export const updateAdminPhone = (phone: string): void => {
+    const settings = getSettings();
+    settings.phoneNumber = phone;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+};
+
+export const getAdminPhone = (): string => {
+    // Ưu tiên sđt từ session (nếu đăng nhập bằng tài khoản nhân viên mới)
+    const sessionUser = sessionStorage.getItem('adminUser');
+    if (sessionUser) {
+        const u = JSON.parse(sessionUser);
+        if (u.phoneNumber) return u.phoneNumber;
+    }
+    return getSettings().phoneNumber || '';
 };
 
 export const verifyCredentials = (username: string, password: string): boolean => {
@@ -97,23 +87,18 @@ export const addAdminEmail = (email: string): void => {
 
 export const removeAdminEmail = (emailToRemove: string): void => {
   const settings = getSettings();
-  if (emailToRemove === MASTER_EMAIL) {
-      alert("Không thể xóa email quản trị chính (Master Email).");
-      return;
-  }
+  if (emailToRemove === MASTER_EMAIL) return;
   if (settings.emails.length <= 1) return;
   settings.emails = settings.emails.filter(email => email !== emailToRemove);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
 
-// --- TOTP (Google Authenticator) Functions ---
-
+// TOTP Functions...
 export const isTotpEnabled = (): boolean => {
     return !!getSettings().isTotpEnabled;
 };
 
 export const generateTotpSecret = (): string => {
-    // Generate a random base32 string
     const secret = new OTPAuth.Secret({ size: 20 });
     return secret.base32;
 };
@@ -144,39 +129,22 @@ export const disableTotp = (): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
 
-// Updated: Accepts optional secret to verify ANY user, not just local master
 export const verifyTotpToken = (token: string, secretOverride?: string): boolean => {
     const settings = getSettings();
     const secret = secretOverride || settings.totpSecret;
     const isEnabled = secretOverride ? true : settings.isTotpEnabled;
-
     if (!secret || !isEnabled) return false;
-
-    // Tự động xóa khoảng trắng
     const cleanToken = token.replace(/\s/g, '');
-
     const totp = new OTPAuth.TOTP({
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
         secret: OTPAuth.Secret.fromBase32(secret)
     });
-
-    // validate returns the delta (0 for current, -1 for prev, 1 for next) or null if invalid
-    // CHANGE: Increased window to 20 (approx +/- 10 minutes) to prevent lockout due to time drift
     const delta = totp.validate({ token: cleanToken, window: 20 });
-    
-    // Debug log to help troubleshooting
-    if (delta === null) {
-        console.warn("TOTP Verification Failed. Token:", cleanToken);
-    } else {
-        console.log("TOTP Verification Success. Delta:", delta);
-    }
-
     return delta !== null;
 };
 
-// Helper to verify a token against a temporary secret (during setup)
 export const verifyTempTotpToken = (token: string, tempSecret: string): boolean => {
     return verifyTotpToken(token, tempSecret);
 };
