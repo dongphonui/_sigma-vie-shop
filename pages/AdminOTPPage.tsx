@@ -12,44 +12,27 @@ const AdminOTPPage: React.FC = () => {
   const [authMethod, setAuthMethod] = useState<'EMAIL' | 'TOTP' | 'DB_TOTP'>('EMAIL');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingUser, setPendingUser] = useState<AdminUser | null>(null);
-  
-  // State để lưu mã OTP thực (để hiển thị khẩn cấp - chỉ dùng cho Email)
   const [emergencyOtp, setEmergencyOtp] = useState<string | null>(null);
 
   useEffect(() => {
     setAdminEmails(getAdminEmails());
-    
-    // 1. Check for DB Pending User (Master or Staff via DB)
     const pendingUserStr = sessionStorage.getItem('pendingUser');
     if (pendingUserStr) {
         setAuthMethod('DB_TOTP');
         setPendingUser(JSON.parse(pendingUserStr));
         return;
     }
-
-    // 2. Fallback to LocalStorage Flow
     const method = sessionStorage.getItem('authMethod') as 'EMAIL' | 'TOTP';
     setAuthMethod(method || 'EMAIL');
-
-    if (method === 'TOTP') {
-        // Nếu dùng Google Auth Master (LocalStorage)
-        return;
-    }
-
-    // 3. Nếu dùng Email thì check session
     checkEmailOtpSession();
   }, []);
 
   const checkEmailOtpSession = () => {
     const otpDataString = sessionStorage.getItem('otpVerification');
-    if (!otpDataString) {
-      if (authMethod === 'EMAIL') setError("Không tìm thấy yêu cầu xác thực. Vui lòng thử lại.");
-      return;
-    }
+    if (!otpDataString) return;
     const otpData = JSON.parse(otpDataString);
     if (Date.now() > otpData.expiry) {
-        setError('Mã OTP đã hết hạn. Vui lòng gửi lại mã.');
-        sessionStorage.removeItem('otpVerification');
+        setError('Mã OTP đã hết hạn.');
         return;
     }
     setEmergencyOtp(otpData.otp);
@@ -60,164 +43,62 @@ const AdminOTPPage: React.FC = () => {
     setError('');
     setIsLoading(true);
     
-    if (authMethod === 'DB_TOTP') {
-        // Handle DB-based 2FA (Specific Secret for Specific User)
-        if (pendingUser && pendingUser.totp_secret) {
-            // Verify against the user's specific secret
-            if (verifyTempTotpToken(otp, pendingUser.totp_secret)) {
-                await recordAdminLogin('GOOGLE_AUTH', 'SUCCESS', pendingUser.username);
-                
-                // Promote pending to authenticated
-                sessionStorage.setItem('adminUser', JSON.stringify(pendingUser));
-                sessionStorage.setItem('isAuthenticated', 'true');
-                sessionStorage.removeItem('pendingUser');
-                
-                window.location.hash = '/admin';
-            } else {
-                setError('Mã xác thực không đúng. Vui lòng kiểm tra ứng dụng Google Authenticator.');
-                setIsLoading(false);
-            }
-        } else {
-            setError('Lỗi hệ thống: Không tìm thấy khóa bí mật của tài khoản.');
-            setIsLoading(false);
-        }
+    const otpDataString = sessionStorage.getItem('otpVerification');
+    const otpData = otpDataString ? JSON.parse(otpDataString) : null;
 
-    } else if (authMethod === 'TOTP') {
-        // Validate Master Google Authenticator Code (LocalStorage - Legacy)
-        if (verifyTotpToken(otp)) {
-            await recordAdminLogin('GOOGLE_AUTH', 'SUCCESS', 'admin');
-            sessionStorage.removeItem('authMethod');
-            sessionStorage.setItem('isAuthenticated', 'true');
-            window.location.hash = '/admin';
-        } else {
-            setError('Mã xác thực không đúng. Vui lòng kiểm tra lại ứng dụng Google Authenticator.');
-            setIsLoading(false);
-        }
+    if (otpData && otp === otpData.otp) {
+        await recordAdminLogin('SMS_EMAIL_OTP', 'SUCCESS', 'admin');
+        sessionStorage.removeItem('otpVerification');
+        sessionStorage.setItem('isAuthenticated', 'true');
+        window.location.hash = '/admin';
     } else {
-        // Validate Email OTP
-        const otpDataString = sessionStorage.getItem('otpVerification');
-        if (!otpDataString) {
-            setError('Phiên đã hết hạn. Vui lòng gửi lại mã.');
-            setIsLoading(false);
-            return;
-        }
-
-        const otpData = JSON.parse(otpDataString);
-
-        if (Date.now() > otpData.expiry) {
-            setError('Mã OTP đã hết hạn. Vui lòng thử đăng nhập lại.');
-            sessionStorage.removeItem('otpVerification');
-            setIsLoading(false);
-            return;
-        }
-
-        if (otp === otpData.otp) {
-            await recordAdminLogin('EMAIL_OTP', 'SUCCESS', 'admin');
-            sessionStorage.removeItem('otpVerification');
-            sessionStorage.removeItem('authMethod');
-            // Nếu login từ DB user (nhưng switch qua Email), cần set adminUser
-            if (pendingUser) {
-                sessionStorage.setItem('adminUser', JSON.stringify(pendingUser));
-            }
-            sessionStorage.setItem('isAuthenticated', 'true');
-            window.location.hash = '/admin';
-        } else {
-            setError('Mã OTP không hợp lệ.');
-            setIsLoading(false);
-        }
+        setError('Mã xác thực không chính xác.');
+        setIsLoading(false);
     }
-  };
-
-  const handleRevealOtp = () => {
-      if (emergencyOtp) {
-          alert(`MÃ OTP KHẨN CẤP CỦA BẠN LÀ: ${emergencyOtp}\n\nHãy sử dụng mã này để đăng nhập.`);
-      }
-  };
-
-  const handleSwitchToEmail = async () => {
-      setIsLoading(true);
-      setError('');
-      try {
-          const result = await sendOtpRequest();
-          if (result.success) {
-              setAuthMethod('EMAIL');
-              // Re-check session to get the code for display
-              checkEmailOtpSession();
-          } else {
-              setError('Không thể gửi mã OTP. Vui lòng thử lại sau.');
-          }
-      } catch (e) {
-          console.error(e);
-          setError('Lỗi khi chuyển đổi phương thức xác thực.');
-      }
-      setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F5F2] px-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-lg">
+      <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold font-serif text-gray-900">Xác thực hai yếu tố</h1>
-          <p className="text-gray-600 mt-2">
-             {authMethod === 'TOTP' || authMethod === 'DB_TOTP'
-                ? <span>Vui lòng nhập mã từ Google Authenticator của <strong>{pendingUser?.username || 'Admin'}</strong></span>
-                : <span>Mã xác thực đã được gửi đến email: <strong>{adminEmails[0]}</strong></span>
-             }
+          <div className="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4 text-teal-600">
+             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Xác minh bảo mật</h1>
+          <p className="text-gray-500 mt-3 text-sm leading-relaxed">
+             Hệ thống đã gửi mã OTP đến <strong>SMS</strong> và <strong>Email</strong> của quản trị viên. Vui lòng kiểm tra điện thoại hoặc hộp thư.
           </p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label htmlFor="otp" className="block text-sm font-medium text-gray-700">Mã Xác Thực (6 số)</label>
-            <input
-              type="text"
-              id="otp"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#D4AF37] focus:border-[#D4AF37] text-center text-2xl tracking-widest"
-              required
-              maxLength={6}
-              autoFocus
-              disabled={isLoading}
-            />
-          </div>
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#D4AF37] hover:bg-[#b89b31] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D4AF37] transition-colors disabled:opacity-70"
-            >
-              {isLoading ? 'Đang xác thực...' : 'Xác thực'}
-            </button>
-          </div>
+          <input
+            type="text"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl py-4 text-center text-3xl font-black tracking-[0.5em] focus:border-teal-500 outline-none transition-all"
+            required
+            maxLength={6}
+            autoFocus
+          />
+          {error && <p className="text-rose-500 text-xs font-bold text-center animate-bounce">{error}</p>}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-lg disabled:opacity-50"
+          >
+            {isLoading ? 'ĐANG XÁC THỰC...' : 'XÁC NHẬN ĐĂNG NHẬP'}
+          </button>
         </form>
 
-        <div className="mt-6 flex flex-col gap-3 text-center">
-             {(authMethod === 'TOTP' || authMethod === 'DB_TOTP') && (
-                 <button 
-                    type="button"
-                    onClick={handleSwitchToEmail}
-                    disabled={isLoading}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                >
-                    Gặp sự cố với Google Auth? Sử dụng OTP Màn hình/Email
-                </button>
-             )}
-
-             {authMethod === 'EMAIL' && (
-                 <button 
-                    type="button"
-                    onClick={handleRevealOtp}
-                    className="text-sm text-red-500 hover:text-red-700 font-medium hover:underline"
-                >
-                    Không nhận được mã? Bấm vào đây để lấy mã khẩn cấp (Màn hình)
-                </button>
-             )}
-
-            <a href="#/login" onClick={(e) => { e.preventDefault(); window.location.hash = '/login'; }} className="text-sm text-[#D4AF37] hover:underline">
-                Quay lại trang Đăng nhập
-            </a>
+        <div className="mt-8 pt-6 border-t border-slate-50 text-center space-y-4">
+             <button 
+                onClick={() => { if(emergencyOtp) alert(`MÃ OTP CỦA BẠN: ${emergencyOtp}`); }}
+                className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline"
+            >
+                Không nhận được tin nhắn? Hiện mã khẩn cấp
+            </button>
+            <br/>
+            <a href="#/login" className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-800">← Quay lại đăng nhập</a>
         </div>
       </div>
     </div>

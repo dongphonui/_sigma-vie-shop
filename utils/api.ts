@@ -1,52 +1,45 @@
 
 import { getAdminEmails } from './adminSettingsStorage';
-import { sendEmail } from './apiClient';
+import { API_BASE_URL } from './apiClient';
 
 export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
-  console.log('Bắt đầu yêu cầu gửi OTP...');
-  
   const adminEmails = getAdminEmails();
-  // Ensure we have at least one email, fallback to a default if absolutely necessary to prevent crash
   const primaryEmail = adminEmails.length > 0 ? adminEmails[0] : 'admin@sigmavie.com';
+  
+  // Giả định số điện thoại admin (Bạn có thể cấu hình trong AdminSettingsStorage nếu muốn)
+  const adminPhone = '0912345678'; 
 
-  // Tạo OTP ngẫu nhiên
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiry = Date.now() + 5 * 60 * 1000; // Hiệu lực 5 phút
+  const expiry = Date.now() + 5 * 60 * 1000;
 
-  // Lưu OTP vào session storage để trang OTP có thể xác thực
   sessionStorage.setItem('otpVerification', JSON.stringify({ otp, expiry }));
   
-  const subject = 'Mã xác thực đăng nhập Sigma Vie';
-  const html = `
-    <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; max-width: 500px;">
-      <h2 style="color: #00695C;">Mã xác thực của bạn</h2>
-      <p>Xin chào quản trị viên,</p>
-      <p>Sử dụng mã dưới đây để đăng nhập vào trang quản trị <strong>Sigma Vie</strong>:</p>
-      <div style="background-color: #f3f4f6; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
-        <h1 style="color: #D4AF37; font-size: 32px; letter-spacing: 5px; margin: 0;">${otp}</h1>
-      </div>
-      <p style="font-size: 12px; color: #6b7280;">Mã này sẽ hết hạn sau 5 phút. Nếu bạn không yêu cầu mã này, vui lòng bỏ qua.</p>
-    </div>
-  `;
-
   try {
-      // Cố gắng gửi email thật
-      const result = await sendEmail(primaryEmail, subject, html);
+      const response = await fetch(`${API_BASE_URL}/admin/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: primaryEmail, phone: adminPhone, otp: otp })
+      });
       
-      // Nếu server trả về lỗi (success: false) hoặc không có kết quả
-      if (!result || !result.success) {
-          throw new Error('Server reported email failure');
+      const result = await response.json();
+      
+      // Nếu không kênh nào gửi được ( kết quả giả từ server khi gặp lỗi mail/sms)
+      if (result.success && !result.delivered.email && !result.delivered.sms) {
+          triggerScreenOtp(otp, "Do server mail/sms bị gián đoạn");
+      } else {
+          console.log("OTP đã được xử lý qua:", result.delivered);
       }
-      
-      console.log('Email OTP đã được gửi thành công.');
 
   } catch (error) {
-      console.warn('Gửi email thất bại, chuyển sang chế độ hiển thị trực tiếp (Fallback).', error);
-      // Fallback: Hiển thị OTP qua Alert nếu gửi mail lỗi
-      setTimeout(() => {
-          alert(`⚠️ CHẾ ĐỘ OTP MÀN HÌNH (Do gửi Email thất bại)\n\nMÃ OTP ĐĂNG NHẬP CỦA BẠN LÀ: ${otp}\n\nHãy nhập mã này để tiếp tục.`);
-      }, 500);
+      console.error('Lỗi kết nối API OTP:', error);
+      triggerScreenOtp(otp, "Lỗi kết nối máy chủ");
   }
 
   return { success: true };
+};
+
+const triggerScreenOtp = (otp: string, reason: string) => {
+    setTimeout(() => {
+        alert(`🔔 THÔNG BÁO HỆ THỐNG\n\nLý do: ${reason}\n\nMÃ OTP ĐĂNG NHẬP CỦA BẠN LÀ: ${otp}\n\n(Hãy lưu lại mã này để nhập vào trang xác thực)`);
+    }, 500);
 };
