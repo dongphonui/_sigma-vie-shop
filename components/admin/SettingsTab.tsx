@@ -268,21 +268,26 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
                     <p style="margin: 0; font-size: 14px; color: #6b7280;">Trạng thái: <strong>Hoạt động tốt</strong></p>
                     <p style="margin: 5px 0 0 0; font-size: 14px; color: #6b7280;">Thời gian: <strong>${new Date().toLocaleString('vi-VN')}</strong></p>
                 </div>
-                <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; border-top: 1px solid #f3f4f6; pt: 20px;">Quý khách nhận được email này vì địa chỉ này đã được đăng ký làm quản trị viên chính.</p>
+                <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; border-top: 1px solid #f3f4f6; padding-top: 20px;">Bạn nhận được email này vì địa chỉ này đã được đăng ký làm quản trị viên chính.</p>
               </div>
               `
           );
           
           if(result && result.success) {
-              setSettingsFeedback('✅ Thành công: Email kiểm tra đã được gửi.');
+              setSettingsFeedback('✅ Thành công: Email kiểm tra đã được gửi. Hãy check mục Hộp thư đến hoặc Thư rác.');
           } else {
-              setSettingsFeedback(`❌ Lỗi: ${result?.message || 'Không thể kết nối API gửi mail.'}`);
+              // Phản hồi chi tiết nếu server trả về lỗi cấu hình
+              const errorMsg = result?.message || 'Không thể kết nối API.';
+              setSettingsFeedback(`❌ Lỗi: ${errorMsg}`);
+              if (errorMsg.includes('SMTP') || errorMsg.includes('EMAIL_USER')) {
+                  alert("⚠️ CẤU HÌNH THIẾU:\nBạn chưa thiết lập EMAIL_USER và EMAIL_PASS (Mật khẩu ứng dụng) trên máy chủ (Render/Vercel). Hãy tạo 'App Password' trong tài khoản Google để hệ thống có thể gửi mail.");
+              }
           }
       } catch (e) {
           setSettingsFeedback('❌ Lỗi: Hệ thống backend không phản hồi.');
       } finally {
           setIsTestingEmail(false);
-          setTimeout(() => setSettingsFeedback(''), 8000);
+          setTimeout(() => setSettingsFeedback(''), 10000);
       }
   };
 
@@ -725,7 +730,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ currentUser }) => {
 
           {showBankSecurityModal && (
                 <div className="fixed inset-0 bg-black/80 z-[250] flex items-center justify-center p-4 backdrop-blur-xl">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-sm p-10 animate-float-up text-center border border-slate-100">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-sm p-10 animate-float-up text-center border border-slate-100">
                         <div className="bg-amber-100 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-6 text-amber-600 shadow-inner">
                             <ShieldCheckIcon className="w-8 h-8" />
                         </div>

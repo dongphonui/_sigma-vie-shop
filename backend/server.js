@@ -32,14 +32,17 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Cấu hình Mail Transporter (Ưu tiên Gmail)
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, // VD: sigmavie@gmail.com
-        pass: process.env.EMAIL_PASS  // Mã mật khẩu ứng dụng (App Password)
-    }
-});
+// Hàm tạo transporter động để không làm sập app nếu thiếu config
+const getTransporter = () => {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null;
+    return nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+};
 
 const initDb = async () => {
   if (!dbUrl) {
@@ -78,11 +81,10 @@ const initDb = async () => {
 
 initDb();
 
-// --- ADMIN USERS & AUTH ---
+// --- ADMIN API ---
 app.post('/api/admin/login', async (req, res) => {
     const { username, password, method } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
     try {
         if (method) {
             await pool.query(
@@ -91,7 +93,6 @@ app.post('/api/admin/login', async (req, res) => {
             );
             return res.json({ success: true });
         }
-
         const result = await pool.query("SELECT * FROM admin_users WHERE username = $1 AND password = $2", [username, password]);
         if (result.rows.length > 0) {
             const user = result.rows[0];
@@ -106,32 +107,28 @@ app.post('/api/admin/login', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// API Gửi Email (Bổ sung mới)
 app.post('/api/admin/email', async (req, res) => {
     const { to, subject, html } = req.body;
+    const transporter = getTransporter();
     
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!transporter) {
         return res.status(400).json({ 
             success: false, 
-            message: 'Server chưa cấu hình EMAIL_USER hoặc EMAIL_PASS trong Environment Variables.' 
+            message: 'Thiếu cấu hình SMTP. Hãy thiết lập EMAIL_USER và EMAIL_PASS (Mật khẩu ứng dụng) trên Render.' 
         });
     }
 
     try {
-        const mailOptions = {
+        await transporter.sendMail({
             from: `"Sigma Vie Boutique" <${process.env.EMAIL_USER}>`,
-            to,
-            subject,
-            html
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.json({ success: true, message: 'Email đã được gửi đi thành công.' });
+            to, subject, html
+        });
+        res.json({ success: true, message: 'Email đã được gửi.' });
     } catch (err) {
         console.error("Mail Error:", err);
         res.status(500).json({ 
             success: false, 
-            message: 'Lỗi từ dịch vụ gửi mail: ' + err.message 
+            message: 'Dịch vụ Email từ chối: ' + err.message 
         });
     }
 });
@@ -176,7 +173,6 @@ app.post('/api/customers', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- ORDERS API ---
 app.get('/api/orders', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM orders ORDER BY timestamp DESC');
@@ -195,7 +191,6 @@ app.post('/api/orders', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- INVENTORY API ---
 app.get('/api/inventory', async (req, res) => {
     try {
         const result = await pool.query('SELECT data FROM inventory_transactions ORDER BY timestamp DESC');
@@ -214,7 +209,6 @@ app.post('/api/inventory', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- CHAT API ---
 app.get('/api/chat/messages/:sessionId', async (req, res) => {
     try {
         const { sessionId } = req.params;
@@ -269,7 +263,6 @@ app.get('/api/chat/sessions', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- SETTINGS APIS ---
 app.get('/api/settings/:key', async (req, res) => {
     try {
         const { key } = req.params;
