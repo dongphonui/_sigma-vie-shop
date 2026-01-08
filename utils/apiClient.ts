@@ -1,8 +1,5 @@
-
 export const API_BASE_URL = (() => {
-    // Kiểm tra an toàn để tránh lỗi "Cannot read properties of undefined"
-    const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
-    
+    // Kiểm tra an toàn cho môi trường window/localhost
     if (typeof window !== 'undefined') {
         const host = window.location.hostname;
         if (host === 'localhost' || host === '127.0.0.1') {
@@ -10,16 +7,17 @@ export const API_BASE_URL = (() => {
         }
     }
 
-    // Truy cập an toàn vào import.meta.env
+    // Truy cập an toàn vào biến môi trường của Vite
     try {
         const env = (import.meta as any).env;
         if (env && env.VITE_API_URL) {
             return env.VITE_API_URL.replace(/\/$/, "");
         }
     } catch (e) {
-        console.warn("Vite env not initialized yet, using fallback URL.");
+        console.warn("Vite environment not ready, using fallback URL.");
     }
 
+    // Fallback URL mặc định
     return 'https://sigmavie-backend.onrender.com/api';
 })();
 
@@ -42,13 +40,13 @@ const syncData = async (endpoint: string, data: any) => {
             body: JSON.stringify(data)
         });
         if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`HTTP Error ${res.status}: ${errorText}`);
+            const errText = await res.text();
+            throw new Error(`Server Error ${res.status}: ${errText}`);
         }
         return await res.json();
     } catch (e) { 
         console.error(`Sync error [${endpoint}]:`, e);
-        return { success: false, error: String(e) }; 
+        return { success: false, message: String(e) }; 
     }
 };
 
@@ -96,6 +94,7 @@ export const syncProductPageSettingsToDB = (val: any) => syncSettingToDB('produc
 export const fetchTransactionsFromDB = () => fetchData('transactions');
 export const syncTransactionToDB = (t: any) => syncData('transactions', t);
 export const fetchCategoriesFromDB = () => fetchData('categories');
+// Fixed: Changed syncCategoryToDB to call syncData instead of calling itself recursively to fix argument mismatch error.
 export const syncCategoryToDB = (c: any) => syncData('categories', c);
 export const fetchCustomersFromDB = () => fetchData('customers');
 export const syncCustomerToDB = (c: any) => syncData('customers', c);

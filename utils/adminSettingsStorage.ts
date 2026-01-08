@@ -5,7 +5,8 @@ interface AdminSettings {
   username: string;
   passwordHash: string; 
   emails: string[];
-  phoneNumber?: string; // Lưu số điện thoại admin
+  phoneNumber?: string; 
+  smsSenderId?: string;
   totpSecret?: string; 
   isTotpEnabled?: boolean;
 }
@@ -28,6 +29,7 @@ const getDefaultSettings = (): AdminSettings => ({
   passwordHash: simpleHash('admin'),
   emails: [MASTER_EMAIL],
   phoneNumber: '',
+  smsSenderId: '',
   isTotpEnabled: false
 });
 
@@ -36,30 +38,32 @@ const getSettings = (): AdminSettings => {
     const storedSettings = localStorage.getItem(STORAGE_KEY);
     if (storedSettings) {
       return { ...getDefaultSettings(), ...JSON.parse(storedSettings) };
-    } else {
-      const defaultSettings = getDefaultSettings();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSettings));
-      return defaultSettings;
     }
-  } catch (error) {
-    return getDefaultSettings();
-  }
+  } catch (error) {}
+  const defaultSettings = getDefaultSettings();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultSettings));
+  return defaultSettings;
 };
 
+// Đảm bảo export chính xác các hàm quản lý SMS cho build tool
 export const updateAdminPhone = (phone: string): void => {
     const settings = getSettings();
     settings.phoneNumber = phone;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
 
+export const updateSmsSenderId = (senderId: string): void => {
+    const settings = getSettings();
+    settings.smsSenderId = senderId;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+};
+
 export const getAdminPhone = (): string => {
-    // Ưu tiên sđt từ session (nếu đăng nhập bằng tài khoản nhân viên mới)
-    const sessionUser = sessionStorage.getItem('adminUser');
-    if (sessionUser) {
-        const u = JSON.parse(sessionUser);
-        if (u.phoneNumber) return u.phoneNumber;
-    }
     return getSettings().phoneNumber || '';
+};
+
+export const getSmsSenderId = (): string => {
+    return getSettings().smsSenderId || '';
 };
 
 export const verifyCredentials = (username: string, password: string): boolean => {
@@ -93,14 +97,12 @@ export const removeAdminEmail = (emailToRemove: string): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 };
 
-// TOTP Functions...
 export const isTotpEnabled = (): boolean => {
     return !!getSettings().isTotpEnabled;
 };
 
 export const generateTotpSecret = (): string => {
-    const secret = new OTPAuth.Secret({ size: 20 });
-    return secret.base32;
+    return new OTPAuth.Secret({ size: 20 }).base32;
 };
 
 export const getTotpUri = (secret: string, label?: string): string => {
@@ -132,17 +134,14 @@ export const disableTotp = (): void => {
 export const verifyTotpToken = (token: string, secretOverride?: string): boolean => {
     const settings = getSettings();
     const secret = secretOverride || settings.totpSecret;
-    const isEnabled = secretOverride ? true : settings.isTotpEnabled;
-    if (!secret || !isEnabled) return false;
-    const cleanToken = token.replace(/\s/g, '');
+    if (!secret) return false;
     const totp = new OTPAuth.TOTP({
         algorithm: 'SHA1',
         digits: 6,
         period: 30,
         secret: OTPAuth.Secret.fromBase32(secret)
     });
-    const delta = totp.validate({ token: cleanToken, window: 20 });
-    return delta !== null;
+    return totp.validate({ token: token.replace(/\s/g, ''), window: 1 }) !== null;
 };
 
 export const verifyTempTotpToken = (token: string, tempSecret: string): boolean => {
