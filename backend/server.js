@@ -60,20 +60,22 @@ const initDb = async () => {
 };
 initDb();
 
-// Helper gửi SMS qua SpeedSMS
+// Helper gửi SMS qua SpeedSMS chuẩn hóa API v2
 const sendSms = (phone, content, senderId = "") => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const apiKey = process.env.SPEEDSMS_API_KEY;
         if (!apiKey) {
-            console.warn("[SpeedSMS] API Key missing. Skipping SMS.");
+            console.warn("[SpeedSMS] API Key missing. Check Render Env.");
             return resolve(false);
         }
 
+        // SpeedSMS dùng Basic Auth với API Key làm username, password để trống
         const auth = Buffer.from(`${apiKey}:`).toString('base64');
-        const data = JSON.stringify({
-            to: [phone],
+        
+        const postData = JSON.stringify({
+            to: [phone], // SpeedSMS yêu cầu mảng cho số điện thoại
             content: content,
-            sms_type: 2, // 2: Chăm sóc khách hàng / OTP
+            sms_type: 2, // 2: Loại CSKH (thường dùng cho OTP)
             sender: senderId || ""
         });
 
@@ -85,25 +87,32 @@ const sendSms = (phone, content, senderId = "") => {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Basic ${auth}`,
-                'Content-Length': data.length
+                'Content-Length': Buffer.byteLength(postData)
             }
         };
 
+        console.log(`[SpeedSMS] Calling API for ${phone}...`);
+
         const req = https.request(options, (res) => {
-            let responseData = '';
-            res.on('data', (chunk) => responseData += chunk);
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
             res.on('end', () => {
-                console.log("[SpeedSMS] API Response:", responseData);
-                resolve(true);
+                console.log("[SpeedSMS] Response:", data);
+                try {
+                    const parsed = JSON.parse(data);
+                    resolve(parsed.status === 'success');
+                } catch (e) {
+                    resolve(false);
+                }
             });
         });
 
         req.on('error', (e) => {
-            console.error("[SpeedSMS] Error:", e);
+            console.error("[SpeedSMS] Request error:", e.message);
             resolve(false);
         });
 
-        req.write(data);
+        req.write(postData);
         req.end();
     });
 };
@@ -113,7 +122,10 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', db: !!dbUrl }));
 app.post('/api/admin/login', async (req, res) => {
     const { username, password } = req.body;
     if (username === 'admin' && password === 'admin') {
-        return res.json({ success: true, user: { id: 'admin', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER' } });
+        return res.json({ 
+            success: true, 
+            user: { id: 'admin', username: 'admin', fullname: 'Quản trị viên', role: 'MASTER' } 
+        });
     }
     res.status(401).json({ success: false, message: 'Sai thông tin đăng nhập.' });
 });
@@ -122,29 +134,30 @@ app.post('/api/admin/send-otp', async (req, res) => {
     const { email, phone, otp, senderId } = req.body;
     const content = `Ma xac thuc Sigma Vie cua ban la: ${otp}. Vui long khong cung cap ma nay cho bat ky ai.`;
 
-    console.log(`[OTP] Processing request for ${phone} / ${email}`);
+    console.log(`[OTP] Sending to Phone: ${phone}, Email: ${email}`);
 
-    // Gửi song song SMS và Email
-    const results = await Promise.allSettled([
-        sendSms(phone, content, senderId),
-        process.env.EMAIL_USER ? transporter.sendMail({
-            from: `"Sigma Vie Security" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `[OTP] Mã xác thực đăng nhập Sigma Vie: ${otp}`,
-            text: content,
-            html: `<div style="font-family:sans-serif; padding:20px; border:1px solid #eee; border-radius:10px;">
-                    <h2 style="color:#111827;">Xác minh Quản trị</h2>
-                    <p>Mã OTP của bạn là:</p>
-                    <div style="font-size:32px; font-weight:bold; letter-spacing:5px; color:#D4AF37; margin:20px 0;">${otp}</div>
-                    <p style="color:#666; font-size:12px;">Mã này có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã này.</p>
-                   </div>`
-        }) : Promise.resolve(false)
-    ]);
+    // Chạy song song cả SMS và Email để tăng độ tin cậy
+    const smsPromise = sendSms(phone, content, senderId);
+    const emailPromise = process.env.EMAIL_USER ? transporter.sendMail({
+        from: `"Sigma Vie Security" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `[OTP] Mã xác thực đăng nhập: ${otp}`,
+        html: `<div style="font-family:sans-serif; padding:30px; background:#f9f9f9; text-align:center;">
+                <div style="background:white; padding:40px; border-radius:20px; display:inline-block; border:1px solid #eee;">
+                    <h2 style="margin-top:0; color:#111827;">Mã xác thực Quản trị</h2>
+                    <p style="color:#666;">Dùng mã dưới đây để truy cập hệ thống Sigma Vie:</p>
+                    <div style="font-size:40px; font-weight:900; letter-spacing:10px; color:#D4AF37; margin:30px 0;">${otp}</div>
+                    <p style="font-size:12px; color:#999;">Mã có hiệu lực trong 5 phút. Nếu không phải bạn yêu cầu, hãy đổi mật khẩu ngay.</p>
+                </div>
+               </div>`
+    }).catch(e => { console.error("Email Error:", e.message); return null; }) : Promise.resolve(null);
+
+    const [smsOk, emailRes] = await Promise.all([smsPromise, emailPromise]);
 
     res.json({ 
         success: true, 
-        sms_attempted: results[0].status === 'fulfilled',
-        email_attempted: results[1].status === 'fulfilled'
+        sms_sent: smsOk,
+        email_sent: !!emailRes
     });
 });
 

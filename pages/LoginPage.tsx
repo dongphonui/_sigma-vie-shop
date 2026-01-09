@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { verifyCredentials, isTotpEnabled } from '../utils/adminSettingsStorage';
 import { sendOtpRequest } from '../utils/api';
@@ -12,13 +11,13 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isRescueMode = (e.nativeEvent as any).shiftKey; // Kiểm tra phím Shift
+    const isRescueMode = (e.nativeEvent as any).shiftKey; 
 
     setError('');
     setIsLoading(true);
 
     try {
-        // Bypass cho admin trong trường hợp khẩn cấp nếu phím Shift được nhấn
+        // 1. CHẾ ĐỘ CỨU HỘ (SHIFT + CLICK)
         if (isRescueMode && username === 'admin' && password === 'admin') {
             if (confirm("Kích hoạt chế độ CỨU HỘ: Bỏ qua OTP để vào Admin?")) {
                 sessionStorage.setItem('isAuthenticated', 'true');
@@ -27,30 +26,34 @@ const LoginPage: React.FC = () => {
             }
         }
 
+        // 2. ĐĂNG NHẬP SERVER
         const serverAuth = await loginAdminUser({ username, password });
         
         if (serverAuth && serverAuth.success) {
             const user = serverAuth.user;
+            
+            // Lưu thông tin user tạm thời (chưa xác thực isAuthenticated)
+            sessionStorage.setItem('pendingAdminUser', JSON.stringify(user));
+
             if (user.is_totp_enabled) {
-                sessionStorage.setItem('pendingUser', JSON.stringify(user));
+                sessionStorage.setItem('authMethod', 'TOTP');
                 window.location.hash = '/otp';
-                return;
+            } else {
+                sessionStorage.setItem('authMethod', 'SMS_EMAIL');
+                // GỬI OTP NGAY KHI ĐĂNG NHẬP ĐÚNG
+                const otpRes = await sendOtpRequest();
+                if (otpRes.success) {
+                    window.location.hash = '/otp';
+                } else {
+                    setError('Không thể gửi mã OTP. Hãy thử lại hoặc dùng mã cứu hộ.');
+                }
             }
-            sessionStorage.setItem('adminUser', JSON.stringify(user));
-            sessionStorage.setItem('isAuthenticated', 'true');
-            window.location.hash = '/admin';
             return;
         }
 
-        // Local Fallback
+        // 3. FALLBACK LOCAL (Dùng cho môi trường dev hoặc khi mất mạng)
         if (verifyCredentials(username, password)) {
-            if (isTotpEnabled()) {
-                sessionStorage.setItem('authMethod', 'TOTP');
-                window.location.hash = '/otp';
-                return;
-            }
-
-            sessionStorage.setItem('authMethod', 'EMAIL');
+            sessionStorage.setItem('authMethod', isTotpEnabled() ? 'TOTP' : 'SMS_EMAIL');
             await sendOtpRequest();
             window.location.hash = '/otp';
         } else {
@@ -58,7 +61,7 @@ const LoginPage: React.FC = () => {
         }
     } catch (e) {
         console.error("Login logic error", e);
-        setError("Lỗi hệ thống. Thử giữ SHIFT + Bấm Tiếp tục để cứu hộ.");
+        setError("Lỗi kết nối server. Thử giữ SHIFT + Bấm Tiếp tục.");
     } finally {
         setIsLoading(false);
     }
@@ -66,13 +69,13 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F5F2] px-4">
-      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
+      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100 animate-float-up">
         <div className="text-center mb-10">
           <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center text-[#D4AF37] mx-auto mb-6 shadow-xl rotate-3">
              <span className="text-3xl font-black">Σ</span>
           </div>
           <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Sigma Admin</h1>
-          <p className="text-slate-400 mt-2 text-xs font-bold uppercase tracking-widest">Hệ thống Quản trị Luxury</p>
+          <p className="text-slate-400 mt-2 text-xs font-bold uppercase tracking-widest leading-relaxed">Hệ thống Quản trị Luxury<br/>Bảo mật 2 lớp SpeedSMS</p>
         </div>
         
         <form onSubmit={handleLogin} className="space-y-6">
@@ -85,10 +88,10 @@ const LoginPage: React.FC = () => {
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-50 focus:border-[#D4AF37] focus:bg-white rounded-2xl px-6 py-4 font-bold outline-none transition-all" required />
           </div>
           
-          {error && <p className="text-rose-500 text-xs font-bold text-center bg-rose-50 py-3 rounded-xl border border-rose-100">{error}</p>}
+          {error && <p className="text-rose-500 text-[10px] font-black uppercase text-center bg-rose-50 py-3 rounded-xl border border-rose-100">{error}</p>}
           
-          <button type="submit" disabled={isLoading} className="w-full bg-[#111827] text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-xl hover:bg-black transition-all active:scale-95">
-            {isLoading ? 'ĐANG XỬ LÝ...' : 'TIẾP TỤC'}
+          <button type="submit" disabled={isLoading} className="w-full bg-[#111827] text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50">
+            {isLoading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP HỆ THỐNG'}
           </button>
         </form>
         

@@ -8,32 +8,39 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
   let adminPhone = getAdminPhone().replace(/\s/g, ''); 
   const senderId = getSmsSenderId();
 
-  // Chuẩn hóa số điện thoại sang định dạng 84 (SpeedSMS yêu cầu)
+  // Chuẩn hóa số điện thoại sang 84
   if (adminPhone.startsWith('0')) {
       adminPhone = '84' + adminPhone.substring(1);
   } else if (!adminPhone.startsWith('84') && adminPhone.length > 0) {
       adminPhone = '84' + adminPhone;
   }
 
-  // 1. TẠO MÃ OTP TRƯỚC (CỨU HỘ)
+  // 1. Tạo OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiry = Date.now() + 5 * 60 * 1000;
 
+  // 2. Lưu vào session ngay lập tức (để UI có thể lấy mã khẩn cấp nếu cần)
   sessionStorage.setItem('otpVerification', JSON.stringify({ otp, expiry }));
   
-  console.log(`[OTP Engine] OTP: ${otp}. Delivery target: ${adminPhone} / ${primaryEmail}`);
+  console.log(`[OTP] Delivering ${otp} to ${adminPhone}`);
 
-  // GỬI YÊU CẦU LÊN SERVER (KHÔNG CHỜ PHẢN HỒI ĐỂ TRÁNH LAG)
-  fetch(`${API_BASE_URL}/admin/send-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-          email: primaryEmail, 
-          phone: adminPhone, 
-          otp: otp,
-          senderId: senderId 
-      })
-  }).catch(e => console.warn("[OTP Engine] Background delivery request failed."));
+  try {
+      // 3. Gọi server gửi OTP
+      const res = await fetch(`${API_BASE_URL}/admin/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              email: primaryEmail, 
+              phone: adminPhone, 
+              otp: otp,
+              senderId: senderId 
+          })
+      });
 
-  return { success: true };
+      // Vẫn cho phép vào trang OTP kể cả khi server trả lỗi (để dùng mã cứu hộ)
+      return { success: true };
+  } catch (e) {
+      console.warn("[OTP] API call failed, but proceeding to OTP page for rescue mode.");
+      return { success: true };
+  }
 };
