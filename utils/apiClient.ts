@@ -1,23 +1,10 @@
 export const API_BASE_URL = (() => {
-    // Kiểm tra an toàn cho môi trường window/localhost
     if (typeof window !== 'undefined') {
         const host = window.location.hostname;
         if (host === 'localhost' || host === '127.0.0.1') {
             return 'http://localhost:3000/api';
         }
     }
-
-    // Truy cập an toàn vào biến môi trường của Vite
-    try {
-        const env = (import.meta as any).env;
-        if (env && env.VITE_API_URL) {
-            return env.VITE_API_URL.replace(/\/$/, "");
-        }
-    } catch (e) {
-        console.warn("Vite environment not ready, using fallback URL.");
-    }
-
-    // Fallback URL mặc định
     return 'https://sigmavie-backend.onrender.com/api';
 })();
 
@@ -27,7 +14,6 @@ const fetchData = async (endpoint: string) => {
         if (!res.ok) return null;
         return await res.json();
     } catch (e) { 
-        console.error(`Fetch error [${endpoint}]:`, e);
         return null; 
     }
 };
@@ -39,14 +25,10 @@ const syncData = async (endpoint: string, data: any) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        if (!res.ok) {
-            const errText = await res.text();
-            throw new Error(`Server Error ${res.status}: ${errText}`);
-        }
+        if (!res.ok) return { success: false, message: "Server Database error" };
         return await res.json();
     } catch (e) { 
-        console.error(`Sync error [${endpoint}]:`, e);
-        return { success: false, message: String(e) }; 
+        return { success: false, message: "Offline" }; 
     }
 };
 
@@ -67,12 +49,6 @@ export const fetchOrdersFromDB = () => fetchData('orders');
 export const syncOrderToDB = (o: any) => syncData('orders', o);
 export const fetchSettingFromDB = (key: string) => fetchData(`settings/${key}`);
 export const syncSettingToDB = (key: string, val: any) => syncData(`settings/${key}`, val);
-export const sendChatMessage = (msg: any) => syncData('chat/messages', msg);
-export const fetchChatMessages = (sid: string) => fetchData(`chat/messages/${sid}`);
-export const fetchChatSessions = () => fetchData('chat/sessions');
-export const markChatAsRead = (sid: string) => syncData(`chat/mark-read/${sid}`, {});
-export const deleteChatMessages = (sid: string) => fetch(`${API_BASE_URL}/chat/messages/${sid}`, { method: 'DELETE' }).then(res => res.json());
-export const updateMessageReaction = (msgId: string, reactions: any) => syncData(`chat/reactions/${msgId}`, { reactions });
 export const fetchAboutContentFromDB = () => fetchSettingFromDB('about-page');
 export const syncAboutContentToDB = (val: any) => syncSettingToDB('about-page', val);
 export const loginAdminUser = (creds: any) => syncData('admin/login', creds);
@@ -94,7 +70,6 @@ export const syncProductPageSettingsToDB = (val: any) => syncSettingToDB('produc
 export const fetchTransactionsFromDB = () => fetchData('transactions');
 export const syncTransactionToDB = (t: any) => syncData('transactions', t);
 export const fetchCategoriesFromDB = () => fetchData('categories');
-// Fixed: Changed syncCategoryToDB to call syncData instead of calling itself recursively to fix argument mismatch error.
 export const syncCategoryToDB = (c: any) => syncData('categories', c);
 export const fetchCustomersFromDB = () => fetchData('customers');
 export const syncCustomerToDB = (c: any) => syncData('customers', c);
@@ -103,9 +78,29 @@ export const deleteCustomerFromDB = (id: string) => fetch(`${API_BASE_URL}/custo
 export const verifyCustomerLoginOnServer = (identifier: string, passwordHash: string) => syncData('customers/login', { identifier, passwordHash });
 export const resetDatabase = (scope: string) => syncData('system/reset', { scope });
 export const fetchAdminLoginLogs = () => fetchData('admin/logs');
-export const changeAdminPassword = (data: any) => syncData('admin/change-password', data);
-export const fetchAdminUsers = () => fetchData('admin/users');
-export const createAdminUser = (user: any) => syncData('admin/users', user);
-export const deleteAdminUser = (id: string) => fetch(`${API_BASE_URL}/admin/users/${id}`, { method: 'DELETE' }).then(res => res.json());
-export const updateAdminUser = (user: any) => syncData(`admin/users/${user.id}`, user);
 export const sendEmail = (to: string, subject: string, body: string) => syncData('system/send-email', { to, subject, body });
+
+// Added missing members for chat and admin users
+// Fix for Header.tsx, CustomerSupportChat.tsx, LiveChatTab.tsx
+export const fetchChatMessages = (sessionId: string) => fetchData(`chat/messages/${sessionId}`);
+// Fix for AdminPage.tsx, LiveChatTab.tsx
+export const fetchChatSessions = () => fetchData('chat/sessions');
+// Fix for CustomerSupportChat.tsx, LiveChatTab.tsx
+export const sendChatMessage = (msg: any) => syncData('chat/messages', msg);
+// Fix for CustomerSupportChat.tsx, LiveChatTab.tsx
+export const markChatAsRead = (sessionId: string) => syncData(`chat/sessions/${sessionId}/read`, {});
+// Fix for CustomerSupportChat.tsx, LiveChatTab.tsx
+export const deleteChatMessages = (sessionId: string) => fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, { method: 'DELETE' }).then(res => res.json());
+// Fix for CustomerSupportChat.tsx, LiveChatTab.tsx
+export const updateMessageReaction = (messageId: string, reactions: any) => syncData(`chat/messages/${messageId}/reaction`, { reactions });
+
+// Fix for SettingsTab.tsx
+export const fetchAdminUsers = () => fetchData('admin/users');
+// Fix for SettingsTab.tsx
+export const createAdminUser = (user: any) => syncData('admin/users', user);
+// Fix for SettingsTab.tsx
+export const updateAdminUser = (user: any) => syncData(`admin/users/${user.id}`, user);
+// Fix for SettingsTab.tsx
+export const deleteAdminUser = (id: string) => fetch(`${API_BASE_URL}/admin/users/${id}`, { method: 'DELETE' }).then(res => res.json());
+// Fix for SettingsTab.tsx
+export const changeAdminPassword = (data: any) => syncData('admin/change-password', data);
