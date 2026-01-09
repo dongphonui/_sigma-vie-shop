@@ -5,19 +5,25 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
   const adminEmails = getAdminEmails();
   const primaryEmail = adminEmails.length > 0 ? adminEmails[0] : 'sigmavieshop@gmail.com';
   
-  const adminPhone = getAdminPhone(); 
+  let adminPhone = getAdminPhone().replace(/\s/g, ''); 
   const senderId = getSmsSenderId();
 
-  // 1. TẠO MÃ OTP TRƯỚC (QUAN TRỌNG ĐỂ CÓ MÃ CỨU HỘ NGAY LẬP TỨC)
+  // Chuẩn hóa số điện thoại sang định dạng 84 (SpeedSMS yêu cầu)
+  if (adminPhone.startsWith('0')) {
+      adminPhone = '84' + adminPhone.substring(1);
+  } else if (!adminPhone.startsWith('84') && adminPhone.length > 0) {
+      adminPhone = '84' + adminPhone;
+  }
+
+  // 1. TẠO MÃ OTP TRƯỚC (CỨU HỘ)
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiry = Date.now() + 5 * 60 * 1000;
 
-  // LƯU VÀO STORAGE TRƯỚC KHI GỌI MẠNG
   sessionStorage.setItem('otpVerification', JSON.stringify({ otp, expiry }));
   
-  console.log(`[OTP Engine] Draft OTP generated: ${otp}. Notify server in background...`);
+  console.log(`[OTP Engine] OTP: ${otp}. Delivery target: ${adminPhone} / ${primaryEmail}`);
 
-  // GỬI YÊU CẦU LÊN SERVER NHƯNG KHÔNG DÙNG 'AWAIT' ĐỂ TRÁNH TREO GIAO DIỆN
+  // GỬI YÊU CẦU LÊN SERVER (KHÔNG CHỜ PHẢN HỒI ĐỂ TRÁNH LAG)
   fetch(`${API_BASE_URL}/admin/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -27,8 +33,7 @@ export const sendOtpRequest = async (): Promise<{ success: boolean }> => {
           otp: otp,
           senderId: senderId 
       })
-  }).catch(e => console.warn("[OTP Engine] Background send failed, user can still use emergency code."));
+  }).catch(e => console.warn("[OTP Engine] Background delivery request failed."));
 
-  // Trả về true ngay để UI chuyển sang trang nhập mã
   return { success: true };
 };
