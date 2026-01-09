@@ -64,18 +64,23 @@ initDb();
 const sendSms = (phone, content, senderId = "") => {
     return new Promise((resolve) => {
         const apiKey = process.env.SPEEDSMS_API_KEY;
+        
         if (!apiKey) {
-            console.warn("[SpeedSMS] API Key missing. Check Render Env.");
-            return resolve(false);
+            console.error("[SpeedSMS] ❌ LỖI: SPEEDSMS_API_KEY chưa được cài đặt trong Environment của Render.");
+            return resolve({ success: false, error: 'Missing API Key' });
         }
 
-        // SpeedSMS dùng Basic Auth với API Key làm username, password để trống
+        // SpeedSMS yêu cầu số điện thoại nhận được phải là mảng hoặc chuỗi phân cách bởi dấu phẩy
+        // Chúng ta đảm bảo nó là một mảng
+        const recipients = [phone.toString()];
+
+        console.log(`[SpeedSMS] 🚀 Đang gọi API gửi mã đến: ${recipients.join(',')}...`);
+
         const auth = Buffer.from(`${apiKey}:`).toString('base64');
-        
         const postData = JSON.stringify({
-            to: [phone], // SpeedSMS yêu cầu mảng cho số điện thoại
+            to: recipients,
             content: content,
-            sms_type: 2, // 2: Loại CSKH (thường dùng cho OTP)
+            sms_type: 2, // 2: Loại tin nhắn CSKH/OTP
             sender: senderId || ""
         });
 
@@ -91,25 +96,31 @@ const sendSms = (phone, content, senderId = "") => {
             }
         };
 
-        console.log(`[SpeedSMS] Calling API for ${phone}...`);
-
         const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
+            let responseBody = '';
+            res.on('data', (chunk) => responseBody += chunk);
             res.on('end', () => {
-                console.log("[SpeedSMS] Response:", data);
+                console.log("[SpeedSMS] 📥 Phản hồi từ SpeedSMS:", responseBody);
                 try {
-                    const parsed = JSON.parse(data);
-                    resolve(parsed.status === 'success');
+                    const result = JSON.parse(responseBody);
+                    // SpeedSMS trả về status: "success" nếu thành công
+                    if (result.status === 'success') {
+                        console.log("[SpeedSMS] ✅ Gửi tin nhắn thành công!");
+                        resolve({ success: true, data: result });
+                    } else {
+                        console.error("[SpeedSMS] ❌ Gửi tin nhắn thất bại:", result.message || 'Không có thông báo lỗi');
+                        resolve({ success: false, error: result.message || 'API rejected request' });
+                    }
                 } catch (e) {
-                    resolve(false);
+                    console.error("[SpeedSMS] ❌ Lỗi phân tích phản hồi JSON:", e.message);
+                    resolve({ success: false, error: 'Invalid JSON response from SpeedSMS' });
                 }
             });
         });
 
         req.on('error', (e) => {
-            console.error("[SpeedSMS] Request error:", e.message);
-            resolve(false);
+            console.error("[SpeedSMS] ❌ Lỗi kết nối HTTP:", e.message);
+            resolve({ success: false, error: e.message });
         });
 
         req.write(postData);
@@ -117,7 +128,12 @@ const sendSms = (phone, content, senderId = "") => {
     });
 };
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', db: !!dbUrl }));
+app.get('/api/health', (req, res) => res.json({ 
+    status: 'ok', 
+    db: !!dbUrl, 
+    speedsms_configured: !!process.env.SPEEDSMS_API_KEY,
+    email_configured: !!process.env.EMAIL_USER
+}));
 
 app.post('/api/admin/login', async (req, res) => {
     const { username, password } = req.body;
@@ -134,30 +150,38 @@ app.post('/api/admin/send-otp', async (req, res) => {
     const { email, phone, otp, senderId } = req.body;
     const content = `Ma xac thuc Sigma Vie cua ban la: ${otp}. Vui long khong cung cap ma nay cho bat ky ai.`;
 
-    console.log(`[OTP] Sending to Phone: ${phone}, Email: ${email}`);
+    console.log(`[OTP Engine] 🔔 Yêu cầu OTP cho SĐT: ${phone} | Email: ${email}`);
 
-    // Chạy song song cả SMS và Email để tăng độ tin cậy
+    // Gửi SMS (Chạy async)
     const smsPromise = sendSms(phone, content, senderId);
-    const emailPromise = process.env.EMAIL_USER ? transporter.sendMail({
+    
+    // Gửi Email (Chạy async)
+    let emailSent = false;
+    const emailPromise = (process.env.EMAIL_USER && process.env.EMAIL_PASS) ? transporter.sendMail({
         from: `"Sigma Vie Security" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: `[OTP] Mã xác thực đăng nhập: ${otp}`,
+        text: content,
         html: `<div style="font-family:sans-serif; padding:30px; background:#f9f9f9; text-align:center;">
-                <div style="background:white; padding:40px; border-radius:20px; display:inline-block; border:1px solid #eee;">
-                    <h2 style="margin-top:0; color:#111827;">Mã xác thực Quản trị</h2>
-                    <p style="color:#666;">Dùng mã dưới đây để truy cập hệ thống Sigma Vie:</p>
-                    <div style="font-size:40px; font-weight:900; letter-spacing:10px; color:#D4AF37; margin:30px 0;">${otp}</div>
-                    <p style="font-size:12px; color:#999;">Mã có hiệu lực trong 5 phút. Nếu không phải bạn yêu cầu, hãy đổi mật khẩu ngay.</p>
+                <div style="background:white; padding:40px; border-radius:20px; border:1px solid #eee; display:inline-block;">
+                    <h2 style="color:#111827;">Mã xác thực Admin</h2>
+                    <p style="color:#666;">Dùng mã dưới đây để vào trang Quản trị:</p>
+                    <div style="font-size:40px; font-weight:900; color:#D4AF37; margin:30px 0; letter-spacing:10px;">${otp}</div>
+                    <p style="font-size:12px; color:#999;">Mã có hiệu lực trong 5 phút. Nếu không phải bạn yêu cầu, hãy kiểm tra lại bảo mật.</p>
                 </div>
                </div>`
-    }).catch(e => { console.error("Email Error:", e.message); return null; }) : Promise.resolve(null);
+    }).then(() => { emailSent = true; console.log("[Email] ✅ Đã gửi OTP thành công."); })
+      .catch(e => console.error("[Email] ❌ Lỗi gửi mail:", e.message))
+    : Promise.resolve();
 
-    const [smsOk, emailRes] = await Promise.all([smsPromise, emailPromise]);
+    // Chờ cả hai hoàn thành hoặc lỗi
+    const [smsResult] = await Promise.all([smsPromise, emailPromise]);
 
+    // Luôn trả về success: true để UI chuyển sang trang nhập OTP (tránh bị kẹt ở Login)
     res.json({ 
         success: true, 
-        sms_sent: smsOk,
-        email_sent: !!emailRes
+        sms_details: smsResult,
+        email_sent: emailSent
     });
 });
 
